@@ -1,0 +1,149 @@
+---
+/**
+ * UI POR DEFECTO del módulo de cotización. OPCIONAL y mínima a propósito:
+ * sirve para arrancar un sitio rápido. Para un diseño propio, cada sitio
+ * escribe su propio formulario llamando a `enviarCotizacion` de
+ * "@crea/core/cotizacion" — el motor no cambia.
+ *
+ * Requiere que la página haya cargado el script de Turnstile:
+ *   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+ */
+import { HONEYPOT_FIELD } from "../index";
+
+interface Props {
+  categorias: { id: string; label: string }[];
+  turnstileSiteKey: string;
+  rutaPolitica?: string;
+  endpoint?: string;
+}
+
+const {
+  categorias,
+  turnstileSiteKey,
+  rutaPolitica = "/politica-de-privacidad",
+  endpoint = "/api/quote",
+} = Astro.props;
+---
+
+<form class="cot-form" data-endpoint={endpoint} novalidate>
+  <label class="cot-campo">
+    <span>Nombre</span>
+    <input type="text" name="nombre" required />
+    <small data-error="nombre"></small>
+  </label>
+
+  <label class="cot-campo">
+    <span>Correo</span>
+    <input type="email" name="email" required />
+    <small data-error="email"></small>
+  </label>
+
+  <label class="cot-campo">
+    <span>Teléfono (opcional)</span>
+    <input type="tel" name="telefono" />
+    <small data-error="telefono"></small>
+  </label>
+
+  <label class="cot-campo">
+    <span>Categoría</span>
+    <select name="categoria" required>
+      <option value="">Selecciona…</option>
+      {categorias.map((c) => <option value={c.id}>{c.label}</option>)}
+    </select>
+    <small data-error="categoria"></small>
+  </label>
+
+  <label class="cot-campo">
+    <span>¿Qué necesitas?</span>
+    <textarea name="descripcion" rows="4" required></textarea>
+    <small data-error="descripcion"></small>
+  </label>
+
+  <label class="cot-politica">
+    <input type="checkbox" name="aceptaPolitica" required />
+    <span>Acepto la <a href={rutaPolitica}>política de privacidad</a>.</span>
+    <small data-error="aceptaPolitica"></small>
+  </label>
+
+  {/* Campo trampa anti-bot: fuera de pantalla, nunca display:none. */}
+  <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">
+    <label>No llenar
+      <input type="text" name={HONEYPOT_FIELD} tabindex="-1" autocomplete="off" />
+    </label>
+  </div>
+
+  <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+  <small data-error="turnstileToken"></small>
+
+  <button type="submit">Enviar solicitud</button>
+  <p class="cot-estado" data-estado role="status" aria-live="polite"></p>
+</form>
+
+<script>
+  import { enviarCotizacion, type DatosCotizacionCliente } from "../index";
+
+  function initFormularios() {
+    const forms = document.querySelectorAll<HTMLFormElement>(".cot-form");
+    forms.forEach((form) => {
+      if (form.dataset.listo) return;
+      form.dataset.listo = "1";
+
+      const estado = form.querySelector<HTMLElement>("[data-estado]");
+      const boton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+
+      const limpiarErrores = () => {
+        form.querySelectorAll<HTMLElement>("[data-error]").forEach((el) => {
+          el.textContent = "";
+        });
+      };
+
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        limpiarErrores();
+        if (estado) estado.textContent = "";
+
+        const fd = new FormData(form);
+        const tokenInput = form.querySelector<HTMLInputElement>(
+          'input[name="cf-turnstile-response"]'
+        );
+
+        const datos: DatosCotizacionCliente = {
+          nombre: String(fd.get("nombre") ?? ""),
+          email: String(fd.get("email") ?? ""),
+          telefono: String(fd.get("telefono") ?? ""),
+          categoria: String(fd.get("categoria") ?? ""),
+          descripcion: String(fd.get("descripcion") ?? ""),
+          aceptaPolitica: fd.get("aceptaPolitica") === "on",
+          turnstileToken: tokenInput?.value ?? "",
+        };
+        // Incluimos el campo trampa con su nombre real.
+        const trampa = form.querySelector<HTMLInputElement>(
+          'input[name="sitio_web"]'
+        );
+        if (trampa) datos[trampa.name] = trampa.value;
+
+        if (boton) boton.disabled = true;
+        const endpoint = form.dataset.endpoint || "/api/quote";
+        const r = await enviarCotizacion(datos, { endpoint });
+        if (boton) boton.disabled = false;
+
+        if (r.ok) {
+          form.reset();
+          if (estado) estado.textContent = "¡Solicitud enviada! Te contactaremos pronto.";
+          return;
+        }
+
+        if (r.fieldErrors) {
+          for (const [campo, mensajes] of Object.entries(r.fieldErrors)) {
+            const el = form.querySelector<HTMLElement>(`[data-error="${campo}"]`);
+            if (el && mensajes?.length) el.textContent = mensajes[0];
+          }
+        }
+        if (estado) estado.textContent = r.message ?? "No se pudo enviar.";
+      });
+    });
+  }
+
+  initFormularios();
+  document.addEventListener("astro:page-load", initFormularios);
+</script>
