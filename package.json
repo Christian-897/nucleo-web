@@ -21,6 +21,6 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts"
+    "test": "tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts"
   }
 }

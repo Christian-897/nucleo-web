@@ -4,3 +4,4 @@
  */
 export * as cotizacion from "./modulos/cotizacion/index";
 export * as carrito from "./modulos/carrito/index";
+export * as pago from "./modulos/pago/index";
