@@ -1,32 +1,32 @@
 /**
- * Punto de entrada del módulo pago (Flow). Un sitio importa desde aquí:
+ * Módulo pago: Flow + Mercado Pago bajo una misma interfaz.
  *
- *   import {
- *     crearEndpointIniciarPago,
- *     crearEndpointConfirmacion,
- *     crearEndpointEstado,
- *     irAPagar,
- *     type ConfigPago,
- *   } from "nucleo-web/pago";
+ *   import { crearEndpointsPago, irAPagar, ErrorPedido, type ConfigPago } from "nucleo-web/pago";
  */
+export * from "./tipos";
 export * from "./config";
+export { crearEndpointsPago } from "./endpoint";
+export {
+  iniciarPago,
+  aplicarResultado,
+  webhookFlow,
+  webhookMercadoPago,
+  consultarEstado,
+} from "./servidor";
+export { irAPagar, destinoPermitido, type ResultadoIniciarPago } from "./cliente";
 export {
   firmarFlow,
-  crearPagoFlow,
-  obtenerEstadoFlow,
+  crearCobroFlow,
+  consultarCobroFlow,
+  estadoDesdeFlow,
   baseUrlFlow,
-  nombreEstado,
-  ESTADO_FLOW,
   type CredencialesFlow,
-  type DatosPagoFlow,
-  type RespuestaCrearPago,
-  type EstadoPagoFlow,
-  type EstadoFlow,
-} from "./flow";
-export { iniciarPago, confirmarPago, consultarEstado } from "./servidor";
+} from "./proveedores/flow";
 export {
-  crearEndpointIniciarPago,
-  crearEndpointConfirmacion,
-  crearEndpointEstado,
-} from "./endpoint";
-export { irAPagar, type ResultadoIniciarPago } from "./cliente";
+  crearCobroMercadoPago,
+  consultarCobroMercadoPago,
+  estadoDesdeMercadoPago,
+  verificarFirmaMercadoPago,
+  manifiestoMercadoPago,
+  parsearXSignature,
+} from "./proveedores/mercadopago";

@@ -25,6 +25,8 @@ nucleo-web/
     validar.ts       # honeypot, escapeHtml, normalizeInput, helpers de zod
     seguridad.ts     # Turnstile, rate limit, same-origin, jsonResponse
     correo.ts        # envío por Resend (modo demo si falta la clave)
+    cripto.ts        # HMAC-SHA256, comparación en tiempo constante, ids aleatorios
+    red.ts           # fetch con tiempo límite
   modulos/
     cotizacion/      # 1er módulo — ver su README
       servidor.ts  endpoint.ts  cliente.ts  esquema.ts
@@ -63,5 +65,5 @@ npm test            # corre las pruebas del módulo
 
 - **cotizacion** — formulario de presupuesto. (listo)
 - **carrito** — carrito de compra con validación de precio/stock en servidor. (listo)
-- **pago** — cobro con Flow (link de pago + webhook de confirmación). (listo)
+- **pago** — cobro con Flow y Mercado Pago, verificación de monto, firma de webhooks e idempotencia. (listo)
 - _por venir:_ resenas, auth, despacho, catalogo, pedidos.
