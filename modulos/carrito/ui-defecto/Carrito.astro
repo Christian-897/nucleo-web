@@ -1,0 +1,78 @@
+---
+/**
+ * Panel del carrito por defecto. OPCIONAL y mínimo, sin estilos propios:
+ * lista los ítems, deja cambiar/quitar, muestra el total y un botón que
+ * valida contra el servidor. El cobro real lo conectará el módulo `pago`.
+ * Para un diseño propio, se ignora y se arma otro llamando a
+ * `obtenerCarrito()` de "nucleo-web/carrito".
+ */
+interface Props {
+  endpoint?: string;
+}
+const { endpoint = "/api/carrito" } = Astro.props;
+---
+
+<div class="carrito" data-endpoint={endpoint}>
+  <ul class="carrito-lista" data-lista></ul>
+  <p class="carrito-total" data-total></p>
+  <button class="carrito-pagar" type="button" data-pagar>Ir a pagar</button>
+  <p class="carrito-mensaje" data-mensaje role="status" aria-live="polite"></p>
+</div>
+
+<script>
+  import { obtenerCarrito, formatearPrecio } from "../index";
+  import type { ItemCarrito } from "../index";
+
+  function init() {
+    const cont = document.querySelector<HTMLElement>(".carrito");
+    if (!cont || cont.dataset.listo) return;
+    cont.dataset.listo = "1";
+
+    const carrito = obtenerCarrito({ endpoint: cont.dataset.endpoint });
+    const lista = cont.querySelector<HTMLUListElement>("[data-lista]");
+    const totalEl = cont.querySelector<HTMLElement>("[data-total]");
+    const mensaje = cont.querySelector<HTMLElement>("[data-mensaje]");
+    const pagar = cont.querySelector<HTMLButtonElement>("[data-pagar]");
+
+    carrito.suscribir((items: ItemCarrito[]) => {
+      if (!lista || !totalEl) return;
+      lista.innerHTML = "";
+      items.forEach((i) => {
+        const li = document.createElement("li");
+        const texto = document.createElement("span");
+        texto.textContent = `${i.nombre} × ${i.cantidad} — ${formatearPrecio(
+          i.precio * i.cantidad
+        )}`;
+        const quitar = document.createElement("button");
+        quitar.type = "button";
+        quitar.textContent = "Quitar";
+        quitar.addEventListener("click", () => carrito.quitar(i.productoId));
+        li.appendChild(texto);
+        li.appendChild(quitar);
+        lista.appendChild(li);
+      });
+      totalEl.textContent = items.length
+        ? "Total: " + formatearPrecio(carrito.totalLocal())
+        : "Tu carrito está vacío.";
+    });
+
+    pagar?.addEventListener("click", async () => {
+      if (mensaje) mensaje.textContent = "Validando…";
+      const r = await carrito.validar();
+      if (!mensaje) return;
+      if (r.listoParaPagar) {
+        mensaje.textContent =
+          "Listo para pagar: " +
+          formatearPrecio(r.total) +
+          " · (aquí se conecta el módulo de pago)";
+      } else if (r.problemas.length) {
+        mensaje.textContent = r.problemas.map((p) => p.mensaje).join(" ");
+      } else {
+        mensaje.textContent = "Tu carrito está vacío.";
+      }
+    });
+  }
+
+  init();
+  document.addEventListener("astro:page-load", init);
+</script>

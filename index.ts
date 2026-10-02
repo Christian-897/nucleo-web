@@ -3,3 +3,4 @@
  * (`nucleo-web/cotizacion`), pero este barril reexporta lo disponible.
  */
 export * as cotizacion from "./modulos/cotizacion/index";
+export * as carrito from "./modulos/carrito/index";

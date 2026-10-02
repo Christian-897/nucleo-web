@@ -62,4 +62,5 @@ npm test            # corre las pruebas del módulo
 ## Módulos
 
 - **cotizacion** — formulario de presupuesto. (listo)
-- _por venir:_ resenas, auth, carrito, pago, despacho, catalogo, pedidos.
+- **carrito** — carrito de compra con validación de precio/stock en servidor. (listo)
+- _por venir:_ pago (Flow), resenas, auth, despacho, catalogo, pedidos.

@@ -1,0 +1,47 @@
+---
+/**
+ * Botón "Agregar al carrito" por defecto. OPCIONAL y mínimo. Para un diseño
+ * propio, cada sitio hace su botón y llama a `obtenerCarrito().agregar(...)`.
+ */
+interface Props {
+  producto: { id: string; nombre: string; precio: number; imagen?: string };
+  etiqueta?: string;
+}
+const { producto, etiqueta = "Agregar al carrito" } = Astro.props;
+---
+
+<button
+  class="carrito-agregar"
+  type="button"
+  data-id={producto.id}
+  data-nombre={producto.nombre}
+  data-precio={producto.precio}
+  data-imagen={producto.imagen ?? ""}
+>
+  {etiqueta}
+</button>
+
+<script>
+  import { obtenerCarrito } from "../index";
+
+  function init() {
+    const carrito = obtenerCarrito();
+    document
+      .querySelectorAll<HTMLButtonElement>(".carrito-agregar")
+      .forEach((btn) => {
+        if (btn.dataset.listo) return;
+        btn.dataset.listo = "1";
+        btn.addEventListener("click", () => {
+          carrito.agregar({
+            productoId: btn.dataset.id || "",
+            nombre: btn.dataset.nombre || "",
+            precio: Number(btn.dataset.precio) || 0,
+            imagen: btn.dataset.imagen || undefined,
+          });
+        });
+      });
+  }
+
+  init();
+  document.addEventListener("astro:page-load", init);
+</script>
