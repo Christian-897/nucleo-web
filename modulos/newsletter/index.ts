@@ -15,6 +15,8 @@ export {
   codificarEmail,
   decodificarEmail,
   celdaCsv,
+  listarActivos,
+  respuestaCsv,
   type Suscriptor,
 } from "./servidor";
 export { suscribirNewsletter, confirmarNewsletter, bajaNewsletter, type ResultadoNewsletter } from "./cliente";

@@ -8,6 +8,7 @@ import { crearCatalogo, ErrorCatalogo, productoDisponible } from "../modulos/cat
 import { crearConfigPagoCompra, crearEndpointsCompra, validarComprador } from "../modulos/compra/index";
 import { necesitaDespacho } from "../modulos/compra/cliente";
 import { aplicarResultado } from "../modulos/pago/servidor";
+import { productosDeLista, imagenSegura, idDeRuta, crearCatalogoEditable, crearSitemap } from "../modulos/catalogo/index";
 import type { EnvPago } from "../modulos/pago/config";
 
 let pasaron = 0;
@@ -176,6 +177,61 @@ async function run() {
   await prueba("el cliente pide dirección si no conoce el tipo de un producto", () => {
     assert.equal(necesitaDespacho([{ productoId: "curso" }], { curso: "digital" }), false);
     assert.equal(necesitaDespacho([{ productoId: "raro" }], { curso: "digital" }), true);
+  });
+
+  console.log("Catálogo en el borde:");
+
+  await prueba("filtros de listas: todos, destacados, categoría y relacionados sin el propio", () => {
+    const c = crearCatalogo(
+      [
+        { id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", destacado: true },
+        { id: "b", nombre: "B", precio: 1, categoria: "x", tipo: "fisico" },
+        { id: "c", nombre: "C", precio: 1, categoria: "y", tipo: "digital" },
+      ],
+      [{ id: "x", nombre: "X" }, { id: "y", nombre: "Y" }]
+    );
+    assert.equal(productosDeLista(c, "todos").length, 3);
+    assert.deepEqual(productosDeLista(c, "destacados").map((p) => p.id), ["a"]);
+    const c2 = crearCatalogo(
+      [
+        { id: "viejo", nombre: "V", precio: 1, categoria: "x", tipo: "fisico", destacado: true },
+        { id: "nuevo", nombre: "N", precio: 1, categoria: "x", tipo: "fisico", destacado: true },
+      ],
+      [{ id: "x", nombre: "X" }]
+    );
+    assert.deepEqual(productosDeLista(c2, "destacados").map((p) => p.id), ["nuevo", "viejo"], "lo recién agregado primero");
+    assert.deepEqual(productosDeLista(c, "categoria:y").map((p) => p.id), ["c"]);
+    assert.deepEqual(productosDeLista(c, "relacionados:x:a").map((p) => p.id), ["b"]);
+    assert.deepEqual(productosDeLista(c, "inventado"), []);
+  });
+
+  await prueba("imágenes: solo /media/ o /img/ propias; nada de javascript:, otros dominios ni '..'", () => {
+    const d = "/img/defecto.png";
+    assert.equal(imagenSegura("/media/producto-a-0123456789ab", d), "/media/producto-a-0123456789ab");
+    assert.equal(imagenSegura("javascript:alert(1)", d), d);
+    assert.equal(imagenSegura("https://malo.com/x.png", d), d);
+    assert.equal(imagenSegura("//malo.com/x.png", d), d);
+    assert.equal(imagenSegura("/img/../admin", d), d);
+    assert.equal(imagenSegura('/img/a.png" onerror="x', d), d);
+  });
+
+  await prueba("ficha: solo direcciones de producto válidas", () => {
+    assert.equal(idDeRuta("/producto/gatito/"), "gatito");
+    assert.equal(idDeRuta("/producto/gatito"), "gatito");
+    assert.equal(idDeRuta("/producto/../admin/"), null);
+    assert.equal(idDeRuta("/producto/Gatito<script>/"), null);
+  });
+
+  await prueba("sitemap con el catálogo editado (y escapado)", async () => {
+    const { env } = entorno();
+    const fuente = crearCatalogoEditable([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico" }], [{ id: "x", nombre: "X" }]);
+    await fuente.guardar(env, [
+      { id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico" },
+      { id: "nuevo", nombre: "N", precio: 1, categoria: "x", tipo: "fisico" },
+    ]);
+    const xml = await (await crearSitemap(fuente, { dominio: "https://t.cl", rutasFijas: ["/"] }).onRequestGet({ env })).text();
+    assert.match(xml, /https:\/\/t\.cl\/producto\/nuevo\//);
+    assert.match(xml, /https:\/\/t\.cl\/tienda\/x\//);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

@@ -1,0 +1,394 @@
+---
+/**
+ * Pantalla del panel, lista para usar en cualquier sitio:
+ *
+ *   ---  // src/pages/admin/index.astro
+ *   import PanelAdmin from "nucleo-web/panel/PanelAdmin.astro";
+ *   ---
+ *   <PanelAdmin nombre="Mi Tienda" logo="/img/logo.png" />
+ *
+ * Toma los colores del sitio con variables CSS (--pa-acento, etc.). Toda
+ * la lógica vive en panel-app.ts y en el cliente del módulo. Cumple la CSP
+ * del panel: sin estilos ni scripts en línea, nada externo.
+ */
+interface Props {
+  nombre: string;
+  logo?: string;
+  /** Dirección pública de la tienda, para el botón "Ver tienda". */
+  tienda?: string;
+  /** Cuántos destacados muestra el inicio (para avisarlo en el panel). */
+  maxDestacados?: number;
+  /** Colores (hex). Por defecto un rosado sobrio. */
+  colores?: { acento?: string; acentoOscuro?: string; fondo?: string; tinta?: string };
+}
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados } = Astro.props;
+const COLOR = /^#[0-9a-fA-F]{3,8}$/;
+const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
+const tema = {
+  acento: c(colores.acento, "#C2185B"),
+  acentoOscuro: c(colores.acentoOscuro, "#9C1449"),
+  fondo: c(colores.fondo, "#FBF7F9"),
+  tinta: c(colores.tinta, "#221A1F"),
+};
+---
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Panel | {nombre}</title>
+  <link rel="icon" href={logo ?? "/favicon.ico"} />
+</head>
+<body class="pa-cuerpo">
+<div
+  class="pa"
+  data-panel
+  data-nombre={nombre}
+  data-acento={tema.acento}
+  data-acento-oscuro={tema.acentoOscuro}
+  data-fondo={tema.fondo}
+  data-tinta={tema.tinta}
+  data-max-destacados={maxDestacados}
+>
+  <a class="pa-saltar" href="#pa-principal">Saltar al contenido</a>
+
+  <header class="pa-cabecera" data-solo-sesion hidden>
+    <div class="pa-marca">
+      {logo && <img src={logo} alt="" width="40" height="40" />}
+      <span><strong>{nombre}</strong><small>Panel de administración</small></span>
+    </div>
+    <nav class="pa-pestanas" aria-label="Secciones">
+      <button type="button" data-tab="productos" aria-current="page">Productos</button>
+      <button type="button" data-tab="pedidos">Pedidos</button>
+      <button type="button" data-tab="suscriptores">Suscriptores</button>
+      <button type="button" data-tab="seguridad">Seguridad</button>
+    </nav>
+    <div class="pa-acciones">
+      <a class="pa-boton pa-boton--suave" href={tienda} target="_blank" rel="noopener">Ver tienda ↗</a>
+      <button class="pa-boton pa-boton--suave" type="button" data-salir>Salir</button>
+    </div>
+  </header>
+
+  <main id="pa-principal" class="pa-principal">
+    <!-- ───────────── acceso ───────────── -->
+    <section class="pa-vista pa-centro" data-vista="cargando" aria-live="polite">
+      <p class="pa-tenue">Cargando el panel…</p>
+    </section>
+
+    <section class="pa-vista pa-centro" data-vista="no-disponible" hidden>
+      <div class="pa-caja">
+        <h1>El panel no está disponible</h1>
+        <p data-no-disponible-texto>Falta configuración en el servidor.</p>
+      </div>
+    </section>
+
+    <section class="pa-vista pa-centro" data-vista="instalar" hidden>
+      <form class="pa-caja" data-form="instalar" novalidate>
+        {logo && <img class="pa-logo-grande" src={logo} alt="" width="96" height="96" />}
+        <h1>Crear tu usuario</h1>
+        <p class="pa-tenue">Esto se hace una sola vez. Guarda tu contraseña en un lugar seguro.</p>
+        <label class="pa-campo">Usuario<input name="usuario" autocomplete="username" required minlength="3" maxlength="40" /></label>
+        <label class="pa-campo">Contraseña (mínimo 10 caracteres)<input name="clave" type="password" autocomplete="new-password" required minlength="10" /></label>
+        <label class="pa-campo">Repite la contraseña<input name="repetir" type="password" autocomplete="new-password" required /></label>
+        <label class="pa-campo">Clave de instalación<input name="claveInstalacion" type="password" autocomplete="off" required /></label>
+        <p class="pa-error" role="alert" data-error></p>
+        <button class="pa-boton" type="submit">Crear usuario</button>
+      </form>
+    </section>
+
+    <section class="pa-vista pa-centro" data-vista="entrar" hidden>
+      <form class="pa-caja" data-form="entrar" novalidate>
+        {logo && <img class="pa-logo-grande" src={logo} alt="" width="96" height="96" />}
+        <h1>Entrar al panel</h1>
+        <p class="pa-aviso" data-aviso-entrar hidden></p>
+        <label class="pa-campo">Usuario<input name="usuario" autocomplete="username" required /></label>
+        <label class="pa-campo">Contraseña<input name="clave" type="password" autocomplete="current-password" required /></label>
+        <p class="pa-error" role="alert" data-error></p>
+        <button class="pa-boton" type="submit">Entrar</button>
+      </form>
+    </section>
+
+    <section class="pa-vista pa-centro" data-vista="codigo" hidden>
+      <form class="pa-caja" data-form="codigo" novalidate>
+        <h1>Código de verificación</h1>
+        <p class="pa-tenue">Escribe los 6 dígitos de tu app autenticadora, o uno de tus códigos de respaldo.</p>
+        <label class="pa-campo">Código<input name="codigo" inputmode="numeric" autocomplete="one-time-code" required maxlength="11" /></label>
+        <p class="pa-error" role="alert" data-error></p>
+        <button class="pa-boton" type="submit">Verificar</button>
+        <button class="pa-enlace" type="button" data-volver-entrar>Volver</button>
+      </form>
+    </section>
+
+    <!-- ───────────── productos ───────────── -->
+    <section class="pa-vista" data-vista="productos" hidden>
+      <div class="pa-titulo">
+        <h1>Productos</h1>
+        <button class="pa-boton" type="button" data-nuevo-producto>+ Nuevo producto</button>
+      </div>
+      <div class="pa-filtros">
+        <label class="pa-campo pa-campo--fila">Buscar<input type="search" data-buscar-producto placeholder="Nombre…" /></label>
+        <label class="pa-campo pa-campo--fila">Categoría<select data-filtro-categoria><option value="">Todas</option></select></label>
+      </div>
+      <p class="pa-tenue" data-resumen-productos></p>
+      <ul class="pa-lista" data-lista-productos aria-live="polite"></ul>
+    </section>
+
+    <!-- ───────────── pedidos ───────────── -->
+    <section class="pa-vista" data-vista="pedidos" hidden>
+      <div class="pa-titulo">
+        <h1>Pedidos</h1>
+        <label class="pa-casilla"><input type="checkbox" data-pedidos-todos /> Ver también los no pagados</label>
+      </div>
+      <p class="pa-tenue" data-resumen-pedidos></p>
+      <ul class="pa-lista" data-lista-pedidos aria-live="polite"></ul>
+    </section>
+
+    <!-- ───────────── suscriptores ───────────── -->
+    <section class="pa-vista" data-vista="suscriptores" hidden>
+      <div class="pa-titulo"><h1>Suscriptores del newsletter</h1></div>
+      <div class="pa-caja pa-caja--ancha">
+        <p class="pa-numero" data-total-suscriptores>—</p>
+        <p class="pa-tenue">personas confirmaron su suscripción.</p>
+        <button class="pa-boton" type="button" data-descargar-csv>Descargar lista (CSV)</button>
+        <p class="pa-tenue pa-chico">Ábrela en Excel o súbela a tu herramienta de correos. Cada envío debe incluir el enlace para darse de baja.</p>
+      </div>
+    </section>
+
+    <!-- ───────────── seguridad ───────────── -->
+    <section class="pa-vista" data-vista="seguridad" hidden>
+      <div class="pa-titulo"><h1>Seguridad</h1></div>
+
+      <div class="pa-caja pa-caja--ancha">
+        <h2>Doble factor</h2>
+        <p data-estado-2fa class="pa-tenue">—</p>
+        <div data-2fa-apagado hidden>
+          <p>Con el doble factor, además de tu contraseña se pide un código de tu teléfono. Es la mejor protección para tu tienda.</p>
+          <button class="pa-boton" type="button" data-2fa-proponer>Activar doble factor</button>
+          <div data-2fa-propuesta hidden class="pa-propuesta">
+            <ol>
+              <li>Instala una app autenticadora (Google Authenticator, Microsoft Authenticator o similar).</li>
+              <li>Escanea este código con la app:</li>
+            </ol>
+            <img data-2fa-qr alt="Código QR para configurar el doble factor" width="200" height="200" />
+            <p class="pa-tenue pa-chico">¿No puedes escanear? Escribe esta clave en la app: <code data-2fa-secreto></code></p>
+            <form data-form="2fa-activar" novalidate>
+              <label class="pa-campo">Escribe el código de 6 dígitos que muestra la app<input name="codigo" inputmode="numeric" maxlength="6" required /></label>
+              <p class="pa-error" role="alert" data-error></p>
+              <button class="pa-boton" type="submit">Confirmar y activar</button>
+            </form>
+          </div>
+        </div>
+        <div data-2fa-encendido hidden>
+          <form data-form="2fa-respaldos" class="pa-en-linea" novalidate>
+            <label class="pa-campo">Código actual<input name="codigo" inputmode="numeric" maxlength="11" required /></label>
+            <button class="pa-boton pa-boton--suave" type="submit">Generar códigos de respaldo nuevos</button>
+            <p class="pa-error" role="alert" data-error></p>
+          </form>
+          <details class="pa-detalles">
+            <summary>Desactivar el doble factor</summary>
+            <form data-form="2fa-desactivar" novalidate>
+              <label class="pa-campo">Tu contraseña<input name="clave" type="password" autocomplete="current-password" required /></label>
+              <label class="pa-campo">Código actual<input name="codigo" inputmode="numeric" maxlength="11" required /></label>
+              <p class="pa-error" role="alert" data-error></p>
+              <button class="pa-boton pa-boton--peligro" type="submit">Desactivar</button>
+            </form>
+          </details>
+        </div>
+        <div data-respaldos hidden class="pa-respaldos">
+          <p><strong>Guarda estos códigos de respaldo.</strong> Cada uno sirve una sola vez si pierdes tu teléfono. No se volverán a mostrar.</p>
+          <ul data-lista-respaldos></ul>
+          <button class="pa-boton" type="button" data-respaldos-listo>Ya los guardé</button>
+        </div>
+      </div>
+
+      <div class="pa-caja pa-caja--ancha">
+        <h2>Cambiar contraseña</h2>
+        <form data-form="clave" novalidate>
+          <label class="pa-campo">Contraseña actual<input name="actual" type="password" autocomplete="current-password" required /></label>
+          <label class="pa-campo">Contraseña nueva (mínimo 10 caracteres)<input name="nueva" type="password" autocomplete="new-password" required minlength="10" /></label>
+          <label class="pa-campo">Repite la nueva<input name="repetir" type="password" autocomplete="new-password" required /></label>
+          <label class="pa-campo" data-si-2fa hidden>Código de tu app<input name="codigo" inputmode="numeric" maxlength="11" /></label>
+          <p class="pa-error" role="alert" data-error></p>
+          <button class="pa-boton" type="submit">Cambiar contraseña</button>
+        </form>
+      </div>
+
+      <div class="pa-caja pa-caja--ancha">
+        <h2>Cierre por inactividad</h2>
+        <p class="pa-tenue">Si nadie usa el panel durante este tiempo, la sesión se cierra sola.</p>
+        <label class="pa-campo pa-campo--fila">Cerrar la sesión después de
+          <select data-inactividad></select>
+        </label>
+      </div>
+    </section>
+  </main>
+
+  <!-- editor de producto -->
+  <dialog class="pa-dialogo" data-editor aria-labelledby="pa-editor-titulo">
+    <form data-form="producto" novalidate>
+      <h2 id="pa-editor-titulo" data-editor-titulo>Producto</h2>
+      <div class="pa-editor">
+        <div class="pa-editor__foto">
+          <img data-editor-foto alt="" width="240" height="240" />
+          <label class="pa-boton pa-boton--suave pa-archivo">
+            Elegir foto
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-editor-archivo />
+          </label>
+          <p class="pa-tenue pa-chico">Se recorta cuadrada al centro y se achica sola.</p>
+          <p class="pa-error" role="alert" data-error-foto></p>
+        </div>
+        <div class="pa-editor__campos">
+          <label class="pa-campo">Nombre<input name="nombre" maxlength="80" required /></label>
+          <p class="pa-error" data-error-campo="nombre"></p>
+          <div class="pa-dos">
+            <label class="pa-campo">Precio (CLP)<input name="precio" inputmode="numeric" required /></label>
+            <label class="pa-campo">Disponible<input name="disponible" inputmode="numeric" placeholder="Sin límite" /></label>
+          </div>
+          <p class="pa-error" data-error-campo="precio"></p>
+          <p class="pa-error" data-error-campo="disponible"></p>
+          <label class="pa-campo">Categoría<select name="categoria" data-editor-categorias required></select></label>
+          <p class="pa-error" data-error-campo="categoria"></p>
+          <fieldset class="pa-opciones">
+            <legend>Tipo</legend>
+            <label class="pa-casilla"><input type="radio" name="tipo" value="fisico" /> Físico (se despacha)</label>
+            <label class="pa-casilla"><input type="radio" name="tipo" value="digital" /> Digital (curso o patrón por correo)</label>
+          </fieldset>
+          <p class="pa-error" data-error-campo="tipo"></p>
+          <label class="pa-campo">Descripción<textarea name="descripcion" rows="4" maxlength="1000"></textarea></label>
+          <p class="pa-error" data-error-campo="descripcion"></p>
+          <label class="pa-casilla"><input type="checkbox" name="destacado" /> Mostrar en "Productos destacados" del inicio</label>
+        </div>
+      </div>
+      <p class="pa-error" role="alert" data-error></p>
+      <div class="pa-pie-dialogo">
+        <button class="pa-boton pa-boton--suave" type="button" data-cerrar-editor>Cancelar</button>
+        <button class="pa-boton" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- aviso de inactividad -->
+  <dialog class="pa-dialogo pa-dialogo--chico" data-aviso-inactividad>
+    <h2>¿Sigues ahí?</h2>
+    <p>Por seguridad, la sesión se cerrará en un minuto.</p>
+    <button class="pa-boton" type="button" data-seguir>Seguir trabajando</button>
+  </dialog>
+
+  <div class="pa-toast" role="status" aria-live="polite" data-toast hidden></div>
+</div>
+</body>
+</html>
+
+<style is:global>
+  .pa-cuerpo { margin: 0; background: #fbf7f9; color: #221a1f; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 16px; line-height: 1.5; }
+  .pa { --pa-acento: #c2185b; --pa-acento-oscuro: #9c1449; --pa-fondo: #fbf7f9; --pa-tinta: #221a1f; --pa-suave: #6e5f68; --pa-borde: #eadfe4; --pa-error: #b3261e; --pa-ok: #2f7a52; min-height: 100vh; background: var(--pa-fondo); color: var(--pa-tinta); }
+  .pa *, .pa *::before, .pa *::after { box-sizing: border-box; }
+  .pa [hidden] { display: none !important; }
+  .pa :focus-visible { outline: 3px solid var(--pa-acento); outline-offset: 2px; }
+  .pa h1 { font-size: 1.6rem; margin: 0; }
+  .pa h2 { font-size: 1.15rem; margin: 0 0 8px; }
+  .pa-saltar { position: absolute; left: -9999px; }
+  .pa-saltar:focus { left: 12px; top: 12px; background: #fff; padding: 8px 12px; z-index: 10; }
+  .pa-tenue { color: var(--pa-suave); }
+  .pa-chico { font-size: .85rem; }
+
+  .pa-cabecera { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 20px; background: #fff; border-bottom: 1px solid var(--pa-borde); position: sticky; top: 0; z-index: 5; }
+  .pa-marca { display: flex; align-items: center; gap: 10px; }
+  .pa-marca img { border-radius: 50%; }
+  .pa-marca span { display: grid; line-height: 1.2; }
+  .pa-marca small { color: var(--pa-suave); font-size: .78rem; }
+  .pa-pestanas { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+  .pa-pestanas button { border: 0; background: none; padding: 8px 12px; border-radius: 999px; font: inherit; font-weight: 600; color: var(--pa-tinta); cursor: pointer; }
+  .pa-pestanas button[aria-current="page"] { background: var(--pa-acento); color: #fff; }
+  .pa-acciones { display: flex; gap: 8px; }
+
+  .pa-principal { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+  .pa-centro { display: grid; place-items: center; min-height: 80vh; }
+  .pa-caja { background: #fff; border: 1px solid var(--pa-borde); border-radius: 16px; padding: 24px; width: min(100%, 420px); display: grid; gap: 12px; }
+  .pa-caja--ancha { width: 100%; margin-bottom: 16px; }
+  .pa-logo-grande { width: 96px; height: 96px; border-radius: 50%; justify-self: center; }
+  .pa-titulo { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .pa-numero { font-size: 2.6rem; font-weight: 800; margin: 0; color: var(--pa-acento-oscuro); }
+
+  .pa-campo { display: grid; gap: 4px; font-weight: 600; font-size: .92rem; }
+  .pa-campo input, .pa-campo select, .pa-campo textarea { font: inherit; font-weight: 400; padding: 10px 12px; border: 1.5px solid var(--pa-borde); border-radius: 10px; background: #fff; color: var(--pa-tinta); width: 100%; }
+  .pa-campo input:focus, .pa-campo select:focus, .pa-campo textarea:focus { border-color: var(--pa-acento); outline: none; }
+  .pa-campo [aria-invalid="true"] { border-color: var(--pa-error); }
+  .pa-campo--fila { grid-auto-flow: column; align-items: center; justify-content: start; gap: 8px; }
+  .pa-casilla { display: flex; gap: 8px; align-items: center; font-size: .95rem; }
+  .pa-casilla input { width: 18px; height: 18px; accent-color: var(--pa-acento); }
+  .pa-opciones { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .pa-opciones legend { font-weight: 600; font-size: .92rem; margin-bottom: 4px; }
+  .pa-dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pa-error { color: var(--pa-error); font-size: .88rem; margin: 0; }
+  .pa-error:empty { display: none; }
+  .pa-aviso { background: #fff4d6; border-radius: 10px; padding: 10px 12px; margin: 0; }
+
+  .pa-boton { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 999px; padding: 10px 18px; background: var(--pa-acento); color: #fff; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+  .pa-boton:hover { background: var(--pa-acento-oscuro); }
+  .pa-boton[disabled] { opacity: .55; cursor: wait; }
+  .pa-boton--suave { background: #fff; color: var(--pa-acento-oscuro); border: 1.5px solid var(--pa-borde); }
+  .pa-boton--suave:hover { background: #fff; border-color: var(--pa-acento); }
+  .pa-boton--peligro { background: var(--pa-error); }
+  .pa-boton--chico { padding: 6px 12px; font-size: .88rem; }
+  .pa-enlace { background: none; border: 0; color: var(--pa-acento-oscuro); text-decoration: underline; cursor: pointer; font: inherit; }
+
+  .pa-filtros { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  .pa-lista { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+  .pa-fila { display: grid; grid-template-columns: 64px 1fr auto; gap: 14px; align-items: center; background: #fff; border: 1px solid var(--pa-borde); border-radius: 14px; padding: 10px 12px; }
+  .pa-fila img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: var(--pa-borde); }
+  .pa-fila__nombre { font-weight: 700; }
+  .pa-fila__datos { color: var(--pa-suave); font-size: .9rem; display: flex; gap: 10px; flex-wrap: wrap; }
+  .pa-fila__botones { display: flex; gap: 6px; flex-wrap: wrap; justify-content: end; }
+  .pa-etiqueta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--pa-borde); color: var(--pa-tinta); }
+  .pa-etiqueta--ok { background: #e3f3ea; color: var(--pa-ok); }
+  .pa-etiqueta--alerta { background: #fde8e6; color: var(--pa-error); }
+  .pa-etiqueta--acento { background: #fde4ef; color: var(--pa-acento-oscuro); }
+
+  .pa-pedido { background: #fff; border: 1px solid var(--pa-borde); border-radius: 14px; padding: 14px 16px; display: grid; gap: 8px; }
+  .pa-pedido__cabeza { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pa-pedido__total { font-weight: 800; font-size: 1.1rem; }
+  .pa-pedido ul { margin: 0; padding-left: 18px; }
+  .pa-pedido__dato { margin: 0; font-size: .92rem; }
+
+  .pa-dialogo { border: 0; border-radius: 16px; padding: 0; width: min(100% - 24px, 760px); max-height: calc(100vh - 24px); color: var(--pa-tinta); }
+  .pa-dialogo::backdrop { background: rgba(20, 10, 16, .45); }
+  .pa-dialogo form { padding: 20px; display: grid; gap: 12px; }
+  .pa-dialogo--chico { padding: 20px; width: min(100% - 24px, 380px); }
+  .pa-editor { display: grid; grid-template-columns: 240px 1fr; gap: 20px; }
+  .pa-editor__foto { display: grid; gap: 8px; align-content: start; }
+  .pa-editor__foto img { width: 240px; height: 240px; object-fit: cover; border-radius: 12px; background: var(--pa-borde); }
+  .pa-editor__campos { display: grid; gap: 8px; align-content: start; }
+  .pa-archivo { position: relative; overflow: hidden; }
+  .pa-archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .pa-pie-dialogo { display: flex; justify-content: end; gap: 8px; }
+
+  .pa-propuesta { display: grid; gap: 10px; margin-top: 12px; }
+  .pa-propuesta img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--pa-borde); border-radius: 8px; padding: 8px; }
+  .pa-propuesta ol { margin: 0; padding-left: 20px; }
+  .pa-respaldos { background: #fff8e1; border-radius: 12px; padding: 14px; display: grid; gap: 8px; }
+  .pa-respaldos ul { columns: 2; font-family: ui-monospace, monospace; font-size: 1.05rem; margin: 0; }
+  .pa-en-linea { display: grid; gap: 8px; }
+  .pa-detalles { margin-top: 12px; }
+  .pa-detalles summary { cursor: pointer; color: var(--pa-error); font-weight: 600; }
+  .pa-detalles form { display: grid; gap: 8px; margin-top: 8px; }
+
+  .pa-toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--pa-tinta); color: #fff; padding: 10px 18px; border-radius: 999px; font-weight: 600; z-index: 20; max-width: calc(100% - 24px); }
+
+  @media (max-width: 700px) {
+    .pa-cabecera { padding: 10px 12px; }
+    .pa-pestanas { margin-left: 0; order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+    .pa-acciones { margin-left: auto; }
+    .pa-fila { grid-template-columns: 56px 1fr; }
+    .pa-fila img { width: 56px; height: 56px; }
+    .pa-fila__botones { grid-column: 1 / -1; justify-content: start; }
+    .pa-editor { grid-template-columns: 1fr; }
+    .pa-editor__foto img { width: 100%; height: auto; aspect-ratio: 1; }
+    .pa-respaldos ul { columns: 1; }
+  }
+</style>
+
+<script>
+  import "./panel-app";
+</script>

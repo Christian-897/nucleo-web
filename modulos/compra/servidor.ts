@@ -13,6 +13,7 @@ import { enviarCorreo, sendNotificationEmail } from "../../core/correo";
 import { validarCarrito } from "../carrito/servidor";
 import type { LineaValidada } from "../carrito/tipos";
 import { fuenteCarrito, registrarVenta } from "../catalogo/stock";
+import { resolverCatalogo } from "../catalogo/almacen";
 import type { ConfigPago, PedidoGuardado } from "../pago/config";
 import { ErrorPedido } from "../pago/tipos";
 import type { ConfigCompra, EnvCompra } from "./config";
@@ -53,7 +54,8 @@ export function crearConfigPagoCompra(config: ConfigCompra): ConfigPago {
         );
       }
 
-      const tipos = carrito.lineas.map((l) => config.catalogo.buscar(l.productoId)?.tipo);
+      const vigente = await resolverCatalogo(config.catalogo, env);
+      const tipos = carrito.lineas.map((l) => vigente.buscar(l.productoId)?.tipo);
       const requiereDespacho = tipos.includes("fisico");
       const tieneDigitales = tipos.includes("digital");
 

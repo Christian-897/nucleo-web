@@ -19,6 +19,7 @@
  */
 import { crearEndpointCarrito } from "../carrito/endpoint";
 import { crearEndpointStock } from "../catalogo/endpoint";
+import { crearEndpointCatalogoPublico } from "../catalogo/publico";
 import { fuenteCarrito } from "../catalogo/stock";
 import { crearEndpointsPago } from "../pago/endpoint";
 import type { ConfigCompra } from "./config";
@@ -28,6 +29,8 @@ export function crearEndpointsCompra(config: ConfigCompra) {
   return {
     carrito: crearEndpointCarrito(fuenteCarrito(config.catalogo)),
     stock: crearEndpointStock(config.catalogo),
+    /** GET /api/catalogo: lista pública del catálogo vigente. */
+    catalogo: crearEndpointCatalogoPublico(config.catalogo),
     pago: crearEndpointsPago(crearConfigPagoCompra(config)),
   };
 }

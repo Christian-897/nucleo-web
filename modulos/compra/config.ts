@@ -1,6 +1,6 @@
 import type { EnvPago } from "../pago/config";
 import type { ConfirmacionPago, PedidoGuardado } from "../pago/config";
-import type { Catalogo } from "../catalogo/tipos";
+import type { CatalogoODinamico } from "../catalogo/almacen";
 import type { Proveedor } from "../pago/tipos";
 
 export type EnvCompra = EnvPago;
@@ -8,7 +8,8 @@ export type EnvCompra = EnvPago;
 /** Lo propio de cada tienda. Todo lo demás lo resuelve el módulo. */
 export interface ConfigCompra {
   nombreSitio: string;
-  catalogo: Catalogo;
+  /** Catálogo fijo (JSON) o editable desde el panel (crearCatalogoEditable). */
+  catalogo: CatalogoODinamico;
   proveedores: Proveedor[];
   envio: {
     /** Ej: "Envío por pagar". */

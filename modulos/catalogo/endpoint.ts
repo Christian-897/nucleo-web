@@ -6,9 +6,9 @@
 import type { EnvBase } from "../../core/tipos";
 import { ID_VALIDO } from "./catalogo";
 import { stockDisponible } from "./stock";
-import type { Catalogo } from "./tipos";
+import type { CatalogoODinamico } from "./almacen";
 
-export function crearEndpointStock(catalogo: Catalogo) {
+export function crearEndpointStock(catalogo: CatalogoODinamico) {
   return {
     onRequestGet: async ({ request, env }: { request: Request; env: EnvBase }) => {
       const ids = (new URL(request.url).searchParams.get("ids") || "")

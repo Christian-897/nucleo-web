@@ -38,3 +38,19 @@ export interface EnvBase {
   /** Almacén principal del sitio (Cloudflare KV). */
   REVIEWS_KV?: AlmacenKV;
 }
+
+/**
+ * Almacén que además guarda archivos (las fotos que sube el panel).
+ * También calza con el KV real de Cloudflare sin importar nada.
+ */
+export interface AlmacenBinario extends AlmacenKV {
+  put(
+    key: string,
+    value: string | ArrayBuffer,
+    options?: { expirationTtl?: number; metadata?: unknown }
+  ): Promise<void>;
+  getWithMetadata(
+    key: string,
+    options: { type: "arrayBuffer" }
+  ): Promise<{ value: ArrayBuffer | null; metadata: unknown }>;
+}

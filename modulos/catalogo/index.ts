@@ -11,6 +11,27 @@ export {
   registrarVenta,
   stockDisponible,
   PREFIJO_VENDIDOS,
+  reponerStock,
+  unidadesVendidas,
 } from "./stock";
+export {
+  crearCatalogoEditable,
+  resolverCatalogo,
+  esDinamico,
+  CLAVE_CATALOGO,
+  type FuenteCatalogo,
+  type CatalogoODinamico,
+} from "./almacen";
+export { crearEndpointCatalogoPublico, type ProductoPublico } from "./publico";
 export { crearEndpointStock } from "./endpoint";
 export { consultarStock } from "./cliente";
+export {
+  crearBordeCatalogo,
+  crearFichaProducto,
+  productosDeLista,
+  imagenSegura,
+  idDeRuta,
+  type OpcionesBorde,
+  type EnvBorde,
+} from "./borde";
+export { crearSitemap } from "./sitemap";

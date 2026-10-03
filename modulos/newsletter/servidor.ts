@@ -343,14 +343,23 @@ export async function exportar(request: Request, env: EnvNewsletter): Promise<Re
   }
   if (!env.REVIEWS_KV) return new Response("Sin almacén", { status: 503 });
 
+  return respuestaCsv(await listarActivos(env));
+}
+
+/** Suscriptores confirmados (lo usan la exportación y el panel). */
+export async function listarActivos(env: EnvNewsletter): Promise<Suscriptor[]> {
+  if (!env.REVIEWS_KV) return [];
   const { keys } = await env.REVIEWS_KV.list({ prefix: PREFIJO_SUSCRIPTOR, limit: 1000 });
-  const filas = ["email,confirmado"];
+  const activos: Suscriptor[] = [];
   for (const { name } of keys) {
     const s = await leerSuscriptor(env, name);
-    if (s?.estado === "activo") {
-      filas.push(`${celdaCsv(s.email)},${celdaCsv(s.confirmado ?? "")}`);
-    }
+    if (s?.estado === "activo") activos.push(s);
   }
+  return activos;
+}
+
+export function respuestaCsv(activos: Suscriptor[]): Response {
+  const filas = ["email,confirmado", ...activos.map((s) => `${celdaCsv(s.email)},${celdaCsv(s.confirmado ?? "")}`)];
   return new Response(filas.join("\n") + "\n", {
     status: 200,
     headers: {
