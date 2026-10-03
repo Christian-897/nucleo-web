@@ -5,3 +5,6 @@
 export * as cotizacion from "./modulos/cotizacion/index";
 export * as carrito from "./modulos/carrito/index";
 export * as pago from "./modulos/pago/index";
+export * as newsletter from "./modulos/newsletter/index";
+export * as catalogo from "./modulos/catalogo/index";
+export * as compra from "./modulos/compra/index";

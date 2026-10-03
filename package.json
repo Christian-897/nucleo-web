@@ -1,7 +1,7 @@
 {
   "name": "nucleo-web",
-  "version": "0.2.0",
-  "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: cotización, carrito y pago (Flow + Mercado Pago).",
+  "version": "0.3.0",
+  "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter y cotización.",
   "type": "module",
   "exports": {
     ".": "./index.ts",
@@ -16,7 +16,14 @@
     "./core/seguridad": "./core/seguridad.ts",
     "./core/correo": "./core/correo.ts",
     "./core/cripto": "./core/cripto.ts",
-    "./core/red": "./core/red.ts"
+    "./core/red": "./core/red.ts",
+    "./newsletter": "./modulos/newsletter/index.ts",
+    "./newsletter/cliente": "./modulos/newsletter/cliente.ts",
+    "./catalogo": "./modulos/catalogo/index.ts",
+    "./catalogo/cliente": "./modulos/catalogo/cliente.ts",
+    "./compra": "./modulos/compra/index.ts",
+    "./compra/cliente": "./modulos/compra/cliente.ts",
+    "./core/turnstile": "./core/turnstile-cliente.ts"
   },
   "dependencies": {
     "zod": "^3.23.8"
@@ -27,6 +34,6 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx pruebas/exports.test.ts && tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts"
+    "test": "tsx pruebas/exports.test.ts && tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts && tsx pruebas/newsletter.test.ts && tsx pruebas/compra.test.ts"
   }
 }

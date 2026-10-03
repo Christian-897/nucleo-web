@@ -24,9 +24,10 @@ nucleo-web/
     tipos.ts         # AlmacenKV, EnvBase (sin depender de tipos de Cloudflare)
     validar.ts       # honeypot, escapeHtml, normalizeInput, helpers de zod
     seguridad.ts     # Turnstile, rate limit, same-origin, jsonResponse
-    correo.ts        # envío por Resend (modo demo si falta la clave)
+    correo.ts        # envío por Resend: aviso interno y a cualquier destinatario
     cripto.ts        # HMAC-SHA256, comparación en tiempo constante, ids aleatorios
     red.ts           # fetch con tiempo límite
+    turnstile-cliente.ts  # Turnstile en el navegador, cargado solo al usarse
   modulos/
     cotizacion/      # 1er módulo — ver su README
       servidor.ts  endpoint.ts  cliente.ts  esquema.ts
@@ -41,7 +42,7 @@ nucleo-web/
 En el `package.json` del sitio:
 
 ```json
-{ "dependencies": { "nucleo-web": "github:TU_USUARIO/nucleo-web#v0.1.0" } }
+{ "dependencies": { "nucleo-web": "github:TU_USUARIO/nucleo-web#v0.3.0" } }
 ```
 
 Cloudflare Pages instala el núcleo al construir cada sitio. El zip del sitio sigue
@@ -66,4 +67,14 @@ npm test            # corre las pruebas del módulo
 - **cotizacion** — formulario de presupuesto. (listo)
 - **carrito** — carrito de compra con validación de precio/stock en servidor. (listo)
 - **pago** — cobro con Flow y Mercado Pago, verificación de monto, firma de webhooks e idempotencia. (listo)
-- _por venir:_ resenas, auth, despacho, catalogo, pedidos.
+- **catalogo** — productos desde JSON con validación y stock real en KV. (listo)
+- **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
+- **newsletter** — suscripción con doble confirmación, baja con un clic y exportación protegida. (listo)
+- _por venir:_ resenas, auth (cursos con login), panel de pedidos.
+
+## Entradas solo para el navegador
+
+`nucleo-web/compra/cliente`, `nucleo-web/newsletter/cliente`,
+`nucleo-web/catalogo/cliente` y `nucleo-web/core/turnstile` no arrastran código
+del servidor. Usarlas en los `<script>` de las páginas: el formulario del
+newsletter pesa 2 KB en vez de 58 KB.

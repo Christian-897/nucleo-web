@@ -24,21 +24,44 @@ export async function sendNotificationEmail(
     remitentePorDefecto?: string;
   }
 ): Promise<{ sent: boolean; simulated: boolean }> {
-  // LIMPIAR LO QUE VIENE DEL PANEL DE CLOUDFLARE. Estas variables las pega
-  // una persona a mano, y copiar una clave arrastra con frecuencia un
-  // espacio o salto de línea invisible al final. Con eso,
-  // `Authorization: Bearer <clave>` deja de ser una cabecera HTTP válida y
-  // la petición revienta ANTES de salir, con un "TypeError: Invalid header
-  // value" que no deja rastro en Resend. Costó una noche.
-  const limpiar = (valor: unknown) =>
-    typeof valor === "string"
-      ? valor.replace(/\s+$/g, "").replace(/^\s+/g, "")
-      : "";
+  // Aviso interno: va a la bandeja de la dueña del sitio.
+  return enviarCorreo(env, { ...params, para: env.ADMIN_NOTIFY_EMAIL ?? "" });
+}
 
-  const clave = limpiar(env.RESEND_API_KEY);
-  const destino = limpiar(env.ADMIN_NOTIFY_EMAIL);
+/**
+ * Limpia lo que viene del panel de Cloudflare. Estas variables las pega
+ * una persona a mano, y copiar una clave arrastra con frecuencia un
+ * espacio o salto de línea invisible al final. Con eso,
+ * `Authorization: Bearer <clave>` deja de ser una cabecera HTTP válida y
+ * la petición revienta ANTES de salir, con un "TypeError: Invalid header
+ * value" que no deja rastro en Resend. Costó una noche.
+ */
+export const limpiarVariable = (valor: unknown) =>
+  typeof valor === "string" ? valor.replace(/^\s+|\s+$/g, "") : "";
+
+/**
+ * Envío a un destinatario cualquiera (comprador, suscriptor). Mismas reglas
+ * que el aviso interno: modo demo sin clave, limpieza de variables y
+ * detalle de errores solo en el registro.
+ *
+ * `cabeceras` permite, por ejemplo, List-Unsubscribe en los correos del
+ * newsletter.
+ */
+export async function enviarCorreo(
+  env: EnvBase,
+  params: {
+    para: string;
+    subject: string;
+    html: string;
+    replyTo?: string;
+    remitentePorDefecto?: string;
+    cabeceras?: Record<string, string>;
+  }
+): Promise<{ sent: boolean; simulated: boolean }> {
+  const clave = limpiarVariable(env.RESEND_API_KEY);
+  const destino = limpiarVariable(params.para);
   const remitente =
-    limpiar(env.RESEND_FROM) ||
+    limpiarVariable(env.RESEND_FROM) ||
     params.remitentePorDefecto ||
     "Notificaciones <onboarding@resend.dev>";
 
@@ -59,27 +82,33 @@ export async function sendNotificationEmail(
     return { sent: false, simulated: false };
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${clave}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: remitente,
-      to: [destino],
-      subject: params.subject,
-      html: params.html,
-      reply_to: params.replyTo,
-    }),
-  });
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${clave}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: remitente,
+        to: [destino],
+        subject: params.subject,
+        html: params.html,
+        reply_to: params.replyTo,
+        headers: params.cabeceras,
+      }),
+    });
 
-  if (!res.ok) {
-    // El detalle va al registro del servidor. Los dos errores más comunes:
-    //   403 "testing emails"    -> el destinatario no es el correo de la
-    //                              cuenta y no hay dominio propio verificado.
-    //   422 domain not verified -> RESEND_FROM usa un dominio sin verificar.
-    console.error("[email:error]", res.status, await res.text());
+    if (!res.ok) {
+      // El detalle va al registro del servidor. Los dos errores más comunes:
+      //   403 "testing emails"    -> el destinatario no es el correo de la
+      //                              cuenta y no hay dominio propio verificado.
+      //   422 domain not verified -> RESEND_FROM usa un dominio sin verificar.
+      console.error("[email:error]", res.status, await res.text());
+      return { sent: false, simulated: false };
+    }
+  } catch (e) {
+    console.error("[email:error] no se pudo contactar a Resend", e);
     return { sent: false, simulated: false };
   }
 
