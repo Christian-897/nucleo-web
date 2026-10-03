@@ -42,7 +42,7 @@ nucleo-web/
 En el `package.json` del sitio:
 
 ```json
-{ "dependencies": { "nucleo-web": "github:TU_USUARIO/nucleo-web#v0.3.0" } }
+{ "dependencies": { "nucleo-web": "github:TU_USUARIO/nucleo-web#v0.4.0" } }
 ```
 
 Cloudflare Pages instala el núcleo al construir cada sitio. El zip del sitio sigue
@@ -69,6 +69,7 @@ npm test            # corre las pruebas del módulo
 - **pago** — cobro con Flow y Mercado Pago, verificación de monto, firma de webhooks e idempotencia. (listo)
 - **catalogo** — productos desde JSON con validación y stock real en KV. (listo)
 - **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
+- **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
 - **newsletter** — suscripción con doble confirmación, baja con un clic y exportación protegida. (listo)
 - _por venir:_ resenas, auth (cursos con login), panel de pedidos.
 
