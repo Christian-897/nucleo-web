@@ -70,6 +70,7 @@ npm test            # corre las pruebas del módulo
 - **catalogo** — productos desde JSON con validación y stock real en KV. (listo)
 - **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
 - **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
+- **contacto** — enlaces de WhatsApp, teléfono, correo y redes, validados (número en cualquier formato, redes con enlace o @usuario). (listo)
 - **panel** — administración propia: login + doble factor, productos con fotos, pedidos y suscriptores. (listo)
 - **newsletter** — suscripción con doble confirmación, baja con un clic y exportación protegida. (listo)
 - _por venir:_ resenas, auth (cursos con login), textos editables del sitio (como en Muebles Crea).
