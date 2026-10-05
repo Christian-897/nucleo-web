@@ -10,7 +10,7 @@ de Muebles Crea, que ya estaba probado en producción, y extendido para tiendas.
 |---|---|
 | Acceso | Instalación con clave de un solo uso, login, sesión con cierre por inactividad (15/30/60 min), salida. |
 | Seguridad | Doble factor (app autenticadora + 8 códigos de respaldo), cambiar contraseña, plazo de inactividad. |
-| Productos | Crear, editar, eliminar; precio, stock disponible, categoría, físico/digital, destacado; foto. |
+| Productos | Crear, editar, eliminar; precio, stock disponible y unidades vendidas (desde el último ajuste), categoría, físico/digital, destacado; foto. |
 | Pedidos | Ventas pagadas con datos de despacho; marcar como enviado. |
 | Suscriptores | Total y descarga CSV del newsletter. |
 | Fotos | Guardadas en KV, servidas en `/media/<id>` con caché de un año. |

@@ -22,4 +22,5 @@ export {
 export { tipoRealDeImagen, medidasAceptables, direccionMediaValida, guardarFoto, borrarFoto, RUTA_MEDIA } from "./imagenes";
 export { validarEntrada, idDesdeNombre, type EntradaProducto } from "./productos";
 export { listarPedidos, type PedidoPanel } from "./pedidos";
+export { textoStock, ayudaVendidos, type TextoStock } from "./texto-stock";
 export { exigirSesion, type Ctx } from "./http";

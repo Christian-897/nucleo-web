@@ -12,6 +12,7 @@ import { crearCatalogoEditable, productoDisponible, registrarVenta } from "../mo
 import { validarCarrito } from "../modulos/carrito/servidor";
 import { fuenteCarrito } from "../modulos/catalogo/stock";
 import { tipoRealDeImagen } from "../modulos/panel/imagenes";
+import { ayudaVendidos, textoStock } from "../modulos/panel/texto-stock";
 
 let pasaron = 0;
 async function prueba(nombre: string, fn: () => Promise<void> | void) {
@@ -265,12 +266,38 @@ async function run() {
     assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 10);
   });
 
+  await prueba("la lista del panel trae disponibles y vendidos después de una venta", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const antes = (await productoDisponible(catalogo, env, "gatito"))!.stock!;
+    await registrarVenta(catalogo, env, [{ productoId: "gatito", cantidad: 1 }]);
+    const r = await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) });
+    const { productos } = (await r.json()) as { productos: { id: string; disponible: number | null; vendidos: number | null }[] };
+    const g = productos.find((p) => p.id === "gatito")!;
+    assert.equal(g.disponible, antes - 1);
+    assert.equal(g.vendidos, 1);
+    assert.equal(textoStock(g.disponible, g.vendidos).vendidos, "1 vendido");
+  });
+
   await prueba("eliminar saca el producto de la venta", async () => {
     const { env } = entorno();
     const cookie = await instalarYEntrar(env);
     await panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "eliminar", id: "curso" } }) });
     const carrito = await validarCarrito([{ productoId: "curso", cantidad: 1 }], fuenteCarrito(catalogo)(env));
     assert.equal(carrito.listoParaPagar, false);
+  });
+
+  console.log("Panel — textos de stock:");
+
+  await prueba("textos de stock: singular, plural, agotado y sin límite", () => {
+    assert.deepEqual(textoStock(2, 1), { disponible: "2 disponibles", agotado: false, vendidos: "1 vendido" });
+    assert.deepEqual(textoStock(1, 3), { disponible: "1 disponible", agotado: false, vendidos: "3 vendidos" });
+    assert.deepEqual(textoStock(0, 5), { disponible: "Agotado", agotado: true, vendidos: "5 vendidos" });
+    assert.deepEqual(textoStock(4, 0), { disponible: "4 disponibles", agotado: false, vendidos: "" });
+    assert.deepEqual(textoStock(null, null), { disponible: "Sin límite", agotado: false, vendidos: "" });
+    assert.deepEqual(textoStock(-1 as number, NaN), { disponible: "Sin límite", agotado: false, vendidos: "" });
+    assert.equal(ayudaVendidos(null, null), "");
+    assert.match(ayudaVendidos(2, 1), /último ajuste: 1\./);
   });
 
   console.log("Panel — fotos:");

@@ -247,6 +247,7 @@ const tema = {
           </div>
           <p class="pa-error" data-error-campo="precio"></p>
           <p class="pa-error" data-error-campo="disponible"></p>
+          <p class="pa-tenue pa-chico" data-editor-vendidos></p>
           <label class="pa-campo">Categoría<select name="categoria" data-editor-categorias required></select></label>
           <p class="pa-error" data-error-campo="categoria"></p>
           <fieldset class="pa-opciones">
@@ -342,6 +343,7 @@ const tema = {
   .pa-fila__datos { color: var(--pa-suave); font-size: .9rem; display: flex; gap: 10px; flex-wrap: wrap; }
   .pa-fila__botones { display: flex; gap: 6px; flex-wrap: wrap; justify-content: end; }
   .pa-etiqueta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--pa-borde); color: var(--pa-tinta); }
+  .pa-etiqueta--suave { background: transparent; border: 1px solid var(--pa-borde); font-weight: 600; }
   .pa-etiqueta--ok { background: #e3f3ea; color: var(--pa-ok); }
   .pa-etiqueta--alerta { background: #fde8e6; color: var(--pa-error); }
   .pa-etiqueta--acento { background: #fde4ef; color: var(--pa-acento-oscuro); }

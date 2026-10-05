@@ -5,6 +5,7 @@
  */
 import { derivarClave, enviar, obtener, reducirFoto, subirFotoProducto } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
+import { ayudaVendidos, textoStock } from "../texto-stock";
 
 type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "productos" | "pedidos" | "suscriptores" | "seguridad";
 const PESTANAS: Vista[] = ["productos", "pedidos", "suscriptores", "seguridad"];
@@ -299,15 +300,17 @@ function pintarProductos() {
       const info = crear("div");
       const nombre = crear("div", "pa-fila__nombre", p.nombre);
       const datos = crear("div", "pa-fila__datos");
+      const stock = textoStock(p.disponible, p.vendidos);
       datos.append(
         crear("span", "", formatearPrecio(p.precio)),
         crear("span", "", nombreCat.get(p.categoria) ?? p.categoria),
-        crear(
-          "span",
-          p.disponible === 0 ? "pa-etiqueta pa-etiqueta--alerta" : "pa-etiqueta",
-          p.disponible === null ? "Sin límite" : p.disponible === 0 ? "Agotado" : `${p.disponible} disponibles`
-        )
+        crear("span", stock.agotado ? "pa-etiqueta pa-etiqueta--alerta" : "pa-etiqueta", stock.disponible)
       );
+      if (stock.vendidos) {
+        const v = crear("span", "pa-etiqueta pa-etiqueta--suave", stock.vendidos);
+        v.title = "Desde el último ajuste de stock";
+        datos.append(v);
+      }
       if (p.tipo === "digital") datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Digital"));
       if (p.destacado) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Destacado"));
       if (!p.imagen) datos.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Sin foto"));
@@ -361,6 +364,7 @@ function abrirEditor(p: Producto | null) {
   campo("nombre").value = p?.nombre ?? "";
   campo("precio").value = p ? String(p.precio) : "";
   campo("disponible").value = p?.disponible === null || !p ? "" : String(p.disponible);
+  $("[data-editor-vendidos]").textContent = p ? ayudaVendidos(p.disponible, p.vendidos) : "";
   (f.elements.namedItem("categoria") as HTMLSelectElement).value = p?.categoria ?? categorias[0]?.id ?? "";
   for (const r of $$<HTMLInputElement>('input[name="tipo"]', f)) r.checked = r.value === (p?.tipo ?? "fisico");
   (f.elements.namedItem("descripcion") as HTMLTextAreaElement).value = p?.descripcion ?? "";
