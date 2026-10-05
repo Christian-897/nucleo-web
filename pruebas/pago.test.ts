@@ -276,6 +276,8 @@ async function run() {
     const { s, ...sinFirma } = enviado;
     assert.equal(s, await firmarFlow(sinFirma, "SECRETO"));
     assert.equal(sinFirma.amount, "19990");
+    // Flow vuelve con POST: el retorno apunta a la función que lo pasa a GET.
+    assert.equal(sinFirma.urlReturn, `${ORIGEN}/api/pago/retorno-flow`);
 
     pagosFlow["FTOK1"] = { status: 2, commerceOrder: orden, amount: 19990, currency: "CLP" };
     const antes = confirmados.length;
@@ -290,6 +292,38 @@ async function run() {
     assert.equal(r.status, 200);
     assert.equal(confirmados.length, antes + 1);
     assert.equal(registro(orden).estado, "pagada");
+  });
+
+  console.log("Retorno de Flow (POST → GET):");
+
+  await prueba("el POST de Flow se convierte en GET a la página de retorno con el token", async () => {
+    const r = await pago.retornoFlow.onRequestPost({
+      request: new Request(`${ORIGEN}/api/pago/retorno-flow`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: "token=FTOK1",
+      }),
+      env,
+    });
+    assert.equal(r.status, 303);
+    assert.equal(r.headers.get("Location"), "/pago/retorno?proveedor=flow&token=FTOK1");
+  });
+
+  await prueba("retorno de Flow: un token raro no se reenvía y no se puede redirigir afuera", async () => {
+    for (const token of ["<script>", "a".repeat(500), "x\r\nSet-Cookie: a=b"]) {
+      const r = await pago.retornoFlow.onRequestPost({
+        request: new Request(`${ORIGEN}/api/pago/retorno-flow`, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({ token }).toString(),
+        }),
+        env,
+      });
+      assert.equal(r.status, 303);
+      assert.equal(r.headers.get("Location"), "/pago/retorno?proveedor=flow");
+    }
+    const r = await pago.retornoFlow.onRequestGet({ request: new Request(`${ORIGEN}/api/pago/retorno-flow`), env });
+    assert.ok(r.headers.get("Location")!.startsWith("/pago/retorno"));
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

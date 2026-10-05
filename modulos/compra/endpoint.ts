@@ -16,6 +16,8 @@
  *   export const { onRequestPost } = tienda.pago.webhookFlow;
  *   // functions/api/pago/estado.ts
  *   export const { onRequestGet, onRequestPost } = tienda.pago.estado;
+ *   // functions/api/pago/retorno-flow.ts  (Flow vuelve con POST)
+ *   export const { onRequestGet, onRequestPost } = tienda.pago.retornoFlow;
  */
 import { crearEndpointCarrito } from "../carrito/endpoint";
 import { crearEndpointStock } from "../catalogo/endpoint";

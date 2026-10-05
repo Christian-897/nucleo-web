@@ -8,7 +8,7 @@
  *  - El dueño entra con `?previa=CLAVE`. Se guarda una cookie con una
  *    FIRMA de la clave (nunca la clave), HttpOnly y Secure, por N días.
  *  - `?previa=salir` borra la cookie (para ver lo que ve el público).
- *  - Siempre pasan los webhooks de pago y robots.txt, más las rutas que
+ *  - Siempre pasan los webhooks de pago, el retorno de Flow y robots.txt, más las rutas que
  *    el sitio agregue (el logo del aviso, por ejemplo).
  *
  * Seguridad: la clave se compara en tiempo constante; si es corta o no

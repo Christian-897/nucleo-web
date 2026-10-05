@@ -223,7 +223,12 @@ export async function iniciarPago(
         origin,
         proveedor === "flow" ? rutas.webhookFlow : rutas.webhookMercadoPago
       ),
-      urlRetorno: urlAbsoluta(origin, `${rutas.retorno}?proveedor=${proveedor}`),
+      // Flow vuelve con un POST del navegador: va a una función que lo pasa
+      // a GET (una página estática no acepta POST). Mercado Pago vuelve con GET.
+      urlRetorno: urlAbsoluta(
+        origin,
+        proveedor === "flow" ? rutas.retornoFlow : `${rutas.retorno}?proveedor=${proveedor}`
+      ),
     });
     registro.idProveedor = cobro.idProveedor;
     await guardarRegistro(env, registro, config);
@@ -469,4 +474,34 @@ export async function consultarEstado(
     console.error("[pago] consultarEstado falló", e);
     return jsonResponse(200, { estado: "desconocido" });
   }
+}
+
+// ─────────────────────────── retorno de Flow (POST → GET) ───────────────────────────
+
+/**
+ * Flow devuelve al comprador con un POST del navegador que trae `token` en el
+ * cuerpo. Las páginas estáticas no aceptan POST, y la cookie de vista previa
+ * (SameSite=Lax) no viaja en un POST que viene de otro sitio. Por eso esta
+ * función solo traduce: lee el token, lo valida y redirige (303) con GET a la
+ * página de retorno. No confirma nada: eso lo hace el webhook.
+ */
+export async function retornoFlow(request: Request, config: ConfigPago): Promise<Response> {
+  const rutas = { ...RUTAS_POR_DEFECTO, ...config.rutas };
+  const url = new URL(request.url);
+  let token = url.searchParams.get("token");
+  if (!token && request.method === "POST") {
+    try {
+      const t = (await request.formData()).get("token");
+      token = typeof t === "string" ? t : null;
+    } catch {
+      token = null;
+    }
+  }
+  const destino = new URL(rutas.retorno, url.origin);
+  destino.searchParams.set("proveedor", "flow");
+  if (token && tokenFlowValido(token)) destino.searchParams.set("token", token);
+  return new Response(null, {
+    status: 303,
+    headers: { Location: destino.pathname + destino.search, "Cache-Control": "no-store" },
+  });
 }

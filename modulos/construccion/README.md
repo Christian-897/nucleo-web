@@ -36,6 +36,6 @@ export const { onRequest } = crearAvisoConstruccion({
 | La clave en el navegador | La cookie guarda una **firma** HMAC, nunca la clave. HttpOnly + Secure + `__Host-`. |
 | Adivinar la clave | Comparación en tiempo constante; clave equivocada = mismo aviso, sin pistas. |
 | Configuración incompleta | Sin `ACCESO_PREVIA` válida nadie entra (falla cerrado). |
-| Pagos de prueba | Los webhooks de pago pasan siempre (los proveedores no tienen cookie). |
+| Pagos de prueba | Los webhooks de pago y el retorno de Flow (`/api/pago/retorno-`) pasan siempre: llegan sin la cookie de vista previa. |
 | Vista previa indexada | Las páginas vistas con acceso llevan `noindex` y `no-store`. |
 | Inyección | Textos escapados, colores validados, enlaces solo `https:`/`mailto:`/`tel:`, CSP propia. |

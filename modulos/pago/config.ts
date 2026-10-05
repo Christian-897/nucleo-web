@@ -92,6 +92,9 @@ export interface ConfigPago {
     webhookFlow?: string;
     webhookMercadoPago?: string;
     retorno?: string;
+    /** Flow vuelve al sitio con un POST (no un GET): esta ruta lo recibe y
+     *  redirige a `retorno` con el token en la URL. */
+    retornoFlow?: string;
   };
 
   /** Forzar sandbox de Flow (por defecto lee FLOW_SANDBOX). */
@@ -108,6 +111,7 @@ export const RUTAS_POR_DEFECTO = {
   webhookFlow: "/api/pago/webhook-flow",
   webhookMercadoPago: "/api/pago/webhook-mercadopago",
   retorno: "/pago/retorno",
+  retornoFlow: "/api/pago/retorno-flow",
 } as const;
 
 const limpiar = (v: unknown) => (typeof v === "string" ? v.trim() : "");

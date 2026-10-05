@@ -71,6 +71,8 @@ export const { onRequestPost } = pago.webhookFlow;
 export const { onRequestPost } = pago.webhookMercadoPago;
 // functions/api/pago/estado.ts        (para la página /pago/retorno)
 export const { onRequestGet, onRequestPost } = pago.estado;
+// functions/api/pago/retorno-flow.ts  (solo con Flow: vuelve con POST)
+export const { onRequestGet, onRequestPost } = pago.retornoFlow;
 ```
 
 En el navegador:
@@ -83,6 +85,12 @@ await irAPagar({ proveedor: "mercadopago", items: carrito.items(), email });
 Si hay un solo proveedor habilitado, `proveedor` se puede omitir.
 
 ## Página de retorno
+
+**Flow vuelve con un POST** del navegador (con `token` en el cuerpo), y una
+página estática no acepta POST. Por eso Flow vuelve a `/api/pago/retorno-flow`,
+que solo redirige (303) a `/pago/retorno?proveedor=flow&token=…`. El aviso de
+construcción deja pasar esa ruta, porque ese POST llega sin la cookie de
+vista previa.
 
 `/pago/retorno` llama a `/api/pago/estado` (con los parámetros que deja el
 proveedor en la URL) para **mostrar** el resultado. Ojo: lo que confirma el

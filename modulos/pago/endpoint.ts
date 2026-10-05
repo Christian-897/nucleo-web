@@ -15,11 +15,14 @@
  *   export const { onRequestPost } = pago.webhookMercadoPago;
  *   // functions/api/pago/estado.ts
  *   export const { onRequestGet, onRequestPost } = pago.estado;
+ *   // functions/api/pago/retorno-flow.ts   (solo si se usa Flow)
+ *   export const { onRequestGet, onRequestPost } = pago.retornoFlow;
  */
 import type { ConfigPago, EnvPago } from "./config";
 import {
   consultarEstado,
   iniciarPago,
+  retornoFlow,
   webhookFlow,
   webhookMercadoPago,
 } from "./servidor";
@@ -46,6 +49,10 @@ export function crearEndpointsPago(config: ConfigPago) {
     estado: {
       onRequestGet: ({ request, env }: Ctx) => consultarEstado(request, env, config),
       onRequestPost: ({ request, env }: Ctx) => consultarEstado(request, env, config),
+    },
+    retornoFlow: {
+      onRequestGet: ({ request }: Ctx) => retornoFlow(request, config),
+      onRequestPost: ({ request }: Ctx) => retornoFlow(request, config),
     },
   };
 }

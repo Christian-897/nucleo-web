@@ -57,8 +57,8 @@ async function run() {
     assert.equal(r.status, 503);
   });
 
-  await prueba("los webhooks de pago, robots.txt y el logo pasan siempre", async () => {
-    for (const ruta of ["/api/pago/webhook-mercadopago", "/robots.txt", "/img/logo.png"]) {
+  await prueba("los webhooks de pago, el retorno de Flow, robots.txt y el logo pasan siempre", async () => {
+    for (const ruta of ["/api/pago/webhook-mercadopago", "/api/pago/retorno-flow", "/robots.txt", "/img/logo.png"]) {
       const r = await pedir(ruta, encendido);
       assert.equal(await r.text(), "SITIO REAL", ruta);
     }
