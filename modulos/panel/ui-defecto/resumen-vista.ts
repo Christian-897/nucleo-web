@@ -23,8 +23,11 @@ export type TipoPartes = "lista" | "barras" | "torta";
 const NS = "http://www.w3.org/2000/svg";
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 export const NOMBRES_MES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-/** Colores de las partes, en orden fijo. Más de 5 se juntan en "Otros". */
-export const COLORES_PARTES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"];
+/**
+ * Colores de las partes, en orden fijo (variables CSS: cada sitio pone su
+ * paleta con `coloresGraficos`). Más de 5 se juntan en "Otros".
+ */
+export const COLORES_PARTES = [1, 2, 3, 4, 5].map((n) => `var(--pa-serie-${n})`);
 const COLOR_OTROS = "#8b8a86";
 
 type Precio = (n: number) => string;
@@ -156,13 +159,18 @@ function zonasTooltip(
   }
 }
 
-function lineaDe(base: Lienzo, valores: number[], clase: string): SVGElement[] {
-  const puntos = valores.map((v, i) => [base.izq + base.paso * i + base.paso / 2, base.y(v)] as const);
-  const d = puntos.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
+/** Línea de 2px; `null` = sin dato (por ejemplo, meses que aún no pasan): corta la línea. */
+function lineaDe(base: Lienzo, valores: (number | null)[], clase: string): SVGElement[] {
+  const puntos = valores.map((v, i) => (v === null ? null : ([base.izq + base.paso * i + base.paso / 2, base.y(v)] as const)));
+  let d = "";
+  puntos.forEach((p, i) => {
+    if (!p) return;
+    d += `${i && puntos[i - 1] ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`;
+  });
   const salida: SVGElement[] = [svg("path", { d, fill: "none" }, `linea ${clase}`)];
   // Marcadores solo si hay espacio (al menos 14px por punto); si no, ensucian.
   if (base.paso >= 14) {
-    for (const [x, y] of puntos) salida.push(svg("circle", { cx: x, cy: y, r: 4 }, `punto ${clase}`));
+    for (const p of puntos) if (p) salida.push(svg("circle", { cx: p[0], cy: p[1], r: 4 }, `punto ${clase}`));
   }
   return salida;
 }
@@ -242,11 +250,16 @@ export function graficoComparacion(
     NOMBRES_MES.map((m, i) => (angosto && i % 2 ? "" : m))
   );
   const esEnCurso = (i: number) => !!enCurso && i === enCurso.mes - 1 && (anioA === enCurso.anio || anioB === enCurso.anio);
+  // Los meses que todavía no llegan no son "cero ventas": no se dibujan.
+  const futuro = (anio: number, i: number) => !!enCurso && (anio > enCurso.anio || (anio === enCurso.anio && i > enCurso.mes - 1));
   const grupos: SVGElement[][] = Array.from({ length: 12 }, () => []);
 
   if (tipo === "linea") {
     // El año B va primero (debajo) y el A encima, con anillo del color de fondo.
-    base.hijos.push(...lineaDe(base, b.map((x) => x.ventas), "serie-b"), ...lineaDe(base, a.map((x) => x.ventas), "serie-a"));
+    base.hijos.push(
+      ...lineaDe(base, b.map((x, i) => (futuro(anioB, i) ? null : x.ventas)), "serie-b"),
+      ...lineaDe(base, a.map((x, i) => (futuro(anioA, i) ? null : x.ventas)), "serie-a")
+    );
   } else {
     const ancho = Math.max(3, Math.min(12, base.paso * 0.3));
     for (let i = 0; i < 12; i++) {
@@ -273,12 +286,12 @@ export function graficoComparacion(
     12,
     tooltip,
     (i) => {
-      const v = esEnCurso(i) ? null : variacion(a[i].ventas, b[i].ventas);
+      const v = esEnCurso(i) || futuro(anioA, i) || futuro(anioB, i) ? null : variacion(a[i].ventas, b[i].ventas);
       return [
         html("strong", "", esEnCurso(i) ? `${NOMBRES_MES[i]} (mes en curso)` : NOMBRES_MES[i]),
-        `${anioA}: ${precio(a[i].ventas)}`,
+        `${anioA}: ${futuro(anioA, i) ? "aún no llega" : precio(a[i].ventas)}`,
         html("br"),
-        `${anioB}: ${precio(b[i].ventas)}`,
+        `${anioB}: ${futuro(anioB, i) ? "aún no llega" : precio(b[i].ventas)}`,
         ...(v === null ? [] : [html("br"), `${v > 0 ? "▲" : v < 0 ? "▼" : "="} ${Math.abs(v)}%`]),
       ];
     },
@@ -365,8 +378,9 @@ export function graficoPartes(
       partes.length === 1
         ? svg("circle", { cx: 80, cy: 80, r: 60, fill: "none", "stroke-width": 36 }, "torta-anillo")
         : svg("path", { d: arco(80, 80, 78, 42, angulo, fin) }, "torta-porcion");
-    if (partes.length === 1) el.setAttribute("stroke", color(i, x.otros));
-    else el.setAttribute("fill", color(i, x.otros));
+    // Con CSSOM (style.*): admite var(--…) y lo permite la CSP del panel.
+    if (partes.length === 1) el.style.stroke = color(i, x.otros);
+    else el.style.fill = color(i, x.otros);
     s.append(el);
     angulo = fin;
   });

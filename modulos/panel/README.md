@@ -55,3 +55,17 @@ La pantalla la pone cada sitio, usando `nucleo-web/panel/cliente`
 
 Mismas claves de KV (`admin:*`, `foto:*`), mismas cookies y mismo cifrado del
 doble factor: Muebles Crea puede pasarse a este módulo sin reinstalar el panel.
+
+## Colores de los gráficos
+
+La pantalla (`PanelAdmin.astro`) recibe `coloresGraficos`: hasta 5 colores en
+orden. Se usan en la torta y las barras de "Más vendidos" y "Medios de pago";
+el segundo es además el año comparado. Lo ideal es sacarlos de la paleta de
+la marca, más intensos, y **validarlos** (que se distingan con daltonismo y
+tengan contraste sobre blanco) antes de usarlos. Sin ellos se usa una paleta
+neutra ya validada.
+
+```astro
+<PanelAdmin nombre="Mi Tienda" colores={{ acento: "#D81B72" }}
+  coloresGraficos={["#D81B72", "#7B46B0", "#1A9A86", "#D9772F", "#4A7BD0"]} />
+```

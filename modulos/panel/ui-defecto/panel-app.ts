@@ -62,6 +62,12 @@ for (const [dato, variable] of [["acento", "--pa-acento"], ["acentoOscuro", "--p
   const v = raiz.dataset[dato];
   if (v && /^#[0-9a-fA-F]{3,8}$/.test(v)) raiz.style.setProperty(variable, v);
 }
+// Colores de los gráficos: --pa-serie-1…5 y el año comparado (el segundo).
+{
+  const lista = (raiz.dataset.graficos ?? "").split(",").filter((x) => /^#[0-9a-fA-F]{3,8}$/.test(x));
+  lista.forEach((c, i) => raiz.style.setProperty(`--pa-serie-${i + 1}`, c));
+  if (lista[1]) raiz.style.setProperty("--pa-comparacion", lista[1]);
+}
 
 function crear<K extends keyof HTMLElementTagNameMap>(tag: K, clase?: string, texto?: string): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);

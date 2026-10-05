@@ -1,6 +1,6 @@
 {
   "name": "nucleo-web",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter, cotización, aviso de construcción, contacto (WhatsApp y redes), métricas de ventas y panel de administración.",
   "type": "module",
   "exports": {
