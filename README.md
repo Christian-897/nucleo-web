@@ -71,6 +71,7 @@ npm test            # corre las pruebas del módulo
 - **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
 - **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
 - **contacto** — enlaces de WhatsApp, teléfono, correo y redes, validados (número en cualquier formato, redes con enlace o @usuario). (listo)
+- **metricas** — resumen de ventas para el panel: hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, rango de fechas a elección (por día, semana o mes), gráficos de barras, línea o torta y comparación por años. (listo)
 - **panel** — administración propia: login + doble factor, productos con fotos, pedidos y suscriptores. (listo)
 - **newsletter** — suscripción con doble confirmación, baja con un clic y exportación protegida. (listo)
 - _por venir:_ resenas, auth (cursos con login), textos editables del sitio (como en Muebles Crea).

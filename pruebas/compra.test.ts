@@ -142,8 +142,8 @@ async function run() {
     assert.equal(r.status, 400);
   });
 
-  await prueba("al confirmar: descuenta stock UNA vez y avisa a la tienda y al comprador", async () => {
-    const { env } = entorno();
+  await prueba("al confirmar: descuenta stock UNA vez, suma a métricas y avisa a la tienda y al comprador", async () => {
+    const { env, datos } = entorno();
     const r = await iniciar(env, { items: [{ productoId: "gatito", cantidad: 1 }, { productoId: "curso", cantidad: 1 }], comprador });
     const { orden } = (await r.json()) as { orden: string };
     const antes = correos.length;
@@ -152,6 +152,12 @@ async function run() {
     assert.equal(await aplicarResultado(resultado, env, cfg), "confirmado");
     assert.equal(await aplicarResultado(resultado, env, cfg), "ya-confirmado");
     assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 1);
+    // Queda en las métricas una sola vez (aunque el aviso llegó dos veces).
+    const dias = [...datos.keys()].filter((k) => k.startsWith("metricas:dia:"));
+    assert.equal(dias.length, 1);
+    const dia = JSON.parse(datos.get(dias[0])!);
+    assert.equal(dia.n, 1);
+    assert.equal(dia.v, 33000);
     const nuevos = correos.slice(antes);
     assert.equal(nuevos.length, 2);
     assert.deepEqual(nuevos.map((c) => c.para).sort(), ["ana@correo.cl", "duena@tienda.cl"]);

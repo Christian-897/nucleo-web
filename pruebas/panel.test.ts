@@ -13,6 +13,8 @@ import { validarCarrito } from "../modulos/carrito/servidor";
 import { fuenteCarrito } from "../modulos/catalogo/stock";
 import { tipoRealDeImagen } from "../modulos/panel/imagenes";
 import { ayudaVendidos, textoStock } from "../modulos/panel/texto-stock";
+import { diaLocal } from "../modulos/metricas/index";
+const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
 async function prueba(nombre: string, fn: () => Promise<void> | void) {
@@ -360,6 +362,35 @@ async function run() {
     assert.ok(m.enviado);
     const inventada = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "marcar-enviado", orden: "ORDzzz" } }) });
     assert.equal(inventada.status, 404);
+  });
+
+  await prueba("resumen: solo con sesión; se pone al día con pedidos antiguos sin contar doble", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const kv = env.REVIEWS_KV!;
+    const hoy = new Date().toISOString();
+    const base = { descripcion: "Compra", moneda: "CLP", email: "ana@correo.cl", actualizado: "", metadata: { comprador: { nombre: "Ana" }, lineas: [{ nombre: "Gatito", cantidad: 1, subtotal: 18000 }], requiereDespacho: true } };
+    await kv.put("pago:pedido:ORDm1", JSON.stringify({ ...base, orden: "ORDm1", proveedor: "mercadopago", monto: 18000, estado: "pagada", creado: hoy }));
+    await kv.put("pago:pedido:ORDm2", JSON.stringify({ ...base, orden: "ORDm2", proveedor: "flow", monto: 18000, estado: "pagada", creado: hoy }));
+    await kv.put("pago:pedido:ORDm3", JSON.stringify({ ...base, orden: "ORDm3", proveedor: "flow", monto: 9000, estado: "pendiente", creado: hoy }));
+    assert.equal((await panel.resumen.onRequestGet({ env, request: req("/api/admin/resumen") })).status, 401);
+    for (let i = 0; i < 2; i++) {
+      const r = await json(await panel.resumen.onRequestGet({ env, request: req("/api/admin/resumen", { cookie }) }));
+      assert.equal(r.periodos.d30.pedidos, 2, "los pendientes no cuentan y no se cuenta doble");
+      assert.equal(r.periodos.d30.ventas, 36000);
+      assert.equal(r.periodos.d30.ticket, 18000);
+      assert.deepEqual(r.topProductos[0], { nombre: "Gatito", unidades: 2, ventas: 36000 });
+      assert.equal(r.porDespachar, 2);
+      assert.equal(r.serie.length, 30);
+    }
+    // Rango de fechas: solo con sesión y con errores claros.
+    const hoyDia = r0Dia();
+    assert.equal((await panel.resumen.onRequestGet({ env, request: req(`/api/admin/resumen?desde=${hoyDia}&hasta=${hoyDia}`) })).status, 401);
+    const rango = await json(await panel.resumen.onRequestGet({ env, request: req(`/api/admin/resumen?desde=${hoyDia}&hasta=${hoyDia}`, { cookie }) }));
+    assert.equal(rango.periodo.pedidos, 2);
+    const malo = await panel.resumen.onRequestGet({ env, request: req("/api/admin/resumen?desde=2026-02-30&hasta=2026-03-01", { cookie }) });
+    assert.equal(malo.status, 400);
+    assert.match((await json(malo)).message, /fechas válidas/);
   });
 
   await prueba("suscriptores: el CSV solo sale con sesión", async () => {

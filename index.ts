@@ -10,4 +10,5 @@ export * as catalogo from "./modulos/catalogo/index";
 export * as compra from "./modulos/compra/index";
 export * as construccion from "./modulos/construccion/index";
 export * as contacto from "./modulos/contacto/index";
+export * as metricas from "./modulos/metricas/index";
 export * as panel from "./modulos/panel/index";

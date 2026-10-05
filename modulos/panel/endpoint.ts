@@ -15,6 +15,7 @@
  *   functions/api/admin/productos.ts       export const { onRequestGet, onRequestPost } = panel.productos;
  *   functions/api/admin/producto-foto.ts   export const { onRequestPost } = panel.productoFoto;
  *   functions/api/admin/pedidos.ts         export const { onRequestGet, onRequestPost } = panel.pedidos;
+ *   functions/api/admin/resumen.ts         export const { onRequestGet } = panel.resumen;
  *   functions/api/admin/suscriptores.ts    export const { onRequestGet } = panel.suscriptores;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
@@ -28,6 +29,7 @@ import { aplicarCabecerasPanel } from "./encabezados";
 import { type Ctx, exigirSesion, jsonResponse } from "./http";
 import { identificadorValido, responderFoto } from "./imagenes";
 import { crearGestionPedidos } from "./pedidos";
+import { crearResumen } from "./resumen";
 import { crearGestionProductos } from "./productos";
 
 export interface OpcionesPanel extends ConfigPanel {
@@ -35,6 +37,8 @@ export interface OpcionesPanel extends ConfigPanel {
   catalogo?: FuenteCatalogo;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
+  /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
+  zonaHoraria?: string;
 }
 
 const noDisponible = async () => jsonResponse(404, { message: "Esta sección no está activa en este sitio." });
@@ -42,6 +46,7 @@ const noDisponible = async () => jsonResponse(404, { message: "Esta sección no 
 export function crearPanel(opciones: OpcionesPanel) {
   const productos = opciones.catalogo ? crearGestionProductos(opciones.catalogo, opciones) : null;
   const pedidos = crearGestionPedidos(opciones.retencionPedidosDias);
+  const resumen = crearResumen(opciones.zonaHoraria);
 
   return {
     parametros: { onRequestGet: (c: Ctx) => acceso.parametros(c) },
@@ -61,6 +66,8 @@ export function crearPanel(opciones: OpcionesPanel) {
     },
     productoFoto: { onRequestPost: (c: Ctx) => (productos ? productos.foto(c) : noDisponible()) },
     pedidos: { onRequestGet: (c: Ctx) => pedidos.get(c), onRequestPost: (c: Ctx) => pedidos.post(c) },
+    /** Métricas de ventas (pestaña Resumen). */
+    resumen: { onRequestGet: (c: Ctx) => resumen(c) },
     suscriptores: {
       onRequestGet: async (c: Ctx) => {
         const s = await exigirSesion(c, false);

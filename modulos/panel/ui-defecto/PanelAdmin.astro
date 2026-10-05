@@ -59,7 +59,8 @@ const tema = {
       <span><strong>{nombre}</strong><small>Panel de administración</small></span>
     </div>
     <nav class="pa-pestanas" aria-label="Secciones">
-      <button type="button" data-tab="productos" aria-current="page">Productos</button>
+      <button type="button" data-tab="resumen" aria-current="page">Resumen</button>
+      <button type="button" data-tab="productos">Productos</button>
       <button type="button" data-tab="pedidos">Pedidos</button>
       <button type="button" data-tab="suscriptores">Suscriptores</button>
       <button type="button" data-tab="seguridad">Seguridad</button>
@@ -132,6 +133,125 @@ const tema = {
       </div>
       <p class="pa-tenue" data-resumen-productos></p>
       <ul class="pa-lista" data-lista-productos aria-live="polite"></ul>
+    </section>
+
+    <!-- ───────────── resumen (métricas) ───────────── -->
+    <section class="pa-vista" data-vista="resumen" hidden>
+      <div class="pa-titulo">
+        <h1>Resumen</h1>
+        <button class="pa-boton pa-boton--suave pa-boton--chico" type="button" data-resumen-recargar>Actualizar</button>
+      </div>
+      <p class="pa-aviso pa-aviso--despacho" data-resumen-despacho hidden>
+        <span data-resumen-despacho-texto></span>
+        <button class="pa-enlace" type="button" data-ir-pedidos>Ver pedidos</button>
+      </p>
+      <div class="pa-kpis">
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Ventas de hoy</p><p class="pa-kpi__valor" data-kpi="hoy">—</p><p class="pa-kpi__nota" data-kpi-nota="hoy"></p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 7 días</p><p class="pa-kpi__valor" data-kpi="d7">—</p><p class="pa-kpi__nota" data-kpi-nota="d7"></p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 30 días</p><p class="pa-kpi__valor" data-kpi="d30">—</p><p class="pa-kpi__nota" data-kpi-nota="d30"></p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Venta promedio</p><p class="pa-kpi__valor" data-kpi="ticket">—</p><p class="pa-kpi__nota">por pedido, últimos 30 días</p></div>
+      </div>
+      <h2 class="pa-subtitulo">Explorar ventas</h2>
+      <form class="pa-panel pa-periodo" data-form-periodo>
+        <div class="pa-periodo__atajos" role="group" aria-label="Períodos rápidos">
+          <button type="button" class="pa-chip" data-atajo="7">7 días</button>
+          <button type="button" class="pa-chip" data-atajo="30">30 días</button>
+          <button type="button" class="pa-chip" data-atajo="este-mes">Este mes</button>
+          <button type="button" class="pa-chip" data-atajo="mes-pasado">Mes pasado</button>
+          <button type="button" class="pa-chip" data-atajo="este-anio">Este año</button>
+          <button type="button" class="pa-chip" data-atajo="anio-pasado">Año pasado</button>
+        </div>
+        <div class="pa-periodo__campos">
+          <label class="pa-campo">Desde<input type="date" name="desde" required /></label>
+          <label class="pa-campo">Hasta<input type="date" name="hasta" required /></label>
+          <label class="pa-campo">Agrupar por<select name="agrupar"><option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option></select></label>
+          <button class="pa-boton" type="submit">Ver</button>
+        </div>
+        <p class="pa-error" role="alert" data-error-periodo></p>
+      </form>
+      <p class="pa-aviso" data-periodo-aproximado hidden></p>
+      <div class="pa-kpis">
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Ventas del período</p><p class="pa-kpi__valor" data-kpi="rango">—</p><p class="pa-kpi__nota" data-kpi-nota="rango"></p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Pedidos</p><p class="pa-kpi__valor" data-kpi="rango-pedidos">—</p><p class="pa-kpi__nota" data-kpi-nota="rango-pedidos"></p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Venta promedio</p><p class="pa-kpi__valor" data-kpi="rango-ticket">—</p><p class="pa-kpi__nota">por pedido en el período</p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo">Período anterior</p><p class="pa-kpi__valor" data-kpi="rango-anterior">—</p><p class="pa-kpi__nota" data-kpi-nota="rango-anterior"></p></div>
+      </div>
+      <div class="pa-panel">
+        <div class="pa-panel__cabeza">
+          <h2 data-titulo-serie>Ventas en el período</h2>
+          <div class="pa-segmento" role="group" aria-label="Tipo de gráfico" data-tipo-grafico="tiempo">
+            <button type="button" data-tipo="barras">Barras</button>
+            <button type="button" data-tipo="linea">Línea</button>
+          </div>
+        </div>
+        <div class="pa-grafico">
+          <svg data-grafico-svg viewBox="0 0 640 200" role="img" aria-label="Ventas en el período"></svg>
+          <div class="pa-grafico__tooltip" data-grafico-tooltip role="status" hidden></div>
+        </div>
+        <details class="pa-tabla-detalle">
+          <summary>Ver como tabla</summary>
+          <table class="pa-tabla"><thead><tr><th scope="col">Período</th><th scope="col">Pedidos</th><th scope="col">Ventas</th></tr></thead><tbody data-tabla-ventas></tbody></table>
+        </details>
+      </div>
+      <div class="pa-columnas">
+        <div class="pa-panel">
+          <div class="pa-panel__cabeza">
+            <h2>Más vendidos</h2>
+            <div class="pa-segmento" role="group" aria-label="Tipo de gráfico" data-tipo-grafico="productos">
+              <button type="button" data-tipo="lista">Lista</button>
+              <button type="button" data-tipo="barras">Barras</button>
+              <button type="button" data-tipo="torta">Torta</button>
+            </div>
+          </div>
+          <div class="pa-partes" data-top-productos></div>
+        </div>
+        <div class="pa-panel">
+          <div class="pa-panel__cabeza">
+            <h2>Medios de pago</h2>
+            <div class="pa-segmento" role="group" aria-label="Tipo de gráfico" data-tipo-grafico="medios">
+              <button type="button" data-tipo="lista">Lista</button>
+              <button type="button" data-tipo="barras">Barras</button>
+              <button type="button" data-tipo="torta">Torta</button>
+            </div>
+          </div>
+          <div class="pa-partes" data-medios></div>
+        </div>
+      </div>
+      <h2 class="pa-subtitulo">Comparación por años</h2>
+      <div class="pa-kpis pa-kpis--dos">
+        <div class="pa-kpi"><p class="pa-kpi__titulo" data-kpi-anio-titulo>Este año a la fecha</p><p class="pa-kpi__valor" data-kpi="anio">—</p><p class="pa-kpi__nota" data-kpi-nota="anio"></p></div>
+        <div class="pa-kpi"><p class="pa-kpi__titulo" data-kpi-anio-anterior-titulo>Año anterior a la misma fecha</p><p class="pa-kpi__valor" data-kpi="anio-anterior">—</p><p class="pa-kpi__nota" data-kpi-nota="anio-anterior"></p></div>
+      </div>
+      <div class="pa-panel">
+        <div class="pa-panel__cabeza">
+          <h2>Ventas por mes</h2>
+          <div class="pa-segmento" role="group" aria-label="Tipo de gráfico" data-tipo-grafico="anios">
+            <button type="button" data-tipo="barras">Barras</button>
+            <button type="button" data-tipo="linea">Línea</button>
+          </div>
+          <div class="pa-comparar">
+            <label class="pa-campo pa-campo--fila">Comparar<select data-anio-a aria-label="Año principal"></select></label>
+            <label class="pa-campo pa-campo--fila">con<select data-anio-b aria-label="Año a comparar"></select></label>
+          </div>
+        </div>
+        <ul class="pa-leyenda" aria-label="Leyenda">
+          <li><span class="pa-leyenda__muestra"></span><span data-leyenda-a></span></li>
+          <li><span class="pa-leyenda__muestra pa-leyenda__muestra--b"></span><span data-leyenda-b></span></li>
+        </ul>
+        <div class="pa-grafico">
+          <svg data-comparacion-svg viewBox="0 0 640 200" role="img" aria-label="Ventas por mes de dos años"></svg>
+          <div class="pa-grafico__tooltip" data-comparacion-tooltip role="status" hidden></div>
+        </div>
+        <details class="pa-tabla-detalle">
+          <summary>Ver como tabla</summary>
+          <table class="pa-tabla"><thead><tr><th scope="col">Mes</th><th scope="col" data-th-a></th><th scope="col" data-th-b></th><th scope="col">Variación</th></tr></thead><tbody data-tabla-comparacion></tbody></table>
+        </details>
+      </div>
+      <div class="pa-panel">
+        <h2>Historial por año</h2>
+        <div class="pa-partes" data-historial-anios></div>
+      </div>
+      <p class="pa-tenue pa-chico">Las visitas al sitio (cuántas personas entran y desde dónde) se ven en Cloudflare → Web Analytics.</p>
     </section>
 
     <!-- ───────────── pedidos ───────────── -->
@@ -343,6 +463,78 @@ const tema = {
   .pa-fila__datos { color: var(--pa-suave); font-size: .9rem; display: flex; gap: 10px; flex-wrap: wrap; }
   .pa-fila__botones { display: flex; gap: 6px; flex-wrap: wrap; justify-content: end; }
   .pa-etiqueta { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: .75rem; font-weight: 700; background: var(--pa-borde); color: var(--pa-tinta); }
+  .pa-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .pa-kpi { background: #fff; border: 1px solid var(--pa-borde); border-radius: 14px; padding: 14px 16px; }
+  .pa-kpi p { margin: 0; }
+  .pa-kpi__titulo { color: var(--pa-suave); font-size: .85rem; font-weight: 600; }
+  .pa-kpi__valor { font-size: 1.7rem; font-weight: 800; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .pa-kpi__nota { color: var(--pa-suave); font-size: .85rem; }
+  .pa-kpi__nota strong { color: var(--pa-tinta); }
+  .pa-panel { background: #fff; border: 1px solid var(--pa-borde); border-radius: 14px; padding: 16px; margin-bottom: 16px; min-width: 0; }
+  .pa-columnas { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .pa-columnas .pa-panel { margin-bottom: 0; }
+  .pa-grafico { position: relative; }
+  .pa-grafico svg { display: block; width: 100%; height: 200px; overflow: visible; }
+  .pa-grafico .eje { font-size: 11px; fill: var(--pa-suave); }
+  .pa-grafico .rejilla { stroke: var(--pa-borde); stroke-width: 1; }
+  .pa-grafico .barra { fill: var(--pa-acento); }
+  .pa-grafico .barra--activa { fill: var(--pa-acento-oscuro); }
+  .pa-grafico .zona { fill: transparent; cursor: pointer; }
+  .pa-grafico__tooltip { position: absolute; top: 0; transform: translateX(-50%); background: var(--pa-tinta); color: #fff; padding: 6px 10px; border-radius: 8px; font-size: .82rem; pointer-events: none; white-space: nowrap; }
+  .pa-grafico__tooltip strong { display: block; }
+  .pa-tabla-detalle { margin-top: 8px; font-size: .9rem; }
+  .pa-tabla-detalle summary { cursor: pointer; color: var(--pa-acento-oscuro); font-weight: 600; }
+  .pa-tabla { width: 100%; border-collapse: collapse; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .pa-tabla th, .pa-tabla td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--pa-borde); }
+  .pa-tabla td:not(:first-child), .pa-tabla th:not(:first-child) { text-align: right; }
+  .pa-ranking { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+  .pa-ranking--simple { list-style: none; padding-left: 0; }
+  .pa-ranking li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+  .pa-ranking li span:last-child { color: var(--pa-suave); text-align: right; min-width: 0; }
+  .pa-ranking li span:first-child { flex-shrink: 0; }
+  .pa-ranking:empty::before { content: "Todavía no hay ventas en este período."; color: var(--pa-suave); }
+  .pa-subtitulo { font-size: 1.25rem !important; margin: 28px 0 12px !important; }
+  .pa-kpis--dos { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .pa-panel__cabeza { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .pa-panel__cabeza h2 { margin: 0; }
+  .pa-comparar { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pa-comparar select { padding: 6px 10px; }
+  .pa-leyenda { list-style: none; margin: 8px 0; padding: 0; display: flex; gap: 16px; font-size: .88rem; color: var(--pa-tinta); }
+  .pa-leyenda li { display: flex; align-items: center; gap: 6px; }
+  .pa-leyenda__muestra { width: 12px; height: 12px; border-radius: 3px; background: var(--pa-acento); }
+  .pa-leyenda__muestra--b { background: var(--pa-comparacion, #2a78d6); }
+  .pa-grafico .barra--b { fill: var(--pa-comparacion, #2a78d6); }
+  .pa-grafico .barra--tenue { opacity: .35; }
+  .pa-periodo { display: grid; gap: 12px; }
+  .pa-periodo__atajos { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pa-periodo__campos { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; }
+  .pa-periodo__campos .pa-campo { min-width: 140px; flex: 1 1 140px; }
+  .pa-periodo__campos .pa-boton { flex: 0 0 auto; }
+  .pa-chip { border: 1.5px solid var(--pa-borde); background: #fff; color: var(--pa-tinta); border-radius: 999px; padding: 5px 12px; font: inherit; font-size: .88rem; cursor: pointer; }
+  .pa-chip:hover, .pa-chip[aria-pressed="true"] { border-color: var(--pa-acento); color: var(--pa-acento-oscuro); }
+  .pa-segmento { display: inline-flex; border: 1.5px solid var(--pa-borde); border-radius: 999px; padding: 2px; background: #fff; }
+  .pa-segmento button { border: 0; background: none; font: inherit; font-size: .85rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; cursor: pointer; color: var(--pa-suave); }
+  .pa-segmento button[aria-pressed="true"] { background: var(--pa-acento); color: #fff; }
+  .pa-grafico .linea { stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .pa-grafico .linea.serie-a { stroke: var(--pa-acento); }
+  .pa-grafico .linea.serie-b { stroke: var(--pa-comparacion, #2a78d6); }
+  .pa-grafico .punto { stroke: #fff; stroke-width: 2; }
+  .pa-grafico .punto.serie-a { fill: var(--pa-acento); }
+  .pa-grafico .punto.serie-b { fill: var(--pa-comparacion, #2a78d6); }
+  .pa-grafico .guia { stroke: var(--pa-suave); stroke-width: 1; stroke-dasharray: 3 3; }
+  .pa-partes { margin-top: 8px; }
+  .pa-barras-h { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .pa-barras-h__cabeza { display: flex; justify-content: space-between; gap: 8px; font-size: .92rem; font-variant-numeric: tabular-nums; }
+  .pa-barras-h__pista { height: 10px; background: #f3edf0; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+  .pa-barras-h__relleno { height: 100%; border-radius: 0 999px 999px 0; }
+  .pa-torta { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .pa-torta svg { width: 150px; height: 150px; flex: 0 0 auto; }
+  .pa-torta .torta-porcion { stroke: #fff; stroke-width: 2; }
+  .pa-torta .torta-centro { font-size: 13px; font-weight: 800; fill: var(--pa-tinta); }
+  .pa-torta__leyenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; flex: 1 1 160px; font-size: .9rem; }
+  .pa-torta__leyenda li { display: grid; grid-template-columns: 12px 1fr auto; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
+  .pa-torta__muestra { width: 12px; height: 12px; border-radius: 3px; }
+  .pa-aviso--despacho { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   .pa-etiqueta--suave { background: transparent; border: 1px solid var(--pa-borde); font-weight: 600; }
   .pa-etiqueta--ok { background: #e3f3ea; color: var(--pa-ok); }
   .pa-etiqueta--alerta { background: #fde8e6; color: var(--pa-error); }

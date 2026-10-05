@@ -1,7 +1,7 @@
 {
   "name": "nucleo-web",
-  "version": "0.8.0",
-  "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter, cotización, aviso de construcción, contacto (WhatsApp y redes) y panel de administración.",
+  "version": "0.9.0",
+  "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter, cotización, aviso de construcción, contacto (WhatsApp y redes), métricas de ventas y panel de administración.",
   "type": "module",
   "exports": {
     ".": "./index.ts",
@@ -26,6 +26,7 @@
     "./core/turnstile": "./core/turnstile-cliente.ts",
     "./construccion": "./modulos/construccion/index.ts",
     "./contacto": "./modulos/contacto/index.ts",
+    "./metricas": "./modulos/metricas/index.ts",
     "./panel": "./modulos/panel/index.ts",
     "./panel/cliente": "./modulos/panel/cliente.ts",
     "./panel/PanelAdmin.astro": "./modulos/panel/ui-defecto/PanelAdmin.astro"
@@ -39,6 +40,6 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx pruebas/exports.test.ts && tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts && tsx pruebas/newsletter.test.ts && tsx pruebas/compra.test.ts && tsx pruebas/construccion.test.ts && tsx pruebas/contacto.test.ts && tsx pruebas/panel.test.ts"
+    "test": "tsx pruebas/exports.test.ts && tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts && tsx pruebas/newsletter.test.ts && tsx pruebas/compra.test.ts && tsx pruebas/construccion.test.ts && tsx pruebas/contacto.test.ts && tsx pruebas/metricas.test.ts && tsx pruebas/panel.test.ts"
   }
 }

@@ -23,6 +23,8 @@ export interface ConfigCompra {
   coloresCorreo?: { acento?: string; fondo?: string };
   /** Días que se guardan los datos del pedido en KV. Por defecto 90. */
   retencionDias?: number;
+  /** Zona horaria para agrupar las ventas por día en las métricas. Por defecto America/Santiago. */
+  zonaHoraria?: string;
   /** Máximo de productos distintos por pedido. Por defecto 30. */
   maxLineas?: number;
   /** Algo extra al confirmarse un pago (ya verificado y sin repetir). */

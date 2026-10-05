@@ -6,9 +6,26 @@
 import { derivarClave, enviar, obtener, reducirFoto, subirFotoProducto } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
 import { ayudaVendidos, textoStock } from "../texto-stock";
+import {
+  diaCorto,
+  dibujarAdaptable,
+  graficoComparacion,
+  graficoPartes,
+  graficoTiempo,
+  guardarPreferencia,
+  NOMBRES_MES,
+  preferencia,
+  textoVariacion,
+  variacion,
+  ventasDelAnio,
+  type RangoPanel,
+  type ResumenPanel,
+  type TipoPartes,
+  type TipoTiempo,
+} from "./resumen-vista";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "productos" | "pedidos" | "suscriptores" | "seguridad";
-const PESTANAS: Vista[] = ["productos", "pedidos", "suscriptores", "seguridad"];
+type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "pedidos" | "suscriptores" | "seguridad";
+const PESTANAS: Vista[] = ["resumen", "productos", "pedidos", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
 interface Producto {
@@ -200,6 +217,7 @@ for (const b of $$<HTMLButtonElement>("[data-tab]")) {
 
 async function abrirPestana(v: Vista) {
   mostrar(v);
+  if (v === "resumen") await cargarResumen();
   if (v === "productos") await cargarProductos();
   if (v === "pedidos") await cargarPedidos();
   if (v === "suscriptores") await cargarSuscriptores();
@@ -208,7 +226,7 @@ async function abrirPestana(v: Vista) {
 
 async function entrarAlPanel(segundos: number) {
   iniciarInactividad(segundos);
-  await abrirPestana("productos");
+  await abrirPestana("resumen");
 }
 
 // ─────────────────────────── inactividad ───────────────────────────
@@ -509,6 +527,236 @@ async function cargarPedidos() {
   );
 }
 $("[data-pedidos-todos]").addEventListener("change", cargarPedidos);
+
+// ─────────────────────────── resumen (métricas) ───────────────────────────
+
+const pedidosTxt = (n: number) => `${n} ${n === 1 ? "pedido" : "pedidos"}`;
+const NOMBRE_MEDIO: Record<string, string> = { flow: "Flow", mercadopago: "Mercado Pago" };
+
+// Tipo de gráfico elegido en cada panel (se recuerda en este navegador).
+const tipos = {
+  tiempo: preferencia<TipoTiempo>("tiempo", ["barras", "linea"], "barras"),
+  anios: preferencia<TipoTiempo>("anios", ["barras", "linea"], "barras"),
+  productos: preferencia<TipoPartes>("productos", ["lista", "barras", "torta"], "lista"),
+  medios: preferencia<TipoPartes>("medios", ["lista", "barras", "torta"], "torta"),
+};
+type ClaveTipo = keyof typeof tipos;
+function marcarTipos() {
+  for (const grupo of $$("[data-tipo-grafico]")) {
+    const clave = grupo.dataset.tipoGrafico as ClaveTipo;
+    for (const b of $$<HTMLButtonElement>("button", grupo)) b.setAttribute("aria-pressed", String(b.dataset.tipo === tipos[clave]));
+  }
+}
+for (const grupo of $$("[data-tipo-grafico]")) {
+  for (const b of $$<HTMLButtonElement>("button", grupo)) {
+    b.addEventListener("click", () => {
+      const clave = grupo.dataset.tipoGrafico as ClaveTipo;
+      (tipos as Record<string, string>)[clave] = b.dataset.tipo!;
+      guardarPreferencia(clave, b.dataset.tipo!);
+      marcarTipos();
+      if (clave === "anios") dibujarComparacionActual();
+      else if (rangoActual) mostrarRango(rangoActual);
+    });
+  }
+}
+marcarTipos();
+
+async function cargarResumen() {
+  const r = await obtener<ResumenPanel>(`${API}/resumen`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo cargar el resumen.");
+  const d = r.datos;
+  const kpi = (k: string, valor: string) => ($(`[data-kpi="${k}"]`).textContent = valor);
+  const nota = (k: string) => $(`[data-kpi-nota="${k}"]`);
+  kpi("hoy", formatearPrecio(d.periodos.hoy.ventas));
+  nota("hoy").textContent = pedidosTxt(d.periodos.hoy.pedidos);
+  kpi("d7", formatearPrecio(d.periodos.d7.ventas));
+  nota("d7").textContent = `${pedidosTxt(d.periodos.d7.pedidos)} · ${textoVariacion(d.variacion7)}`;
+  kpi("d30", formatearPrecio(d.periodos.d30.ventas));
+  nota("d30").textContent = pedidosTxt(d.periodos.d30.pedidos);
+  kpi("ticket", d.periodos.d30.pedidos ? formatearPrecio(d.periodos.d30.ticket) : "—");
+
+  const aviso = $("[data-resumen-despacho]");
+  aviso.hidden = !d.porDespachar;
+  $("[data-resumen-despacho-texto]").textContent =
+    d.porDespachar === 1 ? "Tienes 1 pedido por despachar." : `Tienes ${d.porDespachar} pedidos por despachar.`;
+
+  hoyNegocio = d.hoy;
+  mostrarAnual(d.anual);
+  const f = formPeriodo();
+  if (!f.desde.value) aplicarAtajo("30");
+  else await cargarRango();
+}
+
+// ─── explorar ventas: rango de fechas ───
+
+let hoyNegocio = "";
+let rangoActual: RangoPanel | null = null;
+const formPeriodo = () =>
+  $<HTMLFormElement>("[data-form-periodo]") as HTMLFormElement & { desde: HTMLInputElement; hasta: HTMLInputElement; agrupar: HTMLSelectElement };
+
+/** Suma días a "AAAA-MM-DD" (negativo para restar). */
+function moverDia(dia: string, n: number): string {
+  const [a, m, d] = dia.split("-").map(Number);
+  return new Date(Date.UTC(a, m - 1, d) + n * 86400000).toISOString().slice(0, 10);
+}
+function aplicarAtajo(atajo: string) {
+  const hoy = hoyNegocio || new Date().toISOString().slice(0, 10);
+  const [a, m] = hoy.split("-").map(Number);
+  const mm = (x: number) => String(x).padStart(2, "0");
+  let desde = hoy, hasta = hoy, agrupar = "dia";
+  if (atajo === "7") desde = moverDia(hoy, -6);
+  if (atajo === "30") desde = moverDia(hoy, -29);
+  if (atajo === "este-mes") desde = `${a}-${mm(m)}-01`;
+  if (atajo === "mes-pasado") {
+    const am = m === 1 ? a - 1 : a, mp = m === 1 ? 12 : m - 1;
+    desde = `${am}-${mm(mp)}-01`;
+    hasta = moverDia(`${a}-${mm(m)}-01`, -1);
+  }
+  if (atajo === "este-anio") { desde = `${a}-01-01`; agrupar = "mes"; }
+  if (atajo === "anio-pasado") { desde = `${a - 1}-01-01`; hasta = `${a - 1}-12-31`; agrupar = "mes"; }
+  const f = formPeriodo();
+  f.desde.value = desde;
+  f.hasta.value = hasta;
+  f.agrupar.value = agrupar;
+  for (const b of $$<HTMLButtonElement>("[data-atajo]")) b.setAttribute("aria-pressed", String(b.dataset.atajo === atajo));
+  void cargarRango();
+}
+for (const b of $$<HTMLButtonElement>("[data-atajo]")) b.addEventListener("click", () => aplicarAtajo(b.dataset.atajo!));
+formPeriodo().addEventListener("submit", (e) => {
+  e.preventDefault();
+  for (const b of $$<HTMLButtonElement>("[data-atajo]")) b.setAttribute("aria-pressed", "false");
+  void cargarRango();
+});
+
+async function cargarRango() {
+  const f = formPeriodo();
+  const error = $("[data-error-periodo]");
+  error.textContent = "";
+  if (!f.desde.value || !f.hasta.value) return (error.textContent = "Elige las dos fechas.");
+  if (f.desde.value > f.hasta.value) return (error.textContent = "La fecha de inicio es posterior a la de término.");
+  const q = new URLSearchParams({ desde: f.desde.value, hasta: f.hasta.value, agrupar: f.agrupar.value });
+  const r = await obtener<RangoPanel>(`${API}/resumen?${q}`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return (error.textContent = r.datos.message || "No se pudo cargar ese período.");
+  mostrarRango(r.datos);
+}
+
+const fechaLarga = (dia: string) => `${diaCorto(dia)} ${dia.slice(0, 4)}`;
+
+function mostrarRango(d: RangoPanel) {
+  rangoActual = d;
+  const kpi = (k: string, valor: string) => ($(`[data-kpi="${k}"]`).textContent = valor);
+  const nota = (k: string) => $(`[data-kpi-nota="${k}"]`);
+  const aprox = $("[data-periodo-aproximado]");
+  aprox.hidden = d.exacto;
+  aprox.textContent = d.exacto
+    ? ""
+    : `Para fechas de hace más de 13 meses se cuenta por mes completo: se muestra del ${fechaLarga(d.desde)} al ${fechaLarga(d.hasta)}.`;
+  kpi("rango", formatearPrecio(d.periodo.ventas));
+  nota("rango").textContent = `${fechaLarga(d.desde)} – ${fechaLarga(d.hasta)} · ${d.dias} ${d.dias === 1 ? "día" : "días"}`;
+  kpi("rango-pedidos", String(d.periodo.pedidos));
+  nota("rango-pedidos").textContent = d.anterior ? `${d.anterior.periodo.pedidos} en el período anterior` : "";
+  kpi("rango-ticket", d.periodo.pedidos ? formatearPrecio(d.periodo.ticket) : "—");
+  kpi("rango-anterior", d.anterior ? formatearPrecio(d.anterior.periodo.ventas) : "—");
+  nota("rango-anterior").textContent = d.anterior
+    ? `${fechaLarga(d.anterior.desde)} – ${fechaLarga(d.anterior.hasta)} · ${textoVariacion(d.variacion, "ese período").replace(" vs. ese período", "")}`
+    : "No hay datos suficientes para comparar.";
+
+  const titulo = { dia: "por día", semana: "por semana", mes: "por mes" }[d.agrupar];
+  $("[data-titulo-serie]").textContent = `Ventas ${titulo}`;
+  const puntos = d.serie.map((p) => ({
+    etiqueta: p.etiqueta,
+    detalle: p.desde === p.hasta ? fechaLarga(p.desde) : `${diaCorto(p.desde)} – ${fechaLarga(p.hasta)}`,
+    ventas: p.ventas,
+    pedidos: p.pedidos,
+  }));
+  const lienzo = $("[data-grafico-svg]") as unknown as SVGSVGElement;
+  dibujarAdaptable("tiempo", () => !lienzo.closest("[hidden]") && graficoTiempo(lienzo, $("[data-grafico-tooltip]"), puntos, tipos.tiempo, formatearPrecio));
+  $("[data-tabla-ventas]").replaceChildren(
+    ...[...puntos].reverse().map((x) => {
+      const tr = crear("tr");
+      tr.append(crear("td", "", x.detalle), crear("td", "", String(x.pedidos)), crear("td", "", formatearPrecio(x.ventas)));
+      return tr;
+    })
+  );
+  graficoPartes(
+    $("[data-top-productos]"),
+    d.topProductos.map((p) => ({ nombre: p.nombre, valor: p.ventas, detalle: `${p.unidades} ${p.unidades === 1 ? "unidad" : "unidades"} · ${formatearPrecio(p.ventas)}` })),
+    tipos.productos,
+    formatearPrecio
+  );
+  graficoPartes(
+    $("[data-medios]"),
+    d.medios.map((m) => ({ nombre: NOMBRE_MEDIO[m.proveedor] ?? m.proveedor, valor: m.ventas, detalle: `${pedidosTxt(m.pedidos)} · ${formatearPrecio(m.ventas)}` })),
+    tipos.medios,
+    formatearPrecio
+  );
+}
+
+// ─── comparación por años: se puede elegir qué dos años comparar ───
+
+let anualActual: ResumenPanel["anual"] | null = null;
+function mostrarAnual(a: ResumenPanel["anual"]) {
+  anualActual = a;
+  $("[data-kpi-anio-titulo]").textContent = `${a.anio} a la fecha`;
+  $('[data-kpi="anio"]').textContent = formatearPrecio(a.aFecha.ventas);
+  $('[data-kpi-nota="anio"]').textContent = `${pedidosTxt(a.aFecha.pedidos)} · ${textoVariacion(a.variacionAnual, `mismo período ${a.anio - 1}`)}`;
+  $('[data-kpi="anio-anterior"]').textContent = formatearPrecio(a.aFechaAnterior.ventas);
+  $("[data-kpi-anio-anterior-titulo]").textContent = `${a.anio - 1} a la misma fecha`;
+  $('[data-kpi-nota="anio-anterior"]').textContent = pedidosTxt(a.aFechaAnterior.pedidos);
+
+  const anios = [...new Set([a.anio, a.anio - 1, ...a.anios.map((x) => x.anio)])].sort((x, y) => y - x);
+  const selA = $<HTMLSelectElement>("[data-anio-a]");
+  const selB = $<HTMLSelectElement>("[data-anio-b]");
+  const previoA = Number(selA.value) || a.anio;
+  const previoB = Number(selB.value) || a.anio - 1;
+  for (const [sel, valor] of [[selA, previoA], [selB, previoB]] as [HTMLSelectElement, number][]) {
+    sel.replaceChildren(...anios.map((x) => {
+      const o = crear("option", "", String(x));
+      o.value = String(x);
+      return o;
+    }));
+    sel.value = String(anios.includes(valor) ? valor : anios[0]);
+  }
+  dibujarComparacionActual();
+
+  graficoPartes(
+    $("[data-historial-anios]"),
+    a.anios.map((x) => ({ nombre: String(x.anio), valor: x.ventas, detalle: `${formatearPrecio(x.ventas)} · ${pedidosTxt(x.pedidos)} · promedio ${formatearPrecio(x.ticket)}` })),
+    "lista",
+    formatearPrecio,
+    "Todavía no hay ventas registradas."
+  );
+}
+
+function dibujarComparacionActual() {
+  if (!anualActual) return;
+  const anioA = Number($<HTMLSelectElement>("[data-anio-a]").value);
+  const anioB = Number($<HTMLSelectElement>("[data-anio-b]").value);
+  const a = ventasDelAnio(anualActual.meses, anioA);
+  const b = ventasDelAnio(anualActual.meses, anioB);
+  $("[data-leyenda-a]").textContent = String(anioA);
+  $("[data-leyenda-b]").textContent = String(anioB);
+  const lienzo = $("[data-comparacion-svg]") as unknown as SVGSVGElement;
+  const enCurso = { anio: anualActual.anio, mes: Number(anualActual.hoy.slice(5, 7)) };
+  dibujarAdaptable("anios", () => !lienzo.closest("[hidden]") && graficoComparacion(lienzo, $("[data-comparacion-tooltip]"), anioA, a, anioB, b, tipos.anios, formatearPrecio, enCurso));
+  $("[data-th-a]").textContent = String(anioA);
+  $("[data-th-b]").textContent = String(anioB);
+  $("[data-tabla-comparacion]").replaceChildren(
+    ...NOMBRES_MES.map((m, i) => {
+      const curso = i === enCurso.mes - 1 && (anioA === enCurso.anio || anioB === enCurso.anio);
+      const v = curso ? null : variacion(a[i].ventas, b[i].ventas);
+      const tr = crear("tr");
+      tr.append(crear("td", "", curso ? `${m} (en curso)` : m), crear("td", "", formatearPrecio(a[i].ventas)), crear("td", "", formatearPrecio(b[i].ventas)), crear("td", "", v === null ? "—" : `${v > 0 ? "+" : ""}${v}%`));
+      return tr;
+    })
+  );
+}
+for (const sel of ["[data-anio-a]", "[data-anio-b]"]) $(sel).addEventListener("change", dibujarComparacionActual);
+
+$("[data-resumen-recargar]").addEventListener("click", cargarResumen);
+$("[data-ir-pedidos]").addEventListener("click", () => abrirPestana("pedidos"));
 
 // ─────────────────────────── suscriptores ───────────────────────────
 

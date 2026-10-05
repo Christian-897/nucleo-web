@@ -14,6 +14,7 @@ import { validarCarrito } from "../carrito/servidor";
 import type { LineaValidada } from "../carrito/tipos";
 import { fuenteCarrito, registrarVenta } from "../catalogo/stock";
 import { resolverCatalogo } from "../catalogo/almacen";
+import { registrarPedido } from "../metricas/almacen";
 import type { ConfigPago, PedidoGuardado } from "../pago/config";
 import { ErrorPedido } from "../pago/tipos";
 import type { ConfigCompra, EnvCompra } from "./config";
@@ -95,6 +96,17 @@ export function crearConfigPagoCompra(config: ConfigCompra): ConfigPago {
       await kv?.put(clavePedidoProcesado(confirmacion.orden), "1", {
         expirationTtl: (config.retencionDias ?? 90) * 86400,
       });
+
+      // Métricas del panel. Nunca debe romper una venta ya pagada.
+      try {
+        await registrarPedido(
+          kv,
+          { orden: confirmacion.orden, creado: pedido.creado, monto: confirmacion.monto, proveedor: confirmacion.proveedor, lineas: meta.lineas },
+          config.zonaHoraria
+        );
+      } catch (e) {
+        console.error("[compra] no se pudo registrar en métricas", e);
+      }
 
       const datos = { orden: confirmacion.orden, monto: confirmacion.monto, ...meta };
       const tienda = correoTienda(config, datos);
