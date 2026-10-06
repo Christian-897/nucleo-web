@@ -15,6 +15,9 @@ editable desde el panel (pestaña **Portada**) sin reconstruir el sitio.
 - La primera foto carga con prioridad (buena nota en Core Web Vitals); las
   demás, después.
 - Con una sola diapositiva no hay controles: queda como portada fija.
+- **Estilo de los botones** a elección (en el panel): cápsula blanca, mínimo
+  (puntos blancos y flechas al pasar el mouse), líneas finas de progreso o
+  discreto (solo pausa). Todos dejan la pausa.
 
 ## Montaje en un sitio
 

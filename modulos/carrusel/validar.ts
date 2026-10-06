@@ -3,7 +3,7 @@
  * Nunca se confía en la pantalla: todo pasa por aquí antes de guardarse.
  */
 import { normalizeInput } from "../../core/validar";
-import { ENFOQUES, LIMITES, SEGUNDOS_POR_DEFECTO, type Diapositiva, type Enfoque, type EstadoCarrusel } from "./tipos";
+import { ENFOQUES, ESTILOS_CONTROLES, LIMITES, SEGUNDOS_POR_DEFECTO, type Diapositiva, type Enfoque, type EstadoCarrusel, type EstiloControles } from "./tipos";
 
 const ID = /^[a-z0-9-]{1,40}$/;
 
@@ -53,6 +53,7 @@ export function validarCarrusel(crudo: unknown): Resultado {
     } else segundos = s;
   }
   const automatico = o.automatico !== false;
+  const controles: EstiloControles = ESTILOS_CONTROLES.includes(o.controles as EstiloControles) ? (o.controles as EstiloControles) : "burbuja";
 
   const lista = Array.isArray(o.diapositivas) ? o.diapositivas : null;
   if (!lista || lista.length === 0) e.general = "La portada necesita al menos una diapositiva.";
@@ -114,5 +115,5 @@ export function validarCarrusel(crudo: unknown): Resultado {
     const mensaje = e.general ?? e.segundos ?? (conPosicion ? `Revisa la diapositiva ${Number(conPosicion.split(".")[0]) + 1}.` : "Revisa los datos.");
     return { ok: false, errores: e, mensaje };
   }
-  return { ok: true, datos: { diapositivas, segundos, automatico } };
+  return { ok: true, datos: { diapositivas, segundos, automatico, controles } };
 }

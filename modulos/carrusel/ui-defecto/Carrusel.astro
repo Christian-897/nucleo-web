@@ -120,6 +120,58 @@ const html = htmlCarrusel(estado, opciones);
   .carrusel__punto[aria-current] span::after { transform: scaleX(1); }
   .carrusel :focus-visible { outline: 3px solid var(--carrusel-acento); outline-offset: 2px; }
 
+  /* ── Estilo "mínimo": sin cápsula; todo blanco sobre la foto; flechas al pasar el mouse ── */
+  .carrusel[data-controles="minimo"] .carrusel__controles,
+  .carrusel[data-controles="lineas"] .carrusel__controles,
+  .carrusel[data-controles="discreto"] .carrusel__controles { background: none; box-shadow: none; }
+  .carrusel[data-controles="minimo"] .carrusel__boton-control,
+  .carrusel[data-controles="lineas"] .carrusel__boton-control,
+  .carrusel[data-controles="discreto"] .carrusel__boton-control {
+    width: 34px; height: 34px; color: #fff; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .45));
+  }
+  .carrusel[data-controles="minimo"] .carrusel__boton-control:hover,
+  .carrusel[data-controles="lineas"] .carrusel__boton-control:hover,
+  .carrusel[data-controles="discreto"] .carrusel__boton-control:hover { background: rgba(255, 255, 255, .2); }
+  .carrusel[data-controles="minimo"] .carrusel__boton-control svg,
+  .carrusel[data-controles="lineas"] .carrusel__boton-control svg,
+  .carrusel[data-controles="discreto"] .carrusel__boton-control svg { width: 18px; height: 18px; }
+  .carrusel[data-controles="minimo"] .carrusel__punto span,
+  .carrusel[data-controles="lineas"] .carrusel__punto span { background: rgba(255, 255, 255, .55); box-shadow: 0 0 3px rgba(0, 0, 0, .25); }
+  .carrusel[data-controles="minimo"] .carrusel__punto span::after,
+  .carrusel[data-controles="lineas"] .carrusel__punto span::after { background: #fff; }
+  @media (hover: hover) {
+    .carrusel[data-controles="minimo"] [data-carrusel-anterior],
+    .carrusel[data-controles="minimo"] [data-carrusel-siguiente] { opacity: 0; transition: opacity .25s; }
+    .carrusel[data-controles="minimo"]:hover [data-carrusel-anterior],
+    .carrusel[data-controles="minimo"]:hover [data-carrusel-siguiente],
+    .carrusel[data-controles="minimo"] [data-carrusel-anterior]:focus-visible,
+    .carrusel[data-controles="minimo"] [data-carrusel-siguiente]:focus-visible { opacity: 1; }
+  }
+  @media (hover: none) {
+    .carrusel[data-controles="minimo"] [data-carrusel-anterior],
+    .carrusel[data-controles="minimo"] [data-carrusel-siguiente] { display: none; }
+  }
+
+  /* ── Estilo "líneas": rayitas finas de progreso (tipo historias) ── */
+  .carrusel[data-controles="lineas"] .carrusel__controles { width: min(340px, 46%); gap: 6px; }
+  .carrusel[data-controles="lineas"] [data-carrusel-anterior],
+  .carrusel[data-controles="lineas"] [data-carrusel-siguiente] { display: none; }
+  .carrusel[data-controles="lineas"] .carrusel__puntos { flex: 1; gap: 6px; }
+  .carrusel[data-controles="lineas"] .carrusel__punto,
+  .carrusel[data-controles="lineas"] .carrusel__punto[aria-current] { flex: 1; width: auto; height: 34px; }
+  .carrusel[data-controles="lineas"] .carrusel__punto span,
+  .carrusel[data-controles="lineas"] .carrusel__punto[aria-current] span { width: 100%; height: 3px; }
+  /* Las ya vistas quedan llenas; las que vienen, vacías. */
+  .carrusel[data-controles="lineas"] .carrusel__punto:has(~ .carrusel__punto[aria-current]) span::after { transform: scaleX(1); }
+
+  /* ── Estilo "discreto": solo la pausa, chica ── */
+  .carrusel[data-controles="discreto"] [data-carrusel-anterior],
+  .carrusel[data-controles="discreto"] [data-carrusel-siguiente],
+  .carrusel[data-controles="discreto"] .carrusel__puntos { display: none; }
+  .carrusel[data-controles="discreto"] .carrusel__boton-control { opacity: .75; }
+  .carrusel[data-controles="discreto"] .carrusel__boton-control:hover,
+  .carrusel[data-controles="discreto"] .carrusel__boton-control:focus-visible { opacity: 1; }
+
   @media (prefers-reduced-motion: no-preference) {
     /* Barra de progreso del punto activo: se congela cuando el carrusel se detiene. */
     .carrusel:not([data-detenido]) .carrusel__punto[aria-current] span::after {

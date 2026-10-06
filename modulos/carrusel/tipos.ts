@@ -4,6 +4,17 @@
 export type Enfoque = "izquierda" | "centro" | "derecha";
 export const ENFOQUES: readonly Enfoque[] = ["izquierda", "centro", "derecha"];
 
+/**
+ * Cómo se ven los botones del carrusel. Todos dejan el botón de pausa
+ * (WCAG 2.2.2: lo que avanza solo se tiene que poder detener).
+ *  - burbuja: pausa, flechas y puntos en una cápsula blanca.
+ *  - minimo:  sin cápsula; puntos y pausa blancos sobre la foto; flechas al pasar el mouse.
+ *  - lineas:  rayitas finas de progreso sobre la foto (tipo historias) y pausa.
+ *  - discreto: solo un botón de pausa chico (se cambia deslizando, con el teclado o solo).
+ */
+export type EstiloControles = "burbuja" | "minimo" | "lineas" | "discreto";
+export const ESTILOS_CONTROLES: readonly EstiloControles[] = ["burbuja", "minimo", "lineas", "discreto"];
+
 export interface Diapositiva {
   /** Identificador estable (el panel lo usa para editar y ordenar). */
   id: string;
@@ -27,6 +38,8 @@ export interface EstadoCarrusel {
   segundos: number;
   /** ¿Avanza sola? (Igual se detiene con el mouse encima, al usar el teclado o con "Pausar".) */
   automatico: boolean;
+  /** Estilo de los botones. Por defecto "burbuja". */
+  controles?: EstiloControles;
 }
 
 /** Cómo se dibuja: lo pone el SITIO (código), nunca el panel. */

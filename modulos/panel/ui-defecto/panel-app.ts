@@ -646,6 +646,7 @@ interface EstadoPortada {
   diapositivas: Diapo[];
   segundos: number;
   automatico: boolean;
+  controles?: string;
 }
 
 let portada: EstadoPortada | null = null;
@@ -670,6 +671,7 @@ function pintarPortada(editado: boolean) {
   sel.replaceChildren(...opciones.map((n) => new Option(`${n} segundos`, String(n))));
   sel.value = String(p.segundos);
   sel.disabled = !p.automatico;
+  $<HTMLSelectElement>("[data-carrusel-controles]").value = p.controles ?? "burbuja";
   const total = p.diapositivas.length;
   $<HTMLButtonElement>("[data-nueva-diapo]").disabled = total >= maximoDiapos;
   $("[data-portada-estado]").textContent =
@@ -744,7 +746,8 @@ async function guardarAjustesPortada() {
   if (!portada) return;
   const automatico = $<HTMLInputElement>("[data-carrusel-automatico]").checked;
   const segundos = Number($<HTMLSelectElement>("[data-carrusel-segundos]").value);
-  const r = await guardarPortada({ ...portada, automatico, segundos }, "Listo, guardado.");
+  const controles = $<HTMLSelectElement>("[data-carrusel-controles]").value;
+  const r = await guardarPortada({ ...portada, automatico, segundos, controles }, "Listo, guardado.");
   if (!r.ok) {
     if (r.message) avisar(r.message);
     await cargarPortada();
@@ -752,6 +755,7 @@ async function guardarAjustesPortada() {
 }
 $("[data-carrusel-automatico]").addEventListener("change", guardarAjustesPortada);
 $("[data-carrusel-segundos]").addEventListener("change", guardarAjustesPortada);
+$("[data-carrusel-controles]").addEventListener("change", guardarAjustesPortada);
 
 $("[data-restablecer-portada]").addEventListener("click", async () => {
   if (!confirm("¿Volver a la portada original del sitio? Se pierden las diapositivas editadas aquí.")) return;

@@ -12,6 +12,7 @@ import {
   htmlCarrusel,
   imagenValida,
   validarCarrusel,
+  atributosCarrusel,
   type EstadoCarrusel,
 } from "../modulos/carrusel/index";
 
@@ -170,6 +171,14 @@ async function run() {
     if (!r.ok) return;
     assert.equal(r.datos.diapositivas[0].imagenAlt, "Foto linda");
     assert.equal(r.datos.diapositivas[0].titulo, "Hola");
+  });
+
+  await prueba("estilo de botones: uno de la lista; si no, cápsula", () => {
+    const a = validarCarrusel({ ...copia(), controles: "lineas" });
+    assert.ok(a.ok && a.datos.controles === "lineas");
+    const b = validarCarrusel({ ...copia(), controles: '"><script>' });
+    assert.ok(b.ok && b.datos.controles === "burbuja");
+    assert.equal(atributosCarrusel({ ...copia(), controles: "minimo" })["data-controles"], "minimo");
   });
 
   console.log("Carrusel — marcado:");

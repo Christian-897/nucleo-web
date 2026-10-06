@@ -196,6 +196,14 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <div class="pa-panel pa-portada-ajustes">
         <label class="pa-casilla"><input type="checkbox" data-carrusel-automatico /> Avanzar solas</label>
         <label class="pa-campo pa-campo--fila">Cambiar cada<select data-carrusel-segundos></select></label>
+        <label class="pa-campo pa-campo--fila">Botones
+          <select data-carrusel-controles>
+            <option value="burbuja">Cápsula blanca (pausa, flechas y puntos)</option>
+            <option value="minimo">Mínimo (puntos blancos; flechas al pasar el mouse)</option>
+            <option value="lineas">Líneas finas de progreso</option>
+            <option value="discreto">Discreto (solo pausa)</option>
+          </select>
+        </label>
         <p class="pa-tenue pa-chico">Siempre se pueden pausar. No avanzan solas si la persona pidió "reducir movimiento" en su teléfono o computador.</p>
       </div>
       <ul class="pa-lista" data-lista-diapos aria-live="polite"></ul>

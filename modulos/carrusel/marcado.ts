@@ -91,5 +91,6 @@ export function atributosCarrusel(estado: EstadoCarrusel): Record<string, string
   return {
     "data-segundos": String(estado.segundos),
     "data-automatico": estado.automatico && estado.diapositivas.length > 1 ? "si" : "no",
+    "data-controles": estado.controles ?? "burbuja",
   };
 }
