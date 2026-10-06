@@ -15,6 +15,7 @@ import { tipoRealDeImagen } from "../modulos/panel/imagenes";
 import { ayudaVendidos, textoStock } from "../modulos/panel/texto-stock";
 import { diaLocal } from "../modulos/metricas/index";
 import { crearCarruselEditable } from "../modulos/carrusel/index";
+import { crearContenidoEditable } from "../modulos/contenido/index";
 const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
@@ -69,7 +70,19 @@ const portada = crearCarruselEditable({
     { id: "dos", imagen: "/img/portada/dos.webp", imagenAlt: "Foto dos", titulo: "Dos" },
   ],
 });
-const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada });
+const sitio = crearContenidoEditable(
+  {
+    grupos: [{ id: "g", titulo: "G" }],
+    campos: [
+      { clave: "colores.acento", grupo: "g", etiqueta: "Acento", tipo: "color", variable: "--c-acento" },
+      { clave: "inicio.titulo", grupo: "g", etiqueta: "Título", tipo: "texto", max: 40 },
+      { clave: "inicio.foto", grupo: "g", etiqueta: "Foto", tipo: "imagen" },
+    ],
+  },
+  { "colores.acento": "#d81b72", "inicio.titulo": "Hola", "inicio.foto": "/img/a.webp" },
+  { contraste: [{ texto: "#ffffff", fondo: "colores.acento", minimo: 4.5, descripcion: "Botones" }] }
+);
+const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio });
 
 function entorno(): { env: EnvPanel; datos: ReturnType<typeof kvMemoria>["datos"] } {
   const { kv, datos } = kvMemoria();
@@ -351,6 +364,49 @@ async function run() {
   });
 
   console.log("Panel — pedidos y suscriptores:");
+
+  console.log("Panel — diseño y textos:");
+
+  await prueba("diseño y textos: sin sesión nada; guardar con aviso de contraste (no bloquea); errores por campo", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    assert.equal((await panel.contenido.onRequestGet({ env, request: req("/x") })).status, 401);
+    const g = await json(await panel.contenido.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(g.valores["inicio.titulo"], "Hola");
+    assert.ok(g.fuentes.length >= 10);
+    const ok = await json(await panel.contenido.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", valores: { "colores.acento": "#ffd0e0" } } }) }));
+    assert.equal(ok.ok, true);
+    assert.equal(ok.avisos.length, 1, "libre con aviso");
+    assert.deepEqual(ok.cambiados, ["colores.acento"]);
+    const malo = await panel.contenido.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", valores: { "inicio.titulo": "" } } }) });
+    assert.equal(malo.status, 400);
+    assert.ok((await json(malo)).errores["inicio.titulo"]);
+    // Una foto no se cambia por aquí (solo subiendo un archivo revisado).
+    await panel.contenido.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", valores: { "inicio.foto": "/img/otra.webp" } } }) });
+    assert.equal((await sitio.obtener(env)).valores["inicio.foto"], "/img/a.webp");
+  });
+
+  await prueba("diseño y textos: foto nueva reemplaza (y borra) la anterior; restablecer la borra", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const subir = async () => {
+      const f = new FormData();
+      f.set("clave", "inicio.foto");
+      f.set("archivo", new File([png(1200, 800)], "x.png", { type: "image/png" }));
+      return (await json(await panel.contenidoFoto.onRequestPost({ env, request: req("/x", { cookie, form: f }) }))).imagen as string;
+    };
+    const f1 = await subir();
+    assert.match(f1, /^\/media\/sitio-inicio-foto-/);
+    const f2 = await subir();
+    assert.ok(!datos.has("foto:" + f1.slice(7)));
+    await panel.contenido.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "restablecer", claves: ["inicio.foto"] } }) });
+    assert.ok(!datos.has("foto:" + f2.slice(7)));
+    assert.equal((await sitio.obtener(env)).valores["inicio.foto"], "/img/a.webp");
+    const otro = new FormData();
+    otro.set("clave", "inicio.titulo");
+    otro.set("archivo", new File([png(10, 10)], "x.png", { type: "image/png" }));
+    assert.equal((await panel.contenidoFoto.onRequestPost({ env, request: req("/x", { cookie, form: otro }) })).status, 400, "un campo de texto no recibe fotos");
+  });
 
   console.log("Panel — categorías:");
 

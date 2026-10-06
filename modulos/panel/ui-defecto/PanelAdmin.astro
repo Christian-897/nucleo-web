@@ -29,10 +29,12 @@ interface Props {
   coloresGraficos?: string[];
   /** Muestra la pestaña Portada (el sitio montó el carrusel editable). */
   carrusel?: boolean;
+  /** Muestra la pestaña "Diseño y textos" (el sitio montó el contenido editable). */
+  contenido?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -76,6 +78,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <button type="button" data-tab="productos">Productos</button>
       <button type="button" data-tab="categorias">Categorías</button>
       <button type="button" data-tab="portada" hidden={!carrusel}>Portada</button>
+      <button type="button" data-tab="sitio" hidden={!contenido}>Diseño y textos</button>
       <button type="button" data-tab="pedidos">Pedidos</button>
       <button type="button" data-tab="suscriptores">Suscriptores</button>
       <button type="button" data-tab="seguridad">Seguridad</button>
@@ -157,6 +160,27 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <ul class="pa-lista" data-lista-categorias aria-live="polite"></ul>
       <p class="pa-tenue pa-chico">¿Necesitas una categoría nueva? Lleva su propia página en la tienda: pídesela a quien mantiene el sitio.</p>
       <button class="pa-enlace" type="button" data-restablecer-categorias hidden>Volver a los nombres y fotos originales</button>
+    </section>
+
+    <!-- ───────────── diseño y textos (contenido) ───────────── -->
+    <section class="pa-vista" data-vista="sitio" hidden>
+      <div class="pa-titulo">
+        <h1>Diseño y textos</h1>
+        <a class="pa-boton pa-boton--suave" href={tienda} target="_blank" rel="noopener">Ver tienda ↗</a>
+      </div>
+      <p class="pa-tenue">Elige una sección, cambia lo que quieras y pulsa <strong>Guardar</strong>. El sitio se actualiza en unos segundos.</p>
+      <div class="pa-secciones" role="group" aria-label="Secciones" data-sitio-grupos></div>
+      <form class="pa-panel pa-sitio" data-form="sitio" novalidate>
+        <h2 data-sitio-titulo></h2>
+        <p class="pa-tenue" data-sitio-descripcion></p>
+        <div data-sitio-extra></div>
+        <div class="pa-sitio__campos" data-sitio-campos></div>
+        <p class="pa-error" role="alert" data-error></p>
+        <div class="pa-sitio__pie">
+          <button class="pa-enlace" type="button" data-sitio-restablecer>Volver a lo original en esta sección</button>
+          <button class="pa-boton" type="submit">Guardar</button>
+        </div>
+      </form>
     </section>
 
     <!-- ───────────── portada (carrusel) ───────────── -->
@@ -542,10 +566,11 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-marca img { border-radius: 50%; }
   .pa-marca span { display: grid; line-height: 1.2; }
   .pa-marca small { color: var(--pa-suave); font-size: .78rem; }
-  .pa-pestanas { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
-  .pa-pestanas button { border: 0; background: none; padding: 8px 12px; border-radius: 999px; font: inherit; font-weight: 500; color: var(--pa-tinta); cursor: pointer; }
+  .pa-pestanas { display: flex; gap: 2px; flex-wrap: wrap; margin-left: auto; }
+  .pa-pestanas button { border: 0; background: none; padding: 7px 9px; border-radius: 999px; font: inherit; font-size: .94rem; font-weight: 500; color: var(--pa-tinta); cursor: pointer; white-space: nowrap; }
   .pa-pestanas button[aria-current="page"] { background: var(--pa-acento); color: #fff; font-weight: 600; }
   .pa-acciones { display: flex; gap: 8px; }
+  .pa-acciones .pa-boton { padding: 7px 14px; font-size: .94rem; }
 
   .pa-principal { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
   .pa-centro { display: grid; place-items: center; min-height: 80vh; }
@@ -687,6 +712,36 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-portada-ajustes { display: flex; gap: 8px 24px; align-items: center; flex-wrap: wrap; }
   .pa-portada-ajustes p { flex-basis: 100%; margin: 0; }
   .pa-boton--icono { width: 34px; padding: 6px 0; }
+  .pa-secciones { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .pa-sitio { display: grid; gap: 12px; }
+  .pa-sitio > h2, .pa-sitio > p { margin: 0; }
+  .pa-sitio > p:empty { display: none; }
+  .pa-sitio__campos { display: grid; gap: 14px; }
+  .pa-sitio__pie { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-top: 1px solid var(--pa-borde); padding-top: 12px; }
+  .pa-sitio__campo { display: grid; gap: 4px; }
+  .pa-sitio__campo .pa-campo { gap: 4px; }
+  .pa-sitio__etiqueta { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pa-color { display: flex; gap: 8px; align-items: center; }
+  .pa-color input[type="color"] { width: 48px; height: 42px; padding: 2px; border: 1.5px solid var(--pa-borde); border-radius: 10px; background: #fff; cursor: pointer; flex: none; }
+  .pa-color input[type="text"] { max-width: 130px; font-family: ui-monospace, monospace; }
+  .pa-colores { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+  .pa-muestra-fuente { margin: 4px 0 0; font-size: 1.35rem; line-height: 1.3; color: var(--pa-tinta); overflow-wrap: anywhere; }
+  .pa-foto-campo { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .pa-foto-campo img { width: 160px; height: 107px; object-fit: cover; border-radius: 10px; background: var(--pa-borde); }
+  .pa-avisos { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .pa-avisos li { background: #fff4d6; border-radius: 10px; padding: 8px 12px; font-size: .9rem; }
+  .pa-avisos--ok li { background: #e3f3ea; color: var(--pa-ok); }
+  .pa-combinaciones { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pa-vista-previa { border: 1px solid var(--pa-borde); border-radius: 14px; overflow: hidden; background: var(--c-fondo, #fff); color: var(--c-texto, #333); font-family: var(--fuente-texto, inherit); }
+  .pa-vista-previa__franja { background: var(--c-franja, #eee); color: var(--c-texto, #333); font-size: .8rem; padding: 6px 14px; }
+  .pa-vista-previa__cuerpo { padding: 16px; display: grid; gap: 8px; justify-items: start; }
+  .pa-vista-previa__firma { font-family: var(--fuente-firma, cursive); font-size: 2.2rem; line-height: 1; color: var(--c-tinta, #222); margin: 0; }
+  .pa-vista-previa__titulo { font-family: var(--fuente-titulo, inherit); font-size: 1.7rem; line-height: 1.1; color: var(--c-tinta, #222); margin: 0; font-weight: 400; }
+  .pa-vista-previa__texto { margin: 0; }
+  .pa-vista-previa__boton { background: var(--c-acento, #c2185b); color: #fff; border-radius: 999px; padding: 8px 18px; font-weight: 700; }
+  .pa-vista-previa__marca { display: inline-block; width: 36px; height: 3px; background: var(--c-marca, #f39); border-radius: 2px; }
+  .pa-vista-previa__pie { background: var(--c-pie, #222); color: #fff; font-size: .8rem; padding: 8px 14px; }
+  .pa-cambiado { font-size: .72rem; }
 
   .pa-propuesta { display: grid; gap: 10px; margin-top: 12px; }
   .pa-propuesta img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--pa-borde); border-radius: 8px; padding: 8px; }

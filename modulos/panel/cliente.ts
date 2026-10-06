@@ -133,3 +133,11 @@ export async function subirFotoCategoria(id: string, foto: File, base = "/api/ad
   form.set("archivo", foto);
   return llamar<{ imagen: string }>(`${base}/categoria-foto`, { method: "POST", body: form });
 }
+
+/** Sube una foto del sitio (campo de tipo imagen del módulo contenido) y la deja puesta. */
+export async function subirFotoContenido(clave: string, foto: File, base = "/api/admin") {
+  const form = new FormData();
+  form.set("clave", clave);
+  form.set("archivo", foto);
+  return llamar<{ imagen: string }>(`${base}/contenido-foto`, { method: "POST", body: form });
+}

@@ -23,9 +23,10 @@ import {
   type TipoPartes,
   type TipoTiempo,
 } from "./resumen-vista";
+import { crearVistaSitio } from "./sitio-vista";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "pedidos" | "suscriptores" | "seguridad";
-const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "pedidos", "suscriptores", "seguridad"];
+type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "suscriptores" | "seguridad";
+const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
 interface Producto {
@@ -229,6 +230,7 @@ async function abrirPestana(v: Vista) {
   if (v === "productos") await cargarProductos();
   if (v === "portada") await cargarPortada();
   if (v === "categorias") await cargarCategorias();
+  if (v === "sitio") await vistaSitio.cargar();
   if (v === "pedidos") await cargarPedidos();
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
@@ -473,6 +475,10 @@ formProducto().addEventListener("submit", async (e) => {
     await cargarProductos();
   });
 });
+
+// ─────────────────────────── diseño y textos ───────────────────────────
+
+const vistaSitio = crearVistaSitio({ raiz, avisar, siSeCerro, conBoton });
 
 // ─────────────────────────── categorías ───────────────────────────
 
