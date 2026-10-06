@@ -51,11 +51,19 @@ async function medidasDeArchivo(archivo: Blob): Promise<{ ancho: number; alto: n
 }
 
 /**
- * Reduce una foto en el navegador: recorta al centro en cuadrado (las
- * fichas de producto son cuadradas), la lleva a `lado` px y la comprime
- * (WebP si se puede) hasta quedar bajo `maximoBytes`.
+ * Reduce una foto en el navegador y la comprime (WebP si se puede) hasta
+ * quedar bajo `maximoBytes`.
+ *  - "cuadrado" (por defecto): recorta al centro en cuadrado de `lado` px
+ *    (las fichas de producto son cuadradas).
+ *  - "libre": mantiene la forma; el lado más largo queda en `lado` px
+ *    (fotos de portada).
  */
-export async function reducirFoto(archivo: File, lado = 1200, maximoBytes = 900 * 1024): Promise<File> {
+export async function reducirFoto(
+  archivo: File,
+  lado = 1200,
+  maximoBytes = 900 * 1024,
+  recorte: "cuadrado" | "libre" = "cuadrado"
+): Promise<File> {
   const m = await medidasDeArchivo(archivo);
   if (!m) throw new Error("No pudimos leer esa foto. Usa un JPG, PNG o WebP.");
   if (m.ancho > 15000 || m.alto > 15000 || m.ancho * m.alto > 60_000_000) {
@@ -67,15 +75,23 @@ export async function reducirFoto(archivo: File, lado = 1200, maximoBytes = 900 
   } catch {
     imagen = await createImageBitmap(archivo);
   }
-  const corte = Math.min(imagen.width, imagen.height);
-  const final = Math.min(lado, corte);
   const lienzo = document.createElement("canvas");
-  lienzo.width = final;
-  lienzo.height = final;
   const ctx = lienzo.getContext("2d");
   if (!ctx) throw new Error("Tu navegador no pudo procesar la foto.");
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(imagen, (imagen.width - corte) / 2, (imagen.height - corte) / 2, corte, corte, 0, 0, final, final);
+  if (recorte === "libre") {
+    const escala = Math.min(1, lado / Math.max(imagen.width, imagen.height));
+    lienzo.width = Math.round(imagen.width * escala);
+    lienzo.height = Math.round(imagen.height * escala);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+  } else {
+    const corte = Math.min(imagen.width, imagen.height);
+    const final = Math.min(lado, corte);
+    lienzo.width = final;
+    lienzo.height = final;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(imagen, (imagen.width - corte) / 2, (imagen.height - corte) / 2, corte, corte, 0, 0, final, final);
+  }
   imagen.close?.();
 
   const aBlob = (tipo: string, calidad: number) =>
@@ -101,4 +117,11 @@ export async function subirFotoProducto(id: string, foto: File, base = "/api/adm
   form.set("id", id);
   form.set("archivo", foto);
   return llamar<{ imagen: string }>(`${base}/producto-foto`, { method: "POST", body: form });
+}
+
+/** Sube una foto de la portada (ya reducida). Devuelve su dirección; se usa al guardar el carrusel. */
+export async function subirFotoCarrusel(foto: File, base = "/api/admin") {
+  const form = new FormData();
+  form.set("archivo", foto);
+  return llamar<{ imagen: string }>(`${base}/carrusel-foto`, { method: "POST", body: form });
 }

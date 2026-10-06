@@ -14,6 +14,7 @@ import { fuenteCarrito } from "../modulos/catalogo/stock";
 import { tipoRealDeImagen } from "../modulos/panel/imagenes";
 import { ayudaVendidos, textoStock } from "../modulos/panel/texto-stock";
 import { diaLocal } from "../modulos/metricas/index";
+import { crearCarruselEditable } from "../modulos/carrusel/index";
 const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
@@ -62,7 +63,13 @@ const catalogo = crearCatalogoEditable(
     { id: "cursos", nombre: "Cursos" },
   ]
 );
-const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo });
+const portada = crearCarruselEditable({
+  diapositivas: [
+    { id: "uno", imagen: "/img/portada/uno.webp", imagenAlt: "Foto uno", titulo: "Uno" },
+    { id: "dos", imagen: "/img/portada/dos.webp", imagenAlt: "Foto dos", titulo: "Dos" },
+  ],
+});
+const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada });
 
 function entorno(): { env: EnvPanel; datos: ReturnType<typeof kvMemoria>["datos"] } {
   const { kv, datos } = kvMemoria();
@@ -344,6 +351,69 @@ async function run() {
   });
 
   console.log("Panel — pedidos y suscriptores:");
+
+  console.log("Panel — portada (carrusel):");
+
+  await prueba("portada: sin sesión no se ve ni se cambia; desde otro sitio tampoco", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    assert.equal((await panel.carrusel.onRequestGet({ env, request: req("/x") })).status, 401);
+    assert.equal((await panel.carrusel.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "restablecer" } }) })).status, 401);
+    const ajeno = await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.cl", cuerpo: { accion: "restablecer" } }) });
+    assert.equal(ajeno.status, 403);
+    const foto = await panel.carruselFoto.onRequestPost({ env, request: req("/x", { form: formFoto("", png(1600, 900)) }) });
+    assert.equal(foto.status, 401);
+  });
+
+  await prueba("portada: subir foto, guardar, cambiarla borra la vieja y restablecer limpia todo", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const g = await json(await panel.carrusel.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(g.editado, false);
+    assert.equal(g.carrusel.diapositivas.length, 2);
+
+    const subir = async () => (await json(await panel.carruselFoto.onRequestPost({ env, request: req("/x", { cookie, form: formFoto("", png(1600, 900)) }) }))).imagen as string;
+    const f1 = await subir();
+    assert.match(f1, /^\/media\/portada-[0-9a-f]{12}$/);
+    const carrusel = { ...g.carrusel, diapositivas: [{ ...g.carrusel.diapositivas[0], imagen: f1 }, g.carrusel.diapositivas[1]] };
+    const r1 = await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", carrusel } }) });
+    assert.equal(r1.status, 200);
+    assert.equal(await portada.editado(env), true);
+
+    const f2 = await subir();
+    carrusel.diapositivas[0].imagen = f2;
+    await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", carrusel } }) });
+    assert.ok(!datos.has("foto:" + f1.slice(7)), "la foto reemplazada se borra");
+    assert.ok(datos.has("foto:" + f2.slice(7)));
+
+    const r3 = await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "restablecer" } }) });
+    assert.equal(r3.status, 200);
+    assert.equal(await portada.editado(env), false);
+    assert.ok(!datos.has("foto:" + f2.slice(7)), "al restablecer, las fotos subidas se borran");
+  });
+
+  await prueba("portada: errores por campo; un enlace javascript: o una foto ajena no se guardan", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const malo = {
+      diapositivas: [
+        { imagen: "https://otro.cl/x.png", imagenAlt: "x", boton: { texto: "Ir", enlace: "javascript:alert(1)" } },
+      ],
+    };
+    const r = await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", carrusel: malo } }) });
+    assert.equal(r.status, 400);
+    const d = await json(r);
+    assert.ok(d.errores["0.imagen"] && d.errores["0.enlace"] && d.errores["0.imagenAlt"]);
+    assert.ok(!datos.has("carrusel:portada"));
+  });
+
+  await prueba("portada: un SVG disfrazado de foto no entra", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const r = await panel.carruselFoto.onRequestPost({ env, request: req("/x", { cookie, form: formFoto("", svg, "foto.png") }) });
+    assert.equal(r.status, 400);
+  });
 
   await prueba("pedidos: solo con sesión; muestra los pagados; marcar enviado", async () => {
     const { env } = entorno();

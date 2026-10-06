@@ -3,7 +3,7 @@
  * REGLA: lo que llega del servidor se escribe SIEMPRE con textContent o
  * atributos; nunca con innerHTML.
  */
-import { derivarClave, enviar, obtener, reducirFoto, subirFotoProducto } from "../cliente";
+import { derivarClave, enviar, obtener, reducirFoto, subirFotoCarrusel, subirFotoProducto } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
 import { ayudaVendidos, textoStock } from "../texto-stock";
 import {
@@ -24,8 +24,8 @@ import {
   type TipoTiempo,
 } from "./resumen-vista";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "pedidos" | "suscriptores" | "seguridad";
-const PESTANAS: Vista[] = ["resumen", "productos", "pedidos", "suscriptores", "seguridad"];
+type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "portada" | "pedidos" | "suscriptores" | "seguridad";
+const PESTANAS: Vista[] = ["resumen", "productos", "portada", "pedidos", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
 interface Producto {
@@ -209,6 +209,7 @@ function cerrarLocal(mensaje?: string) {
   aviso.textContent = mensaje ?? "";
   aviso.hidden = !mensaje;
   ($("[data-editor]") as HTMLDialogElement).close();
+  ($("[data-editor-diapo]") as HTMLDialogElement).close();
   mostrar("entrar");
 }
 
@@ -225,6 +226,7 @@ async function abrirPestana(v: Vista) {
   mostrar(v);
   if (v === "resumen") await cargarResumen();
   if (v === "productos") await cargarProductos();
+  if (v === "portada") await cargarPortada();
   if (v === "pedidos") await cargarPedidos();
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
@@ -467,6 +469,263 @@ formProducto().addEventListener("submit", async (e) => {
     editor().close();
     avisar("Guardado. La tienda se actualiza en unos segundos.");
     await cargarProductos();
+  });
+});
+
+// ─────────────────────────── portada (carrusel) ───────────────────────────
+
+interface Diapo {
+  id?: string;
+  imagen: string;
+  imagenAlt: string;
+  enfoque?: "izquierda" | "centro" | "derecha";
+  antetitulo?: string;
+  titulo?: string;
+  subtitulo?: string;
+  texto?: string;
+  boton?: { texto: string; enlace: string };
+}
+interface EstadoPortada {
+  diapositivas: Diapo[];
+  segundos: number;
+  automatico: boolean;
+}
+
+let portada: EstadoPortada | null = null;
+let maximoDiapos = 8;
+const SEGUNDOS = [4, 5, 6, 7, 8, 10, 12, 15];
+
+async function cargarPortada() {
+  const r = await obtener<{ carrusel: EstadoPortada; editado: boolean; limites: { diapositivas: number } }>(`${API}/carrusel`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo cargar la portada.");
+  portada = r.datos.carrusel;
+  maximoDiapos = r.datos.limites?.diapositivas ?? 8;
+  pintarPortada(r.datos.editado);
+}
+
+function pintarPortada(editado: boolean) {
+  if (!portada) return;
+  const p = portada;
+  $<HTMLInputElement>("[data-carrusel-automatico]").checked = p.automatico;
+  const sel = $<HTMLSelectElement>("[data-carrusel-segundos]");
+  const opciones = [...new Set([...SEGUNDOS, p.segundos])].sort((a, b) => a - b);
+  sel.replaceChildren(...opciones.map((n) => new Option(`${n} segundos`, String(n))));
+  sel.value = String(p.segundos);
+  sel.disabled = !p.automatico;
+  const total = p.diapositivas.length;
+  $<HTMLButtonElement>("[data-nueva-diapo]").disabled = total >= maximoDiapos;
+  $("[data-portada-estado]").textContent =
+    (total >= maximoDiapos ? `Llegaste al máximo de ${maximoDiapos} diapositivas. ` : "") +
+    (editado ? "Esta portada se editó desde el panel." : "Esta es la portada original del sitio.");
+  $("[data-restablecer-portada]").hidden = !editado;
+
+  $("[data-lista-diapos]").replaceChildren(
+    ...p.diapositivas.map((d, i) => {
+      const li = crear("li", "pa-fila pa-fila--diapo");
+      const img = crear("img");
+      img.src = d.imagen;
+      img.alt = "";
+      img.width = 112;
+      img.height = 70;
+      img.loading = "lazy";
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", [d.titulo, d.subtitulo].filter(Boolean).join(" · ") || "Sin título"));
+      const datos = crear("div", "pa-fila__datos");
+      datos.append(crear("span", "pa-etiqueta", `${i + 1} de ${total}`));
+      if (d.boton) datos.append(crear("span", "", `Botón "${d.boton.texto}" → ${d.boton.enlace}`));
+      else datos.append(crear("span", "", "Sin botón"));
+      info.append(datos);
+      const botones = crear("div", "pa-fila__botones");
+      const boton = (texto: string, etiqueta: string, accion: () => void, deshabilitado = false, clase = "pa-boton pa-boton--suave pa-boton--chico") => {
+        const b = crear("button", clase, texto);
+        b.type = "button";
+        b.setAttribute("aria-label", etiqueta);
+        b.disabled = deshabilitado;
+        b.addEventListener("click", accion);
+        botones.append(b);
+      };
+      boton("↑", `Subir la diapositiva ${i + 1}`, () => moverDiapo(i, -1), i === 0, "pa-boton pa-boton--suave pa-boton--chico pa-boton--icono");
+      boton("↓", `Bajar la diapositiva ${i + 1}`, () => moverDiapo(i, 1), i === total - 1, "pa-boton pa-boton--suave pa-boton--chico pa-boton--icono");
+      boton("Editar", `Editar la diapositiva ${i + 1}`, () => abrirEditorDiapo(i), false, "pa-boton pa-boton--chico");
+      boton("Eliminar", `Eliminar la diapositiva ${i + 1}`, () => eliminarDiapo(i), total <= 1);
+      li.append(img, info, botones);
+      return li;
+    })
+  );
+}
+
+/** Guarda la portada completa. Devuelve los errores por campo si los hay. */
+async function guardarPortada(nueva: EstadoPortada, listo: string): Promise<{ ok: boolean; errores?: Record<string, string>; message?: string }> {
+  const r = await enviar<{ carrusel: EstadoPortada; errores?: Record<string, string> }>(`${API}/carrusel`, { accion: "guardar", carrusel: nueva });
+  if (siSeCerro(r.status)) return { ok: false };
+  if (!r.ok) return { ok: false, errores: r.datos.errores, message: r.datos.message || "No se pudo guardar." };
+  portada = r.datos.carrusel;
+  pintarPortada(true);
+  avisar(listo);
+  return { ok: true };
+}
+
+async function moverDiapo(i: number, paso: number) {
+  if (!portada) return;
+  const lista = [...portada.diapositivas];
+  const j = i + paso;
+  if (j < 0 || j >= lista.length) return;
+  [lista[i], lista[j]] = [lista[j], lista[i]];
+  const r = await guardarPortada({ ...portada, diapositivas: lista }, "Orden guardado.");
+  if (!r.ok && r.message) avisar(r.message);
+}
+
+async function eliminarDiapo(i: number) {
+  if (!portada || portada.diapositivas.length <= 1) return;
+  if (!confirm(`¿Eliminar la diapositiva ${i + 1}? Dejará de verse en la portada.`)) return;
+  const r = await guardarPortada({ ...portada, diapositivas: portada.diapositivas.filter((_, k) => k !== i) }, "Diapositiva eliminada.");
+  if (!r.ok && r.message) avisar(r.message);
+}
+
+async function guardarAjustesPortada() {
+  if (!portada) return;
+  const automatico = $<HTMLInputElement>("[data-carrusel-automatico]").checked;
+  const segundos = Number($<HTMLSelectElement>("[data-carrusel-segundos]").value);
+  const r = await guardarPortada({ ...portada, automatico, segundos }, "Listo, guardado.");
+  if (!r.ok) {
+    if (r.message) avisar(r.message);
+    await cargarPortada();
+  }
+}
+$("[data-carrusel-automatico]").addEventListener("change", guardarAjustesPortada);
+$("[data-carrusel-segundos]").addEventListener("change", guardarAjustesPortada);
+
+$("[data-restablecer-portada]").addEventListener("click", async () => {
+  if (!confirm("¿Volver a la portada original del sitio? Se pierden las diapositivas editadas aquí.")) return;
+  const r = await enviar(`${API}/carrusel`, { accion: "restablecer" });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo restablecer.");
+  avisar("Volvió la portada original.");
+  await cargarPortada();
+});
+
+// ─── editor de diapositiva ───
+
+const editorDiapo = () => $("[data-editor-diapo]") as HTMLDialogElement;
+const formDiapo = () => $<HTMLFormElement>('[data-form="diapo"]');
+let indiceDiapo: number | null = null; // null = nueva
+let imagenDiapo = "";
+let fotoPendienteDiapo: File | null = null;
+let vistaPreviaDiapo = "";
+
+function limpiarErroresDiapo() {
+  const f = formDiapo();
+  errorDe(f);
+  $$("[data-error-diapo]", f).forEach((e) => (e.textContent = ""));
+  $$("[aria-invalid]", f).forEach((e) => e.removeAttribute("aria-invalid"));
+  $("[data-error-foto-diapo]").textContent = "";
+}
+
+function abrirEditorDiapo(i: number | null) {
+  if (!portada) return;
+  const d: Diapo | null = i === null ? null : portada.diapositivas[i];
+  indiceDiapo = i;
+  imagenDiapo = d?.imagen ?? "";
+  fotoPendienteDiapo = null;
+  const f = formDiapo();
+  f.reset();
+  limpiarErroresDiapo();
+  $("[data-diapo-titulo]").textContent = d ? `Diapositiva ${(i ?? 0) + 1}` : "Nueva diapositiva";
+  const campo = (n: string) => f.elements.namedItem(n) as HTMLInputElement;
+  campo("imagenAlt").value = d?.imagenAlt ?? "";
+  campo("antetitulo").value = d?.antetitulo ?? "";
+  campo("titulo").value = d?.titulo ?? "";
+  campo("subtitulo").value = d?.subtitulo ?? "";
+  (f.elements.namedItem("texto") as HTMLTextAreaElement).value = d?.texto ?? "";
+  campo("botonTexto").value = d?.boton?.texto ?? "";
+  campo("enlace").value = d?.boton?.enlace ?? "";
+  for (const r of $$<HTMLInputElement>('input[name="enfoque"]', f)) r.checked = r.value === (d?.enfoque ?? "centro");
+  if (vistaPreviaDiapo) URL.revokeObjectURL(vistaPreviaDiapo);
+  vistaPreviaDiapo = "";
+  const img = $<HTMLImageElement>("[data-diapo-foto]");
+  img.src = imagenDiapo;
+  img.alt = d ? "Foto actual de la diapositiva" : "";
+  editorDiapo().showModal();
+  campo("titulo").focus();
+}
+$("[data-nueva-diapo]").addEventListener("click", () => abrirEditorDiapo(null));
+$("[data-cerrar-diapo]").addEventListener("click", () => editorDiapo().close());
+
+$<HTMLInputElement>("[data-diapo-archivo]").addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const archivo = input.files?.[0];
+  input.value = "";
+  const error = $("[data-error-foto-diapo]");
+  error.textContent = "";
+  if (!archivo) return;
+  try {
+    error.textContent = "Preparando la foto…";
+    fotoPendienteDiapo = await reducirFoto(archivo, 1920, 900 * 1024, "libre");
+    error.textContent = "";
+    if (vistaPreviaDiapo) URL.revokeObjectURL(vistaPreviaDiapo);
+    vistaPreviaDiapo = URL.createObjectURL(fotoPendienteDiapo);
+    $<HTMLImageElement>("[data-diapo-foto]").src = vistaPreviaDiapo;
+  } catch (err) {
+    fotoPendienteDiapo = null;
+    error.textContent = err instanceof Error ? err.message : "No pudimos usar esa foto.";
+  }
+});
+
+formDiapo().addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!portada) return;
+  const f = e.currentTarget as HTMLFormElement;
+  const datos = new FormData(f);
+  limpiarErroresDiapo();
+  if (!imagenDiapo && !fotoPendienteDiapo) {
+    $("[data-error-foto-diapo]").textContent = "Elige una foto.";
+    return;
+  }
+  const t = (n: string) => String(datos.get(n) || "").trim();
+  await conBoton(f, async () => {
+    if (fotoPendienteDiapo) {
+      $("[data-error-foto-diapo]").textContent = "Subiendo la foto…";
+      const subida = await subirFotoCarrusel(fotoPendienteDiapo);
+      if (siSeCerro(subida.status)) return;
+      if (!subida.ok) {
+        $("[data-error-foto-diapo]").textContent = subida.datos.message || "No se pudo subir la foto.";
+        return;
+      }
+      $("[data-error-foto-diapo]").textContent = "";
+      // Ya subida: si falla el guardado, no se vuelve a subir.
+      imagenDiapo = subida.datos.imagen;
+      fotoPendienteDiapo = null;
+    }
+    const anterior = indiceDiapo === null ? null : portada!.diapositivas[indiceDiapo];
+    const diapo: Diapo = {
+      ...(anterior?.id ? { id: anterior.id } : {}),
+      imagen: imagenDiapo,
+      imagenAlt: t("imagenAlt"),
+      enfoque: (t("enfoque") || "centro") as Diapo["enfoque"],
+      antetitulo: t("antetitulo"),
+      titulo: t("titulo"),
+      subtitulo: t("subtitulo"),
+      texto: t("texto"),
+      boton: { texto: t("botonTexto"), enlace: t("enlace") },
+    };
+    const lista = [...portada!.diapositivas];
+    const posicion = indiceDiapo === null ? lista.length : indiceDiapo;
+    if (indiceDiapo === null) lista.push(diapo);
+    else lista[indiceDiapo] = diapo;
+    const r = await guardarPortada({ ...portada!, diapositivas: lista }, "Guardado. La portada se actualiza en unos segundos.");
+    if (r.ok) return editorDiapo().close();
+    let marcados = 0;
+    for (const [clave, texto] of Object.entries(r.errores ?? {})) {
+      const [n, campo] = clave.split(".");
+      if (Number(n) !== posicion || !campo) continue;
+      marcados++;
+      if (campo === "imagen") $("[data-error-foto-diapo]").textContent = texto;
+      const lugar = f.querySelector<HTMLElement>(`[data-error-diapo="${campo}"]`);
+      if (lugar) lugar.textContent = texto;
+      f.querySelector(`[name="${campo}"]`)?.setAttribute("aria-invalid", "true");
+    }
+    errorDe(f, marcados ? "Revisa los campos marcados." : r.message || "No se pudo guardar.");
   });
 });
 

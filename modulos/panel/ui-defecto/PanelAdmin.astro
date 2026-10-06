@@ -27,8 +27,11 @@ interface Props {
    * usarlos. Sin esto se usa una paleta neutra ya validada.
    */
   coloresGraficos?: string[];
+  /** Muestra la pestaña Portada (el sitio montó el carrusel editable). */
+  carrusel?: boolean;
 }
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [] } = Astro.props;
+import { LIMITES } from "../../carrusel/tipos";
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -70,6 +73,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     <nav class="pa-pestanas" aria-label="Secciones">
       <button type="button" data-tab="resumen" aria-current="page">Resumen</button>
       <button type="button" data-tab="productos">Productos</button>
+      <button type="button" data-tab="portada" hidden={!carrusel}>Portada</button>
       <button type="button" data-tab="pedidos">Pedidos</button>
       <button type="button" data-tab="suscriptores">Suscriptores</button>
       <button type="button" data-tab="seguridad">Seguridad</button>
@@ -142,6 +146,26 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       </div>
       <p class="pa-tenue" data-resumen-productos></p>
       <ul class="pa-lista" data-lista-productos aria-live="polite"></ul>
+    </section>
+
+    <!-- ───────────── portada (carrusel) ───────────── -->
+    <section class="pa-vista" data-vista="portada" hidden>
+      <div class="pa-titulo">
+        <h1>Portada</h1>
+        <div class="pa-fila__botones">
+          <a class="pa-boton pa-boton--suave" href={tienda} target="_blank" rel="noopener">Ver portada ↗</a>
+          <button class="pa-boton" type="button" data-nueva-diapo>+ Nueva diapositiva</button>
+        </div>
+      </div>
+      <p class="pa-tenue">Las fotos grandes del inicio de la tienda. Se muestran en este orden y los cambios se ven en unos segundos.</p>
+      <div class="pa-panel pa-portada-ajustes">
+        <label class="pa-casilla"><input type="checkbox" data-carrusel-automatico /> Avanzar solas</label>
+        <label class="pa-campo pa-campo--fila">Cambiar cada<select data-carrusel-segundos></select></label>
+        <p class="pa-tenue pa-chico">Siempre se pueden pausar. No avanzan solas si la persona pidió "reducir movimiento" en su teléfono o computador.</p>
+      </div>
+      <ul class="pa-lista" data-lista-diapos aria-live="polite"></ul>
+      <p class="pa-tenue pa-chico" data-portada-estado></p>
+      <button class="pa-enlace" type="button" data-restablecer-portada hidden>Volver a la portada original del sitio</button>
     </section>
 
     <!-- ───────────── resumen (métricas) ───────────── -->
@@ -398,6 +422,54 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     </form>
   </dialog>
 
+  <!-- editor de diapositiva (portada) -->
+  <dialog class="pa-dialogo" data-editor-diapo aria-labelledby="pa-diapo-titulo">
+    <form data-form="diapo" novalidate>
+      <h2 id="pa-diapo-titulo" data-diapo-titulo>Diapositiva</h2>
+      <div class="pa-editor pa-editor--ancho">
+        <div class="pa-editor__foto">
+          <img class="pa-foto-ancha" data-diapo-foto alt="" width="320" height="200" />
+          <label class="pa-boton pa-boton--suave pa-archivo">
+            Elegir foto
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-diapo-archivo />
+          </label>
+          <p class="pa-tenue pa-chico">Mejor horizontal. Se achica sola, sin recortarla.</p>
+          <p class="pa-error" role="alert" data-error-foto-diapo></p>
+          <fieldset class="pa-opciones">
+            <legend>Si la foto se recorta, que se vea su parte…</legend>
+            <label class="pa-casilla"><input type="radio" name="enfoque" value="izquierda" /> Izquierda</label>
+            <label class="pa-casilla"><input type="radio" name="enfoque" value="centro" /> Centro</label>
+            <label class="pa-casilla"><input type="radio" name="enfoque" value="derecha" /> Derecha</label>
+          </fieldset>
+        </div>
+        <div class="pa-editor__campos">
+          <label class="pa-campo">Qué muestra la foto<input name="imagenAlt" maxlength={LIMITES.imagenAlt} required placeholder="Ej: gatito tejido a crochet entre ovillos de lana" /></label>
+          <p class="pa-error" data-error-diapo="imagenAlt"></p>
+          <label class="pa-campo">Texto chico sobre el título (opcional)<input name="antetitulo" maxlength={LIMITES.antetitulo} /></label>
+          <p class="pa-error" data-error-diapo="antetitulo"></p>
+          <label class="pa-campo">Título<input name="titulo" maxlength={LIMITES.titulo} /></label>
+          <p class="pa-error" data-error-diapo="titulo"></p>
+          <label class="pa-campo">Subtítulo (opcional)<input name="subtitulo" maxlength={LIMITES.subtitulo} /></label>
+          <p class="pa-error" data-error-diapo="subtitulo"></p>
+          <label class="pa-campo">Texto (opcional)<textarea name="texto" rows="3" maxlength={LIMITES.texto}></textarea></label>
+          <p class="pa-error" data-error-diapo="texto"></p>
+          <div class="pa-dos">
+            <label class="pa-campo">Texto del botón<input name="botonTexto" maxlength={LIMITES.botonTexto} placeholder="Ver productos" /></label>
+            <label class="pa-campo">El botón lleva a<input name="enlace" maxlength={LIMITES.enlace} placeholder="/tienda/" /></label>
+          </div>
+          <p class="pa-error" data-error-diapo="botonTexto"></p>
+          <p class="pa-error" data-error-diapo="enlace"></p>
+          <p class="pa-tenue pa-chico">Una página de la tienda (ej. /tienda/flores/) o una dirección que empiece con https://. Deja los dos vacíos para no mostrar botón.</p>
+        </div>
+      </div>
+      <p class="pa-error" role="alert" data-error></p>
+      <div class="pa-pie-dialogo">
+        <button class="pa-boton pa-boton--suave" type="button" data-cerrar-diapo>Cancelar</button>
+        <button class="pa-boton" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- aviso de inactividad -->
   <dialog class="pa-dialogo pa-dialogo--chico" data-aviso-inactividad>
     <h2>¿Sigues ahí?</h2>
@@ -566,6 +638,13 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-archivo { position: relative; overflow: hidden; }
   .pa-archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .pa-pie-dialogo { display: flex; justify-content: end; gap: 8px; }
+  .pa-editor--ancho { grid-template-columns: 320px 1fr; }
+  .pa-editor__foto .pa-foto-ancha { width: 320px; height: 200px; }
+  .pa-fila--diapo { grid-template-columns: 112px 1fr auto; }
+  .pa-fila--diapo img { width: 112px; height: 70px; }
+  .pa-portada-ajustes { display: flex; gap: 8px 24px; align-items: center; flex-wrap: wrap; }
+  .pa-portada-ajustes p { flex-basis: 100%; margin: 0; }
+  .pa-boton--icono { width: 34px; padding: 6px 0; }
 
   .pa-propuesta { display: grid; gap: 10px; margin-top: 12px; }
   .pa-propuesta img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--pa-borde); border-radius: 8px; padding: 8px; }
@@ -588,6 +667,9 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     .pa-fila__botones { grid-column: 1 / -1; justify-content: start; }
     .pa-editor { grid-template-columns: 1fr; }
     .pa-editor__foto img { width: 100%; height: auto; aspect-ratio: 1; }
+    .pa-editor__foto .pa-foto-ancha { width: 100%; height: auto; aspect-ratio: 16 / 10; }
+    .pa-fila--diapo { grid-template-columns: 88px 1fr; }
+    .pa-fila--diapo img { width: 88px; height: 56px; }
     .pa-respaldos ul { columns: 1; }
   }
 </style>

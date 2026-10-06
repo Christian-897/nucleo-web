@@ -16,11 +16,14 @@
  *   functions/api/admin/producto-foto.ts   export const { onRequestPost } = panel.productoFoto;
  *   functions/api/admin/pedidos.ts         export const { onRequestGet, onRequestPost } = panel.pedidos;
  *   functions/api/admin/resumen.ts         export const { onRequestGet } = panel.resumen;
+ *   functions/api/admin/carrusel.ts        export const { onRequestGet, onRequestPost } = panel.carrusel;
+ *   functions/api/admin/carrusel-foto.ts   export const { onRequestPost } = panel.carruselFoto;
  *   functions/api/admin/suscriptores.ts    export const { onRequestGet } = panel.suscriptores;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
  *   functions/api/admin/_middleware.ts     export const { onRequest } = panel.cabeceras;
  */
+import type { FuenteCarrusel } from "../carrusel/almacen";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import { listarActivos, respuestaCsv } from "../newsletter/servidor";
 import * as acceso from "./acceso";
@@ -28,6 +31,7 @@ import type { ConfigPanel, EnvPanel } from "./config";
 import { aplicarCabecerasPanel } from "./encabezados";
 import { type Ctx, exigirSesion, jsonResponse } from "./http";
 import { identificadorValido, responderFoto } from "./imagenes";
+import { crearGestionCarrusel } from "./carrusel";
 import { crearGestionPedidos } from "./pedidos";
 import { crearResumen } from "./resumen";
 import { crearGestionProductos } from "./productos";
@@ -35,6 +39,8 @@ import { crearGestionProductos } from "./productos";
 export interface OpcionesPanel extends ConfigPanel {
   /** Catálogo editable (crearCatalogoEditable). Sin él, no hay sección Productos. */
   catalogo?: FuenteCatalogo;
+  /** Portada editable (crearCarruselEditable). Sin ella, no hay sección Portada. */
+  carrusel?: FuenteCarrusel;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
   /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
@@ -47,6 +53,7 @@ export function crearPanel(opciones: OpcionesPanel) {
   const productos = opciones.catalogo ? crearGestionProductos(opciones.catalogo, opciones) : null;
   const pedidos = crearGestionPedidos(opciones.retencionPedidosDias);
   const resumen = crearResumen(opciones.zonaHoraria);
+  const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
 
   return {
     parametros: { onRequestGet: (c: Ctx) => acceso.parametros(c) },
@@ -65,6 +72,12 @@ export function crearPanel(opciones: OpcionesPanel) {
       onRequestPost: (c: Ctx) => (productos ? productos.post(c) : noDisponible()),
     },
     productoFoto: { onRequestPost: (c: Ctx) => (productos ? productos.foto(c) : noDisponible()) },
+    /** Portada (carrusel). */
+    carrusel: {
+      onRequestGet: (c: Ctx) => (portada ? portada.get(c) : noDisponible()),
+      onRequestPost: (c: Ctx) => (portada ? portada.post(c) : noDisponible()),
+    },
+    carruselFoto: { onRequestPost: (c: Ctx) => (portada ? portada.foto(c) : noDisponible()) },
     pedidos: { onRequestGet: (c: Ctx) => pedidos.get(c), onRequestPost: (c: Ctx) => pedidos.post(c) },
     /** Métricas de ventas (pestaña Resumen). */
     resumen: { onRequestGet: (c: Ctx) => resumen(c) },
