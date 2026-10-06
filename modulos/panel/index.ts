@@ -1,6 +1,6 @@
 /**
  * Módulo panel: administración del sitio con login propio, doble factor,
- * productos con fotos, portada (carrusel), pedidos y suscriptores. Servidor:
+ * productos con fotos, categorías, portada (carrusel), pedidos y suscriptores. Servidor:
  *
  *   import { crearPanel } from "nucleo-web/panel";
  *
@@ -22,6 +22,7 @@ export {
 export { tipoRealDeImagen, medidasAceptables, direccionMediaValida, guardarFoto, borrarFoto, RUTA_MEDIA } from "./imagenes";
 export { validarEntrada, idDesdeNombre, type EntradaProducto } from "./productos";
 export { crearGestionCarrusel } from "./carrusel";
+export { crearGestionCategorias } from "./categorias";
 export { listarPedidos, type PedidoPanel } from "./pedidos";
 export { textoStock, ayudaVendidos, type TextoStock } from "./texto-stock";
 export { exigirSesion, type Ctx } from "./http";

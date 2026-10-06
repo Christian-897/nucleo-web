@@ -125,3 +125,11 @@ export async function subirFotoCarrusel(foto: File, base = "/api/admin") {
   form.set("archivo", foto);
   return llamar<{ imagen: string }>(`${base}/carrusel-foto`, { method: "POST", body: form });
 }
+
+/** Sube la foto de una categoría (ya reducida). */
+export async function subirFotoCategoria(id: string, foto: File, base = "/api/admin") {
+  const form = new FormData();
+  form.set("id", id);
+  form.set("archivo", foto);
+  return llamar<{ imagen: string }>(`${base}/categoria-foto`, { method: "POST", body: form });
+}

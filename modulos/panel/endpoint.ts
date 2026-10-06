@@ -14,6 +14,8 @@
  *   functions/api/admin/seguridad.ts       export const { onRequestGet, onRequestPost } = panel.seguridad;
  *   functions/api/admin/productos.ts       export const { onRequestGet, onRequestPost } = panel.productos;
  *   functions/api/admin/producto-foto.ts   export const { onRequestPost } = panel.productoFoto;
+ *   functions/api/admin/categorias.ts      export const { onRequestGet, onRequestPost } = panel.categorias;
+ *   functions/api/admin/categoria-foto.ts  export const { onRequestPost } = panel.categoriaFoto;
  *   functions/api/admin/pedidos.ts         export const { onRequestGet, onRequestPost } = panel.pedidos;
  *   functions/api/admin/resumen.ts         export const { onRequestGet } = panel.resumen;
  *   functions/api/admin/carrusel.ts        export const { onRequestGet, onRequestPost } = panel.carrusel;
@@ -32,6 +34,7 @@ import { aplicarCabecerasPanel } from "./encabezados";
 import { type Ctx, exigirSesion, jsonResponse } from "./http";
 import { identificadorValido, responderFoto } from "./imagenes";
 import { crearGestionCarrusel } from "./carrusel";
+import { crearGestionCategorias } from "./categorias";
 import { crearGestionPedidos } from "./pedidos";
 import { crearResumen } from "./resumen";
 import { crearGestionProductos } from "./productos";
@@ -51,6 +54,7 @@ const noDisponible = async () => jsonResponse(404, { message: "Esta sección no 
 
 export function crearPanel(opciones: OpcionesPanel) {
   const productos = opciones.catalogo ? crearGestionProductos(opciones.catalogo, opciones) : null;
+  const categorias = opciones.catalogo ? crearGestionCategorias(opciones.catalogo, opciones) : null;
   const pedidos = crearGestionPedidos(opciones.retencionPedidosDias);
   const resumen = crearResumen(opciones.zonaHoraria);
   const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
@@ -72,6 +76,12 @@ export function crearPanel(opciones: OpcionesPanel) {
       onRequestPost: (c: Ctx) => (productos ? productos.post(c) : noDisponible()),
     },
     productoFoto: { onRequestPost: (c: Ctx) => (productos ? productos.foto(c) : noDisponible()) },
+    /** Nombre, nombre corto y foto de cada categoría. */
+    categorias: {
+      onRequestGet: (c: Ctx) => (categorias ? categorias.get(c) : noDisponible()),
+      onRequestPost: (c: Ctx) => (categorias ? categorias.post(c) : noDisponible()),
+    },
+    categoriaFoto: { onRequestPost: (c: Ctx) => (categorias ? categorias.foto(c) : noDisponible()) },
     /** Portada (carrusel). */
     carrusel: {
       onRequestGet: (c: Ctx) => (portada ? portada.get(c) : noDisponible()),

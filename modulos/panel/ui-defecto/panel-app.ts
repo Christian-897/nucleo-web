@@ -3,7 +3,7 @@
  * REGLA: lo que llega del servidor se escribe SIEMPRE con textContent o
  * atributos; nunca con innerHTML.
  */
-import { derivarClave, enviar, obtener, reducirFoto, subirFotoCarrusel, subirFotoProducto } from "../cliente";
+import { derivarClave, enviar, obtener, reducirFoto, subirFotoCarrusel, subirFotoCategoria, subirFotoProducto } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
 import { ayudaVendidos, textoStock } from "../texto-stock";
 import {
@@ -24,8 +24,8 @@ import {
   type TipoTiempo,
 } from "./resumen-vista";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "portada" | "pedidos" | "suscriptores" | "seguridad";
-const PESTANAS: Vista[] = ["resumen", "productos", "portada", "pedidos", "suscriptores", "seguridad"];
+type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "pedidos" | "suscriptores" | "seguridad";
+const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "pedidos", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
 interface Producto {
@@ -210,6 +210,7 @@ function cerrarLocal(mensaje?: string) {
   aviso.hidden = !mensaje;
   ($("[data-editor]") as HTMLDialogElement).close();
   ($("[data-editor-diapo]") as HTMLDialogElement).close();
+  ($("[data-editor-categoria]") as HTMLDialogElement).close();
   mostrar("entrar");
 }
 
@@ -227,6 +228,7 @@ async function abrirPestana(v: Vista) {
   if (v === "resumen") await cargarResumen();
   if (v === "productos") await cargarProductos();
   if (v === "portada") await cargarPortada();
+  if (v === "categorias") await cargarCategorias();
   if (v === "pedidos") await cargarPedidos();
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
@@ -469,6 +471,155 @@ formProducto().addEventListener("submit", async (e) => {
     editor().close();
     avisar("Guardado. La tienda se actualiza en unos segundos.");
     await cargarProductos();
+  });
+});
+
+// ─────────────────────────── categorías ───────────────────────────
+
+interface CategoriaPanel {
+  id: string;
+  nombre: string;
+  corto: string;
+  imagen: string;
+  productos: number;
+  editada: boolean;
+  original: { nombre: string; corto: string };
+}
+let listaCategoriasPanel: CategoriaPanel[] = [];
+
+async function cargarCategorias() {
+  const r = await obtener<{ categorias: CategoriaPanel[]; editadas: boolean }>(`${API}/categorias`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar las categorías.");
+  listaCategoriasPanel = r.datos.categorias;
+  $("[data-restablecer-categorias]").hidden = !r.datos.editadas;
+  $("[data-lista-categorias]").replaceChildren(
+    ...listaCategoriasPanel.map((c) => {
+      const li = crear("li", "pa-fila");
+      const img = crear("img");
+      img.src = c.imagen;
+      img.alt = "";
+      img.width = 64;
+      img.height = 64;
+      img.loading = "lazy";
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", c.nombre));
+      const datos = crear("div", "pa-fila__datos");
+      datos.append(crear("span", "", c.productos === 1 ? "1 producto" : `${c.productos} productos`));
+      if (c.corto && c.corto !== c.nombre) datos.append(crear("span", "", `Corto: ${c.corto}`));
+      if (c.editada) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Editada"));
+      info.append(datos);
+      const botones = crear("div", "pa-fila__botones");
+      const editar = crear("button", "pa-boton pa-boton--chico", "Editar");
+      editar.type = "button";
+      editar.setAttribute("aria-label", `Editar la categoría ${c.nombre}`);
+      editar.addEventListener("click", () => abrirEditorCategoria(c));
+      const ver = crear("a", "pa-boton pa-boton--suave pa-boton--chico", "Ver");
+      ver.href = `/tienda/${encodeURIComponent(c.id)}/`;
+      ver.target = "_blank";
+      ver.rel = "noopener";
+      botones.append(editar, ver);
+      li.append(img, info, botones);
+      return li;
+    })
+  );
+}
+
+$("[data-restablecer-categorias]").addEventListener("click", async () => {
+  if (!confirm("¿Volver a los nombres y fotos originales de todas las categorías?")) return;
+  const r = await enviar(`${API}/categorias`, { accion: "restablecer" });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo restablecer.");
+  avisar("Listo, volvieron los nombres y fotos originales.");
+  await cargarCategorias();
+});
+
+const editorCategoria = () => $("[data-editor-categoria]") as HTMLDialogElement;
+const formCategoria = () => $<HTMLFormElement>('[data-form="categoria"]');
+let categoriaEditando: CategoriaPanel | null = null;
+let fotoPendienteCategoria: File | null = null;
+let vistaPreviaCategoria = "";
+
+function abrirEditorCategoria(c: CategoriaPanel) {
+  categoriaEditando = c;
+  fotoPendienteCategoria = null;
+  const f = formCategoria();
+  f.reset();
+  errorDe(f);
+  $$("[data-error-categoria]", f).forEach((e) => (e.textContent = ""));
+  $$("[aria-invalid]", f).forEach((e) => e.removeAttribute("aria-invalid"));
+  $("[data-error-foto-categoria]").textContent = "";
+  $("[data-categoria-titulo]").textContent = `Categoría: ${c.nombre}`;
+  (f.elements.namedItem("nombre") as HTMLInputElement).value = c.nombre;
+  (f.elements.namedItem("corto") as HTMLInputElement).value = c.corto === c.nombre ? "" : c.corto;
+  $("[data-categoria-original]").textContent = c.editada ? `Nombre original del sitio: ${c.original.nombre}` : "";
+  if (vistaPreviaCategoria) URL.revokeObjectURL(vistaPreviaCategoria);
+  vistaPreviaCategoria = "";
+  const img = $<HTMLImageElement>("[data-categoria-foto]");
+  img.src = c.imagen;
+  img.alt = `Foto de ${c.nombre}`;
+  editorCategoria().showModal();
+  (f.elements.namedItem("nombre") as HTMLInputElement).focus();
+}
+$("[data-cerrar-categoria]").addEventListener("click", () => editorCategoria().close());
+
+$<HTMLInputElement>("[data-categoria-archivo]").addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const archivo = input.files?.[0];
+  input.value = "";
+  const error = $("[data-error-foto-categoria]");
+  error.textContent = "";
+  if (!archivo) return;
+  try {
+    error.textContent = "Preparando la foto…";
+    fotoPendienteCategoria = await reducirFoto(archivo, 800);
+    error.textContent = "";
+    if (vistaPreviaCategoria) URL.revokeObjectURL(vistaPreviaCategoria);
+    vistaPreviaCategoria = URL.createObjectURL(fotoPendienteCategoria);
+    $<HTMLImageElement>("[data-categoria-foto]").src = vistaPreviaCategoria;
+  } catch (err) {
+    fotoPendienteCategoria = null;
+    error.textContent = err instanceof Error ? err.message : "No pudimos usar esa foto.";
+  }
+});
+
+formCategoria().addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!categoriaEditando) return;
+  const c = categoriaEditando;
+  const f = e.currentTarget as HTMLFormElement;
+  const d = new FormData(f);
+  errorDe(f);
+  $$("[data-error-categoria]", f).forEach((x) => (x.textContent = ""));
+  $$("[aria-invalid]", f).forEach((x) => x.removeAttribute("aria-invalid"));
+  await conBoton(f, async () => {
+    const r = await enviar<{ errores?: Record<string, string> }>(`${API}/categorias`, {
+      accion: "guardar",
+      id: c.id,
+      categoria: { nombre: String(d.get("nombre") || ""), corto: String(d.get("corto") || "") },
+    });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) {
+      for (const [campo, texto] of Object.entries(r.datos.errores ?? {})) {
+        const lugar = f.querySelector<HTMLElement>(`[data-error-categoria="${campo}"]`);
+        if (lugar) lugar.textContent = texto;
+        f.querySelector(`[name="${campo}"]`)?.setAttribute("aria-invalid", "true");
+      }
+      return errorDe(f, r.datos.message || "No se pudo guardar.");
+    }
+    if (fotoPendienteCategoria) {
+      const subida = await subirFotoCategoria(c.id, fotoPendienteCategoria);
+      if (siSeCerro(subida.status)) return;
+      if (!subida.ok) {
+        await cargarCategorias();
+        $("[data-error-foto-categoria]").textContent = subida.datos.message || "El nombre se guardó, pero la foto no.";
+        return;
+      }
+      fotoPendienteCategoria = null;
+    }
+    editorCategoria().close();
+    avisar("Guardado. La tienda se actualiza en unos segundos.");
+    await cargarCategorias();
   });
 });
 

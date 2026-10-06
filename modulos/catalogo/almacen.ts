@@ -11,6 +11,7 @@
  */
 import type { EnvBase } from "../../core/tipos";
 import { crearCatalogo, validarCatalogo } from "./catalogo";
+import { aplicarCambios, CLAVE_CATEGORIAS, limpiarCambios, type CambiosCategorias } from "./categorias";
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 
 export const CLAVE_CATALOGO = "catalogo:productos";
@@ -23,9 +24,14 @@ export interface FuenteCatalogo {
   /** El catálogo del JSON del sitio (lo que rige mientras nadie edite). */
   readonly inicial: Catalogo;
   obtener(env: EnvBase): Promise<Catalogo>;
-  /** ¿Ya se editó alguna vez desde el panel? */
+  /** ¿Ya se editaron los productos desde el panel? */
   editado(env: EnvBase): Promise<boolean>;
   guardar(env: EnvBase, productos: ProductoCatalogo[]): Promise<{ ok: boolean; motivo?: string }>;
+  /** ¿Se cambió el nombre o la foto de alguna categoría desde el panel? */
+  categoriasEditadas(env: EnvBase): Promise<boolean>;
+  /** Cambios guardados por id (lo que el panel cambió encima del sitio). */
+  cambiosCategorias(env: EnvBase): Promise<CambiosCategorias>;
+  guardarCambiosCategorias(env: EnvBase, cambios: CambiosCategorias): Promise<{ ok: boolean; motivo?: string }>;
 }
 
 export type CatalogoODinamico = Catalogo | FuenteCatalogo;
@@ -46,7 +52,10 @@ export function crearCatalogoEditable(
   const inicial = crearCatalogo(productosIniciales, categorias);
   // Caché por almacén: en producción hay uno solo, pero así dos entornos
   // (pruebas, vista previa) nunca se ven los datos entre sí.
-  const caches = new WeakMap<object, { catalogo: Catalogo; editado: boolean; hasta: number }>();
+  const caches = new WeakMap<
+    object,
+    { catalogo: Catalogo; editado: boolean; cambios: CambiosCategorias; categoriasEditadas: boolean; hasta: number }
+  >();
   const SIN_KV = {};
 
   async function leer(env: EnvBase) {
@@ -56,10 +65,24 @@ export function crearCatalogoEditable(
     if (cache && cache.hasta > ahora) return cache;
     let catalogo = inicial;
     let editado = false;
-    const crudo = await env.REVIEWS_KV?.get(CLAVE_CATALOGO);
+    const [crudo, crudoCategorias] = await Promise.all([
+      env.REVIEWS_KV?.get(CLAVE_CATALOGO),
+      env.REVIEWS_KV?.get(CLAVE_CATEGORIAS),
+    ]);
+    let cambios: CambiosCategorias = {};
+    if (crudoCategorias) {
+      try {
+        cambios = limpiarCambios(JSON.parse(crudoCategorias), categorias);
+      } catch (e) {
+        console.error("[catalogo] los cambios de categorías en KV no son válidos; se usan las del sitio", e);
+      }
+    }
+    const categoriasEditadas = Object.keys(cambios).length > 0;
+    const vigentes = categoriasEditadas ? aplicarCambios(categorias, cambios) : categorias;
+    if (categoriasEditadas) catalogo = crearCatalogo(productosIniciales, vigentes);
     if (crudo) {
       try {
-        catalogo = crearCatalogo(JSON.parse(crudo) as ProductoCatalogo[], categorias);
+        catalogo = crearCatalogo(JSON.parse(crudo) as ProductoCatalogo[], vigentes);
         editado = true;
       } catch (e) {
         // Datos dañados: se sirve el inicial antes que romper la tienda,
@@ -67,7 +90,7 @@ export function crearCatalogoEditable(
         console.error("[catalogo] el catálogo guardado en KV no es válido; se usa el inicial", e);
       }
     }
-    const nuevo = { catalogo, editado, hasta: ahora + CACHE_MS };
+    const nuevo = { catalogo, editado, cambios, categoriasEditadas, hasta: ahora + CACHE_MS };
     caches.set(llave, nuevo);
     return nuevo;
   }
@@ -78,6 +101,20 @@ export function crearCatalogoEditable(
     inicial,
     obtener: async (env) => (await leer(env)).catalogo,
     editado: async (env) => (await leer(env)).editado,
+    categoriasEditadas: async (env) => (await leer(env)).categoriasEditadas,
+    cambiosCategorias: async (env) => (await leer(env)).cambios,
+    async guardarCambiosCategorias(env, cambios) {
+      if (!env.REVIEWS_KV) return { ok: false, motivo: "Falta la base de datos." };
+      const limpios = limpiarCambios(cambios, categorias);
+      try {
+        if (Object.keys(limpios).length) await env.REVIEWS_KV.put(CLAVE_CATEGORIAS, JSON.stringify(limpios));
+        else await env.REVIEWS_KV.delete(CLAVE_CATEGORIAS);
+      } catch {
+        return { ok: false, motivo: "No se pudo guardar. Intenta de nuevo." };
+      }
+      caches.delete(env.REVIEWS_KV as object);
+      return { ok: true };
+    },
     async guardar(env, productos) {
       try {
         validarCatalogo(productos, categorias);

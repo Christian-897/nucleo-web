@@ -109,8 +109,6 @@ export function validarEntrada(
 }
 
 export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPanel) {
-  const categoriasPublicas = () => catalogo.categorias.map((c) => ({ id: c.id, nombre: c.nombre }));
-
   async function listar(ctx: Ctx): Promise<Response> {
     const s = await exigirSesion(ctx, false);
     if (s instanceof Response) return s;
@@ -124,7 +122,9 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
         vendidos: p.stock === undefined ? null : await unidadesVendidas(ctx.env, p.id),
       });
     }
-    return jsonResponse(200, { editado: await catalogo.editado(ctx.env), categorias: categoriasPublicas(), productos });
+    // Los nombres de categoría vigentes (pueden haberse cambiado en el panel).
+    const categorias = vigente.categorias.map((c) => ({ id: c.id, nombre: c.nombre }));
+    return jsonResponse(200, { editado: await catalogo.editado(ctx.env), categorias, productos });
   }
 
   async function guardar(ctx: Ctx, entrada: EntradaProducto): Promise<Response> {

@@ -11,6 +11,12 @@
  *    `data-cat="campo"`.
  *  - FICHA: `/producto/<id>/` se arma desde UNA plantilla, llenando los
  *    `data-ficha="campo"`. Así un producto creado hoy ya tiene página.
+ *  - CATEGORÍAS: si se cambió el nombre o la foto de una categoría en el
+ *    panel, todo elemento `data-categoria="<id>"` se pone al día según
+ *    `data-categoria-campo` (uno o varios, separados por espacio):
+ *      nombre · corto · imagen (src) · alt · texto · content
+ *    "texto" y "content" (atributo de <meta>) usan la plantilla de
+ *    `data-categoria-plantilla`, con {nombre} y {corto}.
  *
  * Seguridad: TODO texto se inserta con `html: false` (las etiquetas se ven
  * escritas, no se ejecutan) o con setAttribute (escapa en atributo). Las
@@ -176,6 +182,45 @@ function esHtml(r: Response) {
   return (r.headers.get("content-type") || "").includes("text/html");
 }
 
+// ───────────────────────────── categorías ─────────────────────────────
+
+/** Rellena "{nombre} hechos a mano" con los datos de la categoría. */
+export function rellenarPlantilla(plantilla: string, c: { nombre: string; corto?: string }): string {
+  return plantilla.split("{nombre}").join(c.nombre).split("{corto}").join(c.corto || c.nombre);
+}
+
+function conCategorias(r: Reescritor, catalogo: Catalogo): Reescritor {
+  return r.on("[data-categoria]", {
+    element(el) {
+      const c = catalogo.categoria(el.getAttribute("data-categoria") ?? "");
+      if (!c) return;
+      const plantilla = el.getAttribute("data-categoria-plantilla") ?? "{nombre}";
+      for (const campo of (el.getAttribute("data-categoria-campo") ?? "nombre").split(/\s+/)) {
+        switch (campo) {
+          case "nombre":
+            el.setInnerContent(c.nombre, { html: false });
+            break;
+          case "corto":
+            el.setInnerContent(c.corto || c.nombre, { html: false });
+            break;
+          case "imagen":
+            if (typeof c.imagen === "string" && imagenSegura(c.imagen, "") === c.imagen) el.setAttribute("src", c.imagen);
+            break;
+          case "alt":
+            el.setAttribute("alt", c.nombre);
+            break;
+          case "texto":
+            el.setInnerContent(rellenarPlantilla(plantilla, c), { html: false });
+            break;
+          case "content":
+            el.setAttribute("content", rellenarPlantilla(plantilla, c));
+            break;
+        }
+      }
+    },
+  });
+}
+
 // ───────────────────────────── middleware de listas ─────────────────────────────
 
 export function crearBordeCatalogo(fuente: CatalogoODinamico, opciones: OpcionesBorde) {
@@ -186,13 +231,20 @@ export function crearBordeCatalogo(fuente: CatalogoODinamico, opciones: Opciones
       const respuesta = await next();
       if (!esHtml(respuesta) || !esDinamico(fuente)) return respuesta;
       let catalogo: Catalogo;
+      let productos: boolean;
+      let categorias: boolean;
       try {
-        if (!(await fuente.editado(env))) return respuesta; // lo estático ya es correcto
+        productos = await fuente.editado(env);
+        categorias = await fuente.categoriasEditadas(env);
+        if (!productos && !categorias) return respuesta; // lo estático ya es correcto
         catalogo = await fuente.obtener(env);
       } catch {
         return respuesta; // si KV falla, se sirve lo estático: nunca un error al visitante
       }
-      return conListas(new HTMLRewriter(), catalogo, opciones).transform(respuesta);
+      let r = new HTMLRewriter();
+      if (productos) r = conListas(r, catalogo, opciones);
+      if (categorias) r = conCategorias(r, catalogo);
+      return r.transform(respuesta);
     },
   };
 }

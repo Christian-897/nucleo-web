@@ -67,13 +67,13 @@ npm test            # corre las pruebas del módulo
 - **cotizacion** — formulario de presupuesto. (listo)
 - **carrito** — carrito de compra con validación de precio/stock en servidor. (listo)
 - **pago** — cobro con Flow y Mercado Pago, verificación de monto, firma de webhooks e idempotencia. (listo)
-- **catalogo** — productos desde JSON con validación y stock real en KV. (listo)
+- **catalogo** — productos desde JSON con validación y stock real en KV; nombre, nombre corto y foto de las categorías editables desde el panel. (listo)
 - **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
 - **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
 - **contacto** — enlaces de WhatsApp, teléfono, correo y redes, validados (número en cualquier formato, redes con enlace o @usuario). (listo)
 - **carrusel** — portada con varias diapositivas (foto, textos y botón) que avanzan solas con transición suave, pausa, flechas, puntos y deslizar con el dedo; respeta "reducir movimiento" y se edita desde el panel (pestaña Portada). (listo)
 - **metricas** — resumen de ventas para el panel: hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, rango de fechas a elección (por día, semana o mes), gráficos de barras, línea o torta y comparación por años. (listo)
-- **panel** — administración propia: login + doble factor, productos con fotos, portada (carrusel), pedidos y suscriptores. (listo)
+- **panel** — administración propia: login + doble factor, productos con fotos, categorías, portada (carrusel), pedidos y suscriptores. (listo)
 - **newsletter** — suscripción con doble confirmación, baja con un clic y exportación protegida. (listo)
 - _por venir:_ resenas, auth (cursos con login), textos editables del sitio (como en Muebles Crea).
 

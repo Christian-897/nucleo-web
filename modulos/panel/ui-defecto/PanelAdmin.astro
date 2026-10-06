@@ -31,6 +31,7 @@ interface Props {
   carrusel?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
+import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
@@ -73,6 +74,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     <nav class="pa-pestanas" aria-label="Secciones">
       <button type="button" data-tab="resumen" aria-current="page">Resumen</button>
       <button type="button" data-tab="productos">Productos</button>
+      <button type="button" data-tab="categorias">Categorías</button>
       <button type="button" data-tab="portada" hidden={!carrusel}>Portada</button>
       <button type="button" data-tab="pedidos">Pedidos</button>
       <button type="button" data-tab="suscriptores">Suscriptores</button>
@@ -146,6 +148,15 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       </div>
       <p class="pa-tenue" data-resumen-productos></p>
       <ul class="pa-lista" data-lista-productos aria-live="polite"></ul>
+    </section>
+
+    <!-- ───────────── categorías ───────────── -->
+    <section class="pa-vista" data-vista="categorias" hidden>
+      <div class="pa-titulo"><h1>Categorías</h1></div>
+      <p class="pa-tenue">Cambia el nombre y la foto de cada categoría. Se actualiza en el menú, el inicio y la tienda en unos segundos.</p>
+      <ul class="pa-lista" data-lista-categorias aria-live="polite"></ul>
+      <p class="pa-tenue pa-chico">¿Necesitas una categoría nueva? Lleva su propia página en la tienda: pídesela a quien mantiene el sitio.</p>
+      <button class="pa-enlace" type="button" data-restablecer-categorias hidden>Volver a los nombres y fotos originales</button>
     </section>
 
     <!-- ───────────── portada (carrusel) ───────────── -->
@@ -417,6 +428,37 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <p class="pa-error" role="alert" data-error></p>
       <div class="pa-pie-dialogo">
         <button class="pa-boton pa-boton--suave" type="button" data-cerrar-editor>Cancelar</button>
+        <button class="pa-boton" type="submit">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- editor de categoría -->
+  <dialog class="pa-dialogo" data-editor-categoria aria-labelledby="pa-categoria-titulo">
+    <form data-form="categoria" novalidate>
+      <h2 id="pa-categoria-titulo" data-categoria-titulo>Categoría</h2>
+      <div class="pa-editor">
+        <div class="pa-editor__foto">
+          <img data-categoria-foto alt="" width="240" height="240" />
+          <label class="pa-boton pa-boton--suave pa-archivo">
+            Elegir foto
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-categoria-archivo />
+          </label>
+          <p class="pa-tenue pa-chico">Se recorta cuadrada al centro y se achica sola.</p>
+          <p class="pa-error" role="alert" data-error-foto-categoria></p>
+        </div>
+        <div class="pa-editor__campos">
+          <label class="pa-campo">Nombre<input name="nombre" maxlength={LIMITES_CATEGORIA.nombre} required /></label>
+          <p class="pa-error" data-error-categoria="nombre"></p>
+          <label class="pa-campo">Nombre corto (opcional)<input name="corto" maxlength={LIMITES_CATEGORIA.corto} /></label>
+          <p class="pa-error" data-error-categoria="corto"></p>
+          <p class="pa-tenue pa-chico">Se usa donde hay poco espacio: las tarjetas del inicio y los botones de la tienda. Vacío = igual al nombre.</p>
+          <p class="pa-tenue pa-chico" data-categoria-original></p>
+        </div>
+      </div>
+      <p class="pa-error" role="alert" data-error></p>
+      <div class="pa-pie-dialogo">
+        <button class="pa-boton pa-boton--suave" type="button" data-cerrar-categoria>Cancelar</button>
         <button class="pa-boton" type="submit">Guardar</button>
       </div>
     </form>

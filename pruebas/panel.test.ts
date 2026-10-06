@@ -352,6 +352,53 @@ async function run() {
 
   console.log("Panel — pedidos y suscriptores:");
 
+  console.log("Panel — categorías:");
+
+  await prueba("categorías: sin sesión nada; renombrar se ve en el catálogo y en la lista de productos", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    assert.equal((await panel.categorias.onRequestGet({ env, request: req("/x") })).status, 401);
+    const ajeno = await panel.categorias.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.cl", cuerpo: { accion: "restablecer" } }) });
+    assert.equal(ajeno.status, 403);
+    const r = await panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches y anime", corto: "" } } }) });
+    assert.equal(r.status, 200);
+    const lista = await json(await panel.categorias.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const p = lista.categorias.find((c: { id: string }) => c.id === "peluches");
+    assert.equal(p.nombre, "Peluches y anime");
+    assert.equal(p.editada, true);
+    assert.equal(p.productos, 1);
+    assert.equal(p.original.nombre, "Peluches");
+    const prods = await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(prods.categorias.find((c: { id: string }) => c.id === "peluches").nombre, "Peluches y anime");
+  });
+
+  await prueba("categorías: no se puede inventar una ni dejar el nombre vacío", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const inventada = await panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", id: "nueva", categoria: { nombre: "Nueva" } } }) });
+    assert.equal(inventada.status, 404);
+    const vacia = await panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", id: "peluches", categoria: { nombre: "" } } }) });
+    assert.equal(vacia.status, 400);
+    assert.ok((await json(vacia)).errores.nombre);
+  });
+
+  await prueba("categorías: foto nueva reemplaza (y borra) la anterior; restablecer borra las subidas", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const subir = async () => (await json(await panel.categoriaFoto.onRequestPost({ env, request: req("/x", { cookie, form: formFoto("peluches", png(800, 800)) }) }))).imagen as string;
+    const f1 = await subir();
+    assert.match(f1, /^\/media\/categoria-peluches-/);
+    const f2 = await subir();
+    assert.ok(!datos.has("foto:" + f1.slice(7)), "la anterior se borra");
+    assert.ok(datos.has("foto:" + f2.slice(7)));
+    await panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "restablecer" } }) });
+    assert.ok(!datos.has("foto:" + f2.slice(7)));
+    assert.ok(!datos.has("catalogo:categorias"));
+    const svg = new TextEncoder().encode("<svg><script>alert(1)</script></svg>");
+    const malo = await panel.categoriaFoto.onRequestPost({ env, request: req("/x", { cookie, form: formFoto("peluches", svg) }) });
+    assert.equal(malo.status, 400);
+  });
+
   console.log("Panel — portada (carrusel):");
 
   await prueba("portada: sin sesión no se ve ni se cambia; desde otro sitio tampoco", async () => {

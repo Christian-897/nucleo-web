@@ -22,6 +22,16 @@ export {
   type FuenteCatalogo,
   type CatalogoODinamico,
 } from "./almacen";
+export {
+  CLAVE_CATEGORIAS,
+  LIMITES_CATEGORIA,
+  validarCambioCategoria,
+  limpiarCambios,
+  aplicarCambios,
+  imagenCategoriaValida,
+  type CambioCategoria,
+  type CambiosCategorias,
+} from "./categorias";
 export { crearEndpointCatalogoPublico, type ProductoPublico } from "./publico";
 export { crearEndpointStock } from "./endpoint";
 export { consultarStock } from "./cliente";
@@ -30,6 +40,7 @@ export {
   crearFichaProducto,
   productosDeLista,
   imagenSegura,
+  rellenarPlantilla,
   idDeRuta,
   type OpcionesBorde,
   type EnvBorde,
