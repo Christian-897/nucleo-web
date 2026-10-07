@@ -227,6 +227,36 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 30 días</p><p class="pa-kpi__valor" data-kpi="d30">—</p><p class="pa-kpi__nota" data-kpi-nota="d30"></p></div>
         <div class="pa-kpi"><p class="pa-kpi__titulo">Venta promedio</p><p class="pa-kpi__valor" data-kpi="ticket">—</p><p class="pa-kpi__nota">por pedido, últimos 30 días</p></div>
       </div>
+      <div class="pa-titulo-seccion">
+        <h2 class="pa-subtitulo">Visitas</h2>
+        <div class="pa-segmento" role="group" aria-label="Período de visitas" data-visitas-periodo>
+          <button type="button" data-dias="7">7 días</button>
+          <button type="button" data-dias="30">30 días</button>
+        </div>
+      </div>
+      <p class="pa-aviso" data-visitas-aviso hidden></p>
+      <div data-visitas-datos hidden>
+        <div class="pa-kpis">
+          <div class="pa-kpi"><p class="pa-kpi__titulo">Visitas</p><p class="pa-kpi__valor" data-kpi="visitas">—</p><p class="pa-kpi__nota">personas que llegaron a la tienda</p></div>
+          <div class="pa-kpi"><p class="pa-kpi__titulo">Páginas vistas</p><p class="pa-kpi__valor" data-kpi="paginas">—</p><p class="pa-kpi__nota" data-kpi-nota="paginas"></p></div>
+          <div class="pa-kpi"><p class="pa-kpi__titulo">Compran</p><p class="pa-kpi__valor" data-kpi="conversion">—</p><p class="pa-kpi__nota" data-kpi-nota="conversion"></p></div>
+        </div>
+        <div class="pa-panel">
+          <h2>Visitas por día</h2>
+          <div class="pa-grafico">
+            <svg data-visitas-svg viewBox="0 0 640 200" role="img" aria-label="Visitas por día"></svg>
+            <div class="pa-grafico__tooltip" data-visitas-tooltip role="status" hidden></div>
+          </div>
+        </div>
+        <div class="pa-columnas">
+          <div class="pa-panel"><h2>Páginas más vistas</h2><div class="pa-partes" data-visitas-paginas></div></div>
+          <div class="pa-panel"><h2>De dónde llegan</h2><div class="pa-partes" data-visitas-origenes></div></div>
+          <div class="pa-panel"><h2>Países</h2><div class="pa-partes" data-visitas-paises></div></div>
+          <div class="pa-panel"><h2>Dispositivos</h2><div class="pa-partes" data-visitas-dispositivos></div></div>
+        </div>
+        <p class="pa-tenue pa-chico" data-visitas-nota></p>
+      </div>
+
       <h2 class="pa-subtitulo">Explorar ventas</h2>
       <form class="pa-panel pa-periodo" data-form-periodo>
         <div class="pa-periodo__atajos" role="group" aria-label="Períodos rápidos">
@@ -750,6 +780,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-vista-previa__marca { display: inline-block; width: 36px; height: 3px; background: var(--c-marca, #f39); border-radius: 2px; }
   .pa-vista-previa__pie { background: var(--c-pie, #222); color: #fff; font-size: .8rem; padding: 8px 14px; }
   .pa-cambiado { font-size: .72rem; }
+  .pa-titulo-seccion { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin: 28px 0 12px; }
+  .pa-titulo-seccion .pa-subtitulo { margin: 0 !important; }
 
   .pa-propuesta { display: grid; gap: 10px; margin-top: 12px; }
   .pa-propuesta img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--pa-borde); border-radius: 8px; padding: 8px; }

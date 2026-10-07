@@ -117,7 +117,7 @@ function prepararLienzo(lienzo: SVGSVGElement, n: number, maximo: number, precio
     const y = arriba + alto - f * alto;
     hijos.push(svg("line", { x1: izq, x2: W - der, y1: y, y2: y }, "rejilla"));
     const t = svg("text", { x: izq - 8, y: y + 4, "text-anchor": "end" }, "eje");
-    t.textContent = f === 0 ? "$0" : precio(tope * f);
+    t.textContent = precio(tope * f);
     hijos.push(t);
   }
   // Etiquetas del eje X: como máximo una cada ~70px, contando desde la última.
@@ -182,7 +182,9 @@ export function graficoTiempo(
   tooltip: HTMLElement,
   puntos: { etiqueta: string; detalle: string; ventas: number; pedidos: number }[],
   tipo: TipoTiempo,
-  precio: Precio
+  precio: Precio,
+  /** Para usar el mismo gráfico con otra cosa que ventas (ej. visitas). */
+  textos?: { segunda?: (i: number) => string; resumen?: (total: string) => string }
 ) {
   const n = puntos.length;
   const base = prepararLienzo(lienzo, n, Math.max(0, ...puntos.map((p) => p.ventas)), precio, puntos.map((p) => p.etiqueta));
@@ -211,7 +213,7 @@ export function graficoTiempo(
     tooltip,
     (i) => {
       const t = html("strong", "", precio(puntos[i].ventas));
-      return [t, `${puntos[i].detalle} · ${puntos[i].pedidos} ${puntos[i].pedidos === 1 ? "pedido" : "pedidos"}`];
+      return [t, textos?.segunda ? `${puntos[i].detalle} · ${textos.segunda(i)}` : `${puntos[i].detalle} · ${puntos[i].pedidos} ${puntos[i].pedidos === 1 ? "pedido" : "pedidos"}`];
     },
     (i) => {
       if (tipo === "barras") marcas.forEach((m, j) => m.classList.toggle("barra--activa", j === i));
@@ -224,7 +226,7 @@ export function graficoTiempo(
   );
   lienzo.replaceChildren(...base.hijos);
   const total = puntos.reduce((s, p) => s + p.ventas, 0);
-  lienzo.setAttribute("aria-label", `Ventas en el período: ${precio(total)} en total. El detalle está en "Ver como tabla".`);
+  lienzo.setAttribute("aria-label", textos?.resumen ? textos.resumen(precio(total)) : `Ventas en el período: ${precio(total)} en total. El detalle está en "Ver como tabla".`);
 }
 
 // ─────────────────────────── dos años, mes a mes ───────────────────────────

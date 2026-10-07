@@ -24,6 +24,7 @@ export { validarEntrada, idDesdeNombre, type EntradaProducto } from "./productos
 export { crearGestionCarrusel } from "./carrusel";
 export { crearGestionCategorias } from "./categorias";
 export { crearGestionContenido } from "./contenido";
+export { visitasPanel } from "./visitas";
 export { listarPedidos, type PedidoPanel } from "./pedidos";
 export { textoStock, ayudaVendidos, type TextoStock } from "./texto-stock";
 export { exigirSesion, type Ctx } from "./http";

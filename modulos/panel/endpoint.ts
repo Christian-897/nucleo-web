@@ -18,6 +18,7 @@
  *   functions/api/admin/categoria-foto.ts  export const { onRequestPost } = panel.categoriaFoto;
  *   functions/api/admin/pedidos.ts         export const { onRequestGet, onRequestPost } = panel.pedidos;
  *   functions/api/admin/resumen.ts         export const { onRequestGet } = panel.resumen;
+ *   functions/api/admin/visitas.ts         export const { onRequestGet } = panel.visitas;
  *   functions/api/admin/carrusel.ts        export const { onRequestGet, onRequestPost } = panel.carrusel;
  *   functions/api/admin/contenido.ts       export const { onRequestGet, onRequestPost } = panel.contenido;
  *   functions/api/admin/contenido-foto.ts  export const { onRequestPost } = panel.contenidoFoto;
@@ -41,6 +42,7 @@ import { crearGestionCategorias } from "./categorias";
 import { crearGestionContenido } from "./contenido";
 import { crearGestionPedidos } from "./pedidos";
 import { crearResumen } from "./resumen";
+import { visitasPanel } from "./visitas";
 import { crearGestionProductos } from "./productos";
 
 export interface OpcionesPanel extends ConfigPanel {
@@ -104,6 +106,8 @@ export function crearPanel(opciones: OpcionesPanel) {
     pedidos: { onRequestGet: (c: Ctx) => pedidos.get(c), onRequestPost: (c: Ctx) => pedidos.post(c) },
     /** Métricas de ventas (pestaña Resumen). */
     resumen: { onRequestGet: (c: Ctx) => resumen(c) },
+    /** Visitas de Cloudflare Web Analytics (si están las variables ANALITICA_*). */
+    visitas: { onRequestGet: (c: Ctx) => visitasPanel(c) },
     suscriptores: {
       onRequestGet: async (c: Ctx) => {
         const s = await exigirSesion(c, false);

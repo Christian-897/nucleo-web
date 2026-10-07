@@ -365,6 +365,15 @@ async function run() {
 
   console.log("Panel — pedidos y suscriptores:");
 
+  await prueba("visitas: solo con sesión; sin las claves de Cloudflare dice 'no conectadas' (sin error)", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    assert.equal((await panel.visitas.onRequestGet({ env, request: req("/x") })).status, 401);
+    const r = await panel.visitas.onRequestGet({ env, request: req("/api/admin/visitas?dias=30", { cookie }) });
+    assert.equal(r.status, 200);
+    assert.equal((await json(r)).conectadas, false);
+  });
+
   console.log("Panel — diseño y textos:");
 
   await prueba("diseño y textos: sin sesión nada; guardar con aviso de contraste (no bloquea); errores por campo", async () => {

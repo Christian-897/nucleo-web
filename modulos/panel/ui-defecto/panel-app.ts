@@ -1008,10 +1008,127 @@ async function cargarResumen() {
     d.porDespachar === 1 ? "Tienes 1 pedido por despachar." : `Tienes ${d.porDespachar} pedidos por despachar.`;
 
   hoyNegocio = d.hoy;
+  resumenActual = d;
+  void cargarVisitas();
   mostrarAnual(d.anual);
   const f = formPeriodo();
   if (!f.desde.value) aplicarAtajo("30");
   else await cargarRango();
+}
+
+// ─── visitas (Cloudflare Web Analytics) ───
+
+interface Parte { nombre: string; valor: number }
+interface Visitas {
+  conectadas: boolean;
+  message?: string;
+  dias: number;
+  visitas: number;
+  paginas: number;
+  porDia: { dia: string; visitas: number; paginas: number }[];
+  masVistas: Parte[];
+  paises: Parte[];
+  dispositivos: Parte[];
+  origenes: Parte[];
+  generado: string;
+}
+let resumenActual: ResumenPanel | null = null;
+let diasVisitas = Number(preferencia<string>("visitas", ["7", "30"], "7"));
+const entero = (n: number) => n.toLocaleString("es-CL");
+const regiones = (() => {
+  try {
+    return new Intl.DisplayNames(["es"], { type: "region" });
+  } catch {
+    return null;
+  }
+})();
+const nombrePais = (c: string) => (c && regiones ? regiones.of(c.toUpperCase()) ?? c : c || "Desconocido");
+const DISPOSITIVOS: Record<string, string> = { desktop: "Computador", mobile: "Celular", tablet: "Tablet", smarttv: "Televisor" };
+function nombrePagina(ruta: string): string {
+  if (ruta === "/") return "Inicio";
+  if (ruta === "/tienda/") return "Tienda (todo)";
+  if (ruta === "/carrito/") return "Carrito";
+  const legible = (s: string) => decodeURIComponent(s).replace(/-/g, " ");
+  const m = ruta.match(/^\/(tienda|producto)\/([^/]+)\/?$/);
+  if (m) return `${m[1] === "tienda" ? "Categoría" : "Producto"}: ${legible(m[2])}`;
+  return ruta;
+}
+
+function marcarPeriodoVisitas() {
+  for (const b of $$<HTMLButtonElement>("[data-visitas-periodo] button")) b.setAttribute("aria-pressed", String(Number(b.dataset.dias) === diasVisitas));
+}
+for (const b of $$<HTMLButtonElement>("[data-visitas-periodo] button")) {
+  b.addEventListener("click", () => {
+    diasVisitas = Number(b.dataset.dias);
+    guardarPreferencia("visitas", String(diasVisitas));
+    marcarPeriodoVisitas();
+    void cargarVisitas();
+  });
+}
+marcarPeriodoVisitas();
+
+async function cargarVisitas() {
+  const aviso = $("[data-visitas-aviso]");
+  const datos = $("[data-visitas-datos]");
+  const r = await obtener<Visitas>(`${API}/visitas?dias=${diasVisitas}`);
+  if (siSeCerro(r.status)) return;
+  if (r.ok && !r.datos.conectadas) {
+    aviso.textContent = "Las visitas todavía no están conectadas. Quien mantiene el sitio puede activarlas con tres claves de Cloudflare; después aparecen aquí solas.";
+    aviso.hidden = false;
+    datos.hidden = true;
+    return;
+  }
+  if (!r.ok) {
+    aviso.textContent = r.datos.message || "No se pudieron cargar las visitas. Intenta más tarde.";
+    aviso.hidden = false;
+    datos.hidden = true;
+    return;
+  }
+  const v = r.datos;
+  aviso.hidden = true;
+  datos.hidden = false;
+  const kpi = (k: string, valor: string) => ($(`[data-kpi="${k}"]`).textContent = valor);
+  kpi("visitas", entero(v.visitas));
+  kpi("paginas", entero(v.paginas));
+  $('[data-kpi-nota="paginas"]').textContent = v.visitas ? `${(v.paginas / v.visitas).toFixed(1).replace(".", ",")} páginas por visita` : "";
+  const pedidos = resumenActual ? (v.dias === 30 ? resumenActual.periodos.d30.pedidos : resumenActual.periodos.d7.pedidos) : null;
+  if (pedidos !== null && v.visitas > 0) {
+    const pct = (pedidos / v.visitas) * 100;
+    kpi("conversion", `${pct < 10 ? pct.toFixed(1).replace(".", ",") : Math.round(pct)} %`);
+    $('[data-kpi-nota="conversion"]').textContent = `${pedidosTxt(pedidos)} de ${entero(v.visitas)} visitas`;
+  } else {
+    kpi("conversion", "—");
+    $('[data-kpi-nota="conversion"]').textContent = "pedidos por cada 100 visitas";
+  }
+  const puntos = v.porDia.map((p) => ({ etiqueta: diaCorto(p.dia), detalle: fechaLarga(p.dia), ventas: p.visitas, pedidos: p.paginas }));
+  const lienzo = $("[data-visitas-svg]") as unknown as SVGSVGElement;
+  dibujarAdaptable("visitas", () =>
+    !lienzo.closest("[hidden]") &&
+    graficoTiempo(lienzo, $("[data-visitas-tooltip]"), puntos, "barras", entero, {
+      segunda: (i) => `${entero(puntos[i].pedidos)} páginas vistas`,
+      resumen: (total) => `Visitas por día: ${total} en total.`,
+    })
+  );
+  const propio = location.hostname.replace(/^www\./, "");
+  const lista = (sel: string, partes: Parte[], nombre: (s: string) => string, vacio: string) =>
+    graficoPartes(
+      $(sel),
+      partes.map((p) => ({ nombre: nombre(p.nombre), valor: p.valor, detalle: `${entero(p.valor)} ${p.valor === 1 ? "vista" : "vistas"}` })),
+      "lista",
+      entero,
+      vacio
+    );
+  lista("[data-visitas-paginas]", v.masVistas, nombrePagina, "Todavía no hay visitas.");
+  lista(
+    "[data-visitas-origenes]",
+    v.origenes.filter((o) => o.nombre.replace(/^www\./, "") !== propio),
+    (h) => (h ? h.replace(/^www\./, "").replace(/^l\.|^lm\.|^m\./, "") : "Directo o guardado"),
+    "Todavía no hay visitas."
+  );
+  lista("[data-visitas-paises]", v.paises, nombrePais, "Todavía no hay visitas.");
+  lista("[data-visitas-dispositivos]", v.dispositivos, (d) => DISPOSITIVOS[d] ?? (d || "Otro"), "Todavía no hay visitas.");
+  const hora = new Date(v.generado).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" });
+  $("[data-visitas-nota]").textContent = `Datos de Cloudflare Web Analytics, sin robots. Actualizados a las ${hora}; se renuevan cada 10 minutos. Con muchas visitas, Cloudflare entrega cifras aproximadas.`;
 }
 
 // ─── explorar ventas: rango de fechas ───

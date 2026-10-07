@@ -13,4 +13,5 @@ export * as contacto from "./modulos/contacto/index";
 export * as carrusel from "./modulos/carrusel/index";
 export * as contenido from "./modulos/contenido/index";
 export * as metricas from "./modulos/metricas/index";
+export * as visitas from "./modulos/visitas/index";
 export * as panel from "./modulos/panel/index";
