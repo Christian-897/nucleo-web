@@ -16,6 +16,7 @@ export {
   decodificarEmail,
   celdaCsv,
   listarActivos,
+  quitarPorCorreo,
   respuestaCsv,
   type Suscriptor,
 } from "./servidor";

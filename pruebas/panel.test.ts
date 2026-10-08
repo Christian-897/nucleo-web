@@ -16,6 +16,7 @@ import { ayudaVendidos, textoStock } from "../modulos/panel/texto-stock";
 import { diaLocal } from "../modulos/metricas/index";
 import { crearCarruselEditable } from "../modulos/carrusel/index";
 import { crearContenidoEditable } from "../modulos/contenido/index";
+import { hmacSha256Hex } from "../core/cripto";
 const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
@@ -581,6 +582,35 @@ async function run() {
     assert.equal((await panel.suscriptores.onRequestGet({ env, request: req("/x?formato=csv") })).status, 401);
     const r = await panel.suscriptores.onRequestGet({ env, request: req("/x?formato=csv", { cookie }) });
     assert.match(r.headers.get("Content-Type")!, /text\/csv/);
+  });
+
+  await prueba("suscriptores: la lista y quitar a alguien solo con sesión y mismo origen", async () => {
+    const { env, datos } = entorno();
+    const SECRETO = "s".repeat(40);
+    env.NEWSLETTER_SECRET = SECRETO;
+    const clave = async (e: string) => "news:sub:" + (await hmacSha256Hex(SECRETO, `clave:${e}`)).slice(0, 40);
+    await env.REVIEWS_KV!.put(await clave("ana@correo.cl"), JSON.stringify({ email: "ana@correo.cl", estado: "activo", creado: "2026-10-01T00:00:00Z", confirmado: "2026-10-01T00:00:00Z" }));
+    await env.REVIEWS_KV!.put(await clave("beto@correo.cl"), JSON.stringify({ email: "beto@correo.cl", estado: "activo", creado: "2026-10-02T00:00:00Z", confirmado: "2026-10-02T00:00:00Z" }));
+    const cookie = await instalarYEntrar(env);
+
+    assert.equal((await panel.suscriptores.onRequestGet({ env, request: req("/x") })).status, 401);
+    const l = await json(await panel.suscriptores.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(l.total, 2);
+    assert.deepEqual(l.lista.map((x: { email: string }) => x.email), ["beto@correo.cl", "ana@correo.cl"], "los más nuevos primero");
+
+    const quitar = (email: unknown, o: { cookie?: string; origen?: string } = {}) =>
+      panel.suscriptores.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "quitar", email }, ...o }) });
+    assert.equal((await quitar("ana@correo.cl")).status, 401, "sin sesión no");
+    assert.equal((await quitar("ana@correo.cl", { cookie, origen: "https://malo.cl" })).status, 403, "otro origen no");
+    assert.equal((await quitar("no-es-correo", { cookie })).status, 400);
+    assert.equal((await quitar("nadie@correo.cl", { cookie })).status, 404);
+    assert.equal((await quitar("  ANA@correo.cl ", { cookie })).status, 200, "ignora mayúsculas y espacios");
+    assert.ok(![...datos.keys()].includes(await clave("ana@correo.cl")));
+    const l2 = await json(await panel.suscriptores.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(l2.total, 1);
+
+    delete env.NEWSLETTER_SECRET;
+    assert.equal((await quitar("beto@correo.cl", { cookie })).status, 503);
   });
 
   await prueba("las cabeceras del panel reemplazan (no suman) y prohíben scripts externos", async () => {

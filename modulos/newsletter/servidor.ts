@@ -326,6 +326,24 @@ export async function darDeBaja(
   });
 }
 
+/**
+ * Baja hecha por la dueña desde el panel (quien se lo pidió por WhatsApp o
+ * correo). Quien llama ya comprobó la sesión del panel.
+ */
+export async function quitarPorCorreo(
+  env: EnvNewsletter,
+  correo: unknown
+): Promise<"quitado" | "no-estaba" | "correo-invalido" | "no-disponible"> {
+  const secreto = secretoValido(env);
+  if (!secreto || !env.REVIEWS_KV) return "no-disponible";
+  const email = normalizarEmail(correo);
+  if (!email) return "correo-invalido";
+  const clave = await claveSuscriptor(secreto, email);
+  if (!(await leerSuscriptor(env, clave))) return "no-estaba";
+  await env.REVIEWS_KV.delete(clave);
+  return "quitado";
+}
+
 // ───────────────────────────── EXPORTAR ─────────────────────────────
 
 /** Neutraliza fórmulas al abrir el CSV en Excel/Sheets (=, +, -, @). */

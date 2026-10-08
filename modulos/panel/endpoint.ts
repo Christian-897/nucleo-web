@@ -23,7 +23,7 @@
  *   functions/api/admin/contenido.ts       export const { onRequestGet, onRequestPost } = panel.contenido;
  *   functions/api/admin/contenido-foto.ts  export const { onRequestPost } = panel.contenidoFoto;
  *   functions/api/admin/carrusel-foto.ts   export const { onRequestPost } = panel.carruselFoto;
- *   functions/api/admin/suscriptores.ts    export const { onRequestGet } = panel.suscriptores;
+ *   functions/api/admin/suscriptores.ts    export const { onRequestGet, onRequestPost } = panel.suscriptores;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
  *   functions/api/admin/_middleware.ts     export const { onRequest } = panel.cabeceras;
@@ -31,11 +31,11 @@
 import type { FuenteCarrusel } from "../carrusel/almacen";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import type { FuenteContenido } from "../contenido/almacen";
-import { listarActivos, respuestaCsv } from "../newsletter/servidor";
+import { listarActivos, quitarPorCorreo, respuestaCsv } from "../newsletter/servidor";
 import * as acceso from "./acceso";
 import type { ConfigPanel, EnvPanel } from "./config";
 import { aplicarCabecerasPanel } from "./encabezados";
-import { type Ctx, exigirSesion, jsonResponse } from "./http";
+import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
 import { identificadorValido, responderFoto } from "./imagenes";
 import { crearGestionCarrusel } from "./carrusel";
 import { crearGestionCategorias } from "./categorias";
@@ -118,7 +118,22 @@ export function crearPanel(opciones: OpcionesPanel) {
           r.headers.set("Cache-Control", "no-store");
           return r;
         }
-        return jsonResponse(200, { total: activos.length });
+        const lista = activos
+          .map((a) => ({ email: a.email, confirmado: a.confirmado ?? "" }))
+          .sort((a, b) => b.confirmado.localeCompare(a.confirmado));
+        return jsonResponse(200, { total: lista.length, lista });
+      },
+      /** Quitar a alguien de la lista (lo pidió por WhatsApp o correo). */
+      onRequestPost: async (c: Ctx) => {
+        const s = await exigirSesion(c, true);
+        if (s instanceof Response) return s;
+        const cuerpo = await leerJson(c.request);
+        if (cuerpo?.accion !== "quitar") return jsonResponse(400, { message: "Acción no válida." });
+        const r = await quitarPorCorreo(c.env, cuerpo.email);
+        if (r === "no-disponible") return jsonResponse(503, { message: "El newsletter no está activo." });
+        if (r === "correo-invalido") return jsonResponse(400, { message: "Ese correo no es válido." });
+        if (r === "no-estaba") return jsonResponse(404, { message: "Ese correo no está en la lista." });
+        return jsonResponse(200, { ok: true });
       },
     },
     /** Fotos públicas subidas desde el panel. */

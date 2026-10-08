@@ -54,6 +54,17 @@ export const { onRequestGet } = newsletter.exportar;
 Páginas del sitio: `/newsletter/confirmar` y `/newsletter/baja`, cada una con
 un botón que llama a `confirmarNewsletter` / `bajaNewsletter`.
 
+## Baja desde el panel
+
+En **Suscriptores** del panel se ve la lista (más nuevos primero), con
+buscador y un botón **Quitar** por correo, para quien lo pida por WhatsApp o
+correo. El sitio debe exportar también `onRequestPost`:
+
+```ts
+// functions/api/admin/suscriptores.ts
+export const { onRequestGet, onRequestPost } = panel.suscriptores;
+```
+
 ## Descargar la lista
 
 ```bash

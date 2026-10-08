@@ -1303,10 +1303,60 @@ $("[data-ir-pedidos]").addEventListener("click", () => abrirPestana("pedidos"));
 
 // ─────────────────────────── suscriptores ───────────────────────────
 
+interface FilaSuscriptor {
+  email: string;
+  confirmado: string;
+}
+let suscriptores: FilaSuscriptor[] = [];
+const MAXIMO_FILAS_SUSCRIPTORES = 100;
+
 async function cargarSuscriptores() {
-  const r = await obtener<{ total: number }>(`${API}/suscriptores`);
+  const r = await obtener<{ total: number; lista?: FilaSuscriptor[] }>(`${API}/suscriptores`);
   if (siSeCerro(r.status)) return;
   $("[data-total-suscriptores]").textContent = r.ok ? String(r.datos.total) : "—";
+  suscriptores = r.ok && Array.isArray(r.datos.lista) ? r.datos.lista : [];
+  pintarSuscriptores();
+}
+
+function pintarSuscriptores() {
+  const buscar = $<HTMLInputElement>("[data-buscar-suscriptor]").value.trim().toLowerCase();
+  const filtrados = buscar ? suscriptores.filter((s) => s.email.includes(buscar)) : suscriptores;
+  const visibles = filtrados.slice(0, MAXIMO_FILAS_SUSCRIPTORES);
+  const lista = $("[data-lista-suscriptores]");
+  lista.replaceChildren(
+    ...visibles.map((s) => {
+      const li = crear("li", "pa-fila pa-fila--correo");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", s.email));
+      const fecha = s.confirmado ? new Date(s.confirmado) : null;
+      if (fecha && !Number.isNaN(fecha.getTime())) {
+        info.append(crear("div", "pa-fila__datos", `Desde el ${fecha.toLocaleDateString("es-CL")}`));
+      }
+      const quitar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Quitar");
+      quitar.type = "button";
+      quitar.addEventListener("click", () => quitarSuscriptor(s.email));
+      const botones = crear("div", "pa-fila__botones");
+      botones.append(quitar);
+      li.append(info, botones);
+      return li;
+    })
+  );
+  const nota = $("[data-nota-suscriptores]");
+  if (!suscriptores.length) nota.textContent = "Todavía no hay suscriptores confirmados.";
+  else if (!filtrados.length) nota.textContent = "Ningún correo coincide con la búsqueda.";
+  else if (filtrados.length > visibles.length) nota.textContent = `Se muestran ${visibles.length} de ${filtrados.length}. Escribe en el buscador para encontrar uno.`;
+  else nota.textContent = "";
+  nota.hidden = !nota.textContent;
+}
+$("[data-buscar-suscriptor]").addEventListener("input", pintarSuscriptores);
+
+async function quitarSuscriptor(email: string) {
+  if (!confirm(`¿Quitar a ${email} de la lista? Ya no le llegarán tus correos.`)) return;
+  const r = await enviar(`${API}/suscriptores`, { accion: "quitar", email });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok && r.status !== 404) return avisar(r.datos.message || "No se pudo quitar.");
+  avisar(`${email} ya no está en la lista.`);
+  await cargarSuscriptores();
 }
 $("[data-descargar-csv]").addEventListener("click", async () => {
   const res = await fetch(`${API}/suscriptores?formato=csv`, { credentials: "same-origin" });

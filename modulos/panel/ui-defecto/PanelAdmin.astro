@@ -379,6 +379,13 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <button class="pa-boton" type="button" data-descargar-csv>Descargar lista (CSV)</button>
         <p class="pa-tenue pa-chico">Ábrela en Excel o súbela a tu herramienta de correos. Cada envío debe incluir el enlace para darse de baja.</p>
       </div>
+      <div class="pa-caja pa-caja--ancha">
+        <h2>Lista</h2>
+        <p class="pa-tenue pa-chico">Si alguien te pide que ya no le lleguen correos, búscalo y presiona <strong>Quitar</strong>.</p>
+        <label class="pa-campo pa-campo--fila">Buscar<input type="search" data-buscar-suscriptor placeholder="correo@…" autocomplete="off" /></label>
+        <ul class="pa-lista" data-lista-suscriptores aria-live="polite"></ul>
+        <p class="pa-tenue pa-chico" data-nota-suscriptores hidden></p>
+      </div>
     </section>
 
     <!-- ───────────── seguridad ───────────── -->
@@ -746,6 +753,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-editor--ancho { grid-template-columns: 320px 1fr; }
   .pa-editor__foto .pa-foto-ancha { width: 320px; height: 200px; }
   .pa-fila--diapo { grid-template-columns: 112px 1fr auto; }
+  .pa-fila--correo { grid-template-columns: 1fr auto; }
+  .pa-fila--correo .pa-fila__nombre { overflow-wrap: anywhere; }
   .pa-fila--diapo img { width: 112px; height: 70px; }
   .pa-portada-ajustes { display: flex; gap: 8px 24px; align-items: center; flex-wrap: wrap; }
   .pa-portada-ajustes p { flex-basis: 100%; margin: 0; }
@@ -807,6 +816,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     .pa-editor__foto .pa-foto-ancha { width: 100%; height: auto; aspect-ratio: 16 / 10; }
     .pa-fila--diapo { grid-template-columns: 88px 1fr; }
     .pa-fila--diapo img { width: 88px; height: 56px; }
+    .pa-fila--correo { grid-template-columns: 1fr auto; }
+    .pa-fila--correo .pa-fila__botones { grid-column: auto; }
     .pa-respaldos ul { columns: 1; }
   }
 </style>
