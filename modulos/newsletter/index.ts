@@ -9,6 +9,7 @@ export {
   suscribir,
   confirmar,
   darDeBaja,
+  pedirBaja,
   exportar,
   enlaceBaja,
   normalizarEmail,
@@ -20,4 +21,4 @@ export {
   respuestaCsv,
   type Suscriptor,
 } from "./servidor";
-export { suscribirNewsletter, confirmarNewsletter, bajaNewsletter, type ResultadoNewsletter } from "./cliente";
+export { suscribirNewsletter, confirmarNewsletter, bajaNewsletter, pedirBajaNewsletter, type ResultadoNewsletter } from "./cliente";

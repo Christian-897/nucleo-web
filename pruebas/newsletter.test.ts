@@ -8,6 +8,7 @@ import {
   confirmar,
   darDeBaja,
   exportar,
+  pedirBaja,
   suscribir,
   enlaceBaja,
   celdaCsv,
@@ -195,6 +196,41 @@ async function run() {
       env
     );
     assert.equal(r.status, 200);
+  });
+
+  await prueba("pedir la baja: llega el enlace, sirve, y la respuesta no revela quién está", async () => {
+    const { env, datos } = entorno();
+    await suscribir(pedir("/x", valido), env, config);
+    const antes = correos.length;
+    const pedido = { email: "ana@correo.cl", turnstileToken: "humano" };
+    const r = await pedirBaja(pedir("/x", pedido), env, config);
+    assert.equal(r.status, 200);
+    assert.equal(correos.length, antes + 1);
+    assert.equal(correos.at(-1)!.para, "ana@correo.cl");
+    const enlace = enlaceDelCorreo();
+    assert.equal(enlace.pathname, "/newsletter/baja");
+    const ok = await darDeBaja(pedir("/x", { e: enlace.searchParams.get("e"), t: enlace.searchParams.get("t") }), env);
+    assert.equal(ok.status, 200);
+    assert.equal([...datos.keys()].some((k) => k.startsWith(PREFIJO_SUSCRIPTOR)), false);
+
+    // Un correo que no está: misma respuesta y ningún correo.
+    const otro = await pedirBaja(pedir("/x", { email: "nadie@correo.cl", turnstileToken: "humano" }), env, config);
+    assert.equal(otro.status, 200);
+    assert.deepEqual(await otro.json(), await (await pedirBaja(pedir("/x", pedido), env, config)).json());
+    assert.equal(correos.length, antes + 1);
+  });
+
+  await prueba("pedir la baja: sin Turnstile, otro origen o bombardeo, no envía", async () => {
+    const { env } = entorno();
+    await suscribir(pedir("/x", valido), env, config);
+    const antes = correos.length;
+    assert.equal((await pedirBaja(pedir("/x", { email: "ana@correo.cl", turnstileToken: "robot" }), env, config)).status, 400);
+    assert.equal((await pedirBaja(pedir("/x", { email: "ana@correo.cl", turnstileToken: "humano" }, { Origin: "https://malo.cl" }), env, config)).status, 403);
+    assert.equal((await pedirBaja(pedir("/x", { email: "no-es-correo", turnstileToken: "humano" }), env, config)).status, 400);
+    for (let i = 0; i < 5; i++) {
+      await pedirBaja(pedir("/x", { email: "ana@correo.cl", turnstileToken: "humano" }, { "CF-Connecting-IP": `10.1.0.${i}` }), env, config);
+    }
+    assert.equal(correos.length, antes + 3, "máximo 3 enlaces al día por correo");
   });
 
   await prueba("exportar exige el token y solo lista activos", async () => {

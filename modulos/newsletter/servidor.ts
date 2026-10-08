@@ -33,7 +33,7 @@ import {
   LARGO_MINIMO_SECRETO,
   RUTAS_NEWSLETTER,
 } from "./config";
-import { correoConfirmacion } from "./plantilla-correo";
+import { correoBaja, correoConfirmacion } from "./plantilla-correo";
 
 export const PREFIJO_SUSCRIPTOR = "news:sub:";
 const EMAIL_VALIDO = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,}$/;
@@ -324,6 +324,74 @@ export async function darDeBaja(
     ok: true,
     message: "Listo. Ya no recibirás más correos nuestros.",
   });
+}
+
+const RESPUESTA_PEDIR_BAJA = {
+  ok: true,
+  message: "Si ese correo está en nuestra lista, te enviamos un enlace para darte de baja. Revisa también spam.",
+};
+
+/**
+ * La persona pide su enlace de baja escribiendo su correo (por si borró los
+ * correos o nunca llegó a confirmar). La respuesta es SIEMPRE la misma: no se
+ * puede averiguar quién está suscrito. El correo solo sale si el correo está en
+ * la lista, y con topes por IP y por correo (no sirve para bombardear buzones).
+ */
+export async function pedirBaja(
+  request: Request,
+  env: EnvNewsletter,
+  config: ConfigNewsletter
+): Promise<Response> {
+  if (!isSameOrigin(request)) return jsonResponse(403, { message: "Origen no permitido." });
+  const secreto = secretoValido(env);
+  if (!secreto || !env.REVIEWS_KV) {
+    return jsonResponse(503, { message: "No disponible ahora. Escríbenos y te damos de baja." });
+  }
+  const cuerpo = await leerJson(request);
+  if (!cuerpo) return jsonResponse(400, { message: "Solicitud inválida." });
+  if (typeof cuerpo[HONEYPOT_FIELD] === "string" && cuerpo[HONEYPOT_FIELD]) {
+    return jsonResponse(200, RESPUESTA_PEDIR_BAJA);
+  }
+  const email = normalizarEmail(cuerpo.email);
+  if (!email) {
+    return jsonResponse(400, {
+      message: "Revisa tu correo electrónico.",
+      fieldErrors: { email: ["Ingresa un correo válido."] },
+    });
+  }
+
+  const ip = getClientIp(request);
+  const tope = config.rateLimit ?? { max: 5, ventanaSeg: 600 };
+  if (!(await checkRateLimit(env.REVIEWS_KV, `news:bajaip:${ip}`, tope.max, tope.ventanaSeg))) {
+    return jsonResponse(429, { message: "Demasiados intentos. Intenta más tarde." });
+  }
+  const token = typeof cuerpo.turnstileToken === "string" ? cuerpo.turnstileToken : "";
+  const turnstile = await verifyTurnstile(token, limpiarVariable(env.TURNSTILE_SECRET_KEY), ip);
+  if (!turnstile.success) {
+    return jsonResponse(400, {
+      message: "No pudimos verificar que eres una persona. Intenta de nuevo.",
+      fieldErrors: { turnstileToken: ["Completa la verificación."] },
+    });
+  }
+
+  const clave = await claveSuscriptor(secreto, email);
+  if (!(await leerSuscriptor(env, clave))) return jsonResponse(200, RESPUESTA_PEDIR_BAJA);
+  const hashCorreo = clave.slice(PREFIJO_SUSCRIPTOR.length);
+  if (!(await checkRateLimit(env.REVIEWS_KV, `news:bajamail:${hashCorreo}`, 3, 86400))) {
+    return jsonResponse(200, RESPUESTA_PEDIR_BAJA);
+  }
+
+  const enlace = await enlaceBaja(env, new URL(request.url).origin, email, config);
+  if (enlace) {
+    const envio = await enviarCorreo(env, {
+      para: email,
+      subject: `Darte de baja de ${config.nombreSitio}`,
+      html: correoBaja(config, enlace),
+      remitentePorDefecto: config.remitentePorDefecto,
+    });
+    if (envio.simulated) console.log("[newsletter:demo] enlace de baja:", enlace);
+  }
+  return jsonResponse(200, RESPUESTA_PEDIR_BAJA);
 }
 
 /**

@@ -54,6 +54,21 @@ export const { onRequestGet } = newsletter.exportar;
 Páginas del sitio: `/newsletter/confirmar` y `/newsletter/baja`, cada una con
 un botón que llama a `confirmarNewsletter` / `bajaNewsletter`.
 
+## Baja sin depender de nadie
+
+Además del enlace de cada correo, la persona puede pedir su enlace de baja
+escribiendo su correo (por si borró los correos). Usa Turnstile, la
+respuesta es siempre la misma (no revela quién está suscrito) y hay topes
+por IP y por correo (máximo 3 al día).
+
+```ts
+// functions/api/newsletter/pedir-baja.ts
+export const { onRequestPost } = newsletter.pedirBaja;
+```
+
+En el navegador: `pedirBajaNewsletter({ email, turnstileToken })`. Lo cómodo
+es que la página de baja muestre ese formulario cuando se abre sin `e` y `t`.
+
 ## Baja desde el panel
 
 En **Suscriptores** del panel se ve la lista (más nuevos primero), con

@@ -53,7 +53,7 @@ async function run() {
   });
 
   await prueba("los enlaces del correo del newsletter pasan; suscribirse no", async () => {
-    for (const ruta of ["/newsletter/confirmar?e=x&v=1&t=y", "/newsletter/baja/", "/api/newsletter/confirmar", "/api/newsletter/baja"]) {
+    for (const ruta of ["/newsletter/confirmar?e=x&v=1&t=y", "/newsletter/baja/", "/api/newsletter/confirmar", "/api/newsletter/baja", "/api/newsletter/pedir-baja"]) {
       assert.equal(await (await pedir(ruta, encendido)).text(), "SITIO REAL", ruta);
     }
     assert.equal((await pedir("/api/newsletter/suscribir", encendido)).status, 503);

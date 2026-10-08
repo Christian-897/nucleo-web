@@ -53,3 +53,11 @@ export function bajaNewsletter(
 ) {
   return enviar(opciones.endpoint ?? "/api/newsletter/baja", params);
 }
+
+/** Pide el enlace de baja por correo (para quien no tiene a mano un correo nuestro). */
+export function pedirBajaNewsletter(
+  datos: { email: string; turnstileToken: string; [k: string]: unknown },
+  opciones: { endpoint?: string } = {}
+) {
+  return enviar(opciones.endpoint ?? "/api/newsletter/pedir-baja", datos);
+}

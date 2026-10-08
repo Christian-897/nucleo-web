@@ -46,7 +46,8 @@ export interface ConfigConstruccion {
 /**
  * Pasan siempre. Los enlaces del correo del newsletter (confirmar y darse de
  * baja) se abren desde el correo, sin la cookie de vista previa; van firmados,
- * así que dejarlos pasar no abre nada más. Suscribirse sigue bloqueado.
+ * así que dejarlos pasar no abre nada más. Pedir el enlace de baja también
+ * pasa (quien se suscribió debe poder salirse siempre). Suscribirse sigue bloqueado.
  */
 export const RUTAS_LIBRES_POR_DEFECTO = [
   "/api/pago/webhook-",
@@ -56,6 +57,7 @@ export const RUTAS_LIBRES_POR_DEFECTO = [
   "/newsletter/baja",
   "/api/newsletter/confirmar",
   "/api/newsletter/baja",
+  "/api/newsletter/pedir-baja",
 ];
 export const LARGO_MINIMO_CLAVE_PREVIA = 16;
 export const NOMBRE_COOKIE = "__Host-previa";
