@@ -52,6 +52,13 @@ async function run() {
     assert.match(await r.text(), /Sitio en construcción/);
   });
 
+  await prueba("los enlaces del correo del newsletter pasan; suscribirse no", async () => {
+    for (const ruta of ["/newsletter/confirmar?e=x&v=1&t=y", "/newsletter/baja/", "/api/newsletter/confirmar", "/api/newsletter/baja"]) {
+      assert.equal(await (await pedir(ruta, encendido)).text(), "SITIO REAL", ruta);
+    }
+    assert.equal((await pedir("/api/newsletter/suscribir", encendido)).status, 503);
+  });
+
   await prueba("también bloquea la API (no se puede comprar a escondidas)", async () => {
     const r = await pedir("/api/pago/iniciar", encendido);
     assert.equal(r.status, 503);

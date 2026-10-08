@@ -37,5 +37,6 @@ export const { onRequest } = crearAvisoConstruccion({
 | Adivinar la clave | Comparación en tiempo constante; clave equivocada = mismo aviso, sin pistas. |
 | Configuración incompleta | Sin `ACCESO_PREVIA` válida nadie entra (falla cerrado). |
 | Pagos de prueba | Los webhooks de pago y el retorno de Flow (`/api/pago/retorno-`) pasan siempre: llegan sin la cookie de vista previa. |
+| Correo del newsletter | Confirmar y darse de baja (`/newsletter/confirmar`, `/newsletter/baja` y sus `/api/newsletter/…`) pasan siempre: se abren desde el correo, sin la cookie. Suscribirse sigue bloqueado. Para que esas páginas se vean con estilos, el sitio debe dejar pasar también sus estilos (`/_astro/`). |
 | Vista previa indexada | Las páginas vistas con acceso llevan `noindex` y `no-store`. |
 | Inyección | Textos escapados, colores validados, enlaces solo `https:`/`mailto:`/`tel:`, CSP propia. |

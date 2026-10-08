@@ -33,8 +33,8 @@ export interface ConfigConstruccion {
   contactos?: EnlaceContacto[];
   /**
    * Prefijos de ruta que pasan siempre, aunque el aviso esté activo. Por
-   * defecto los webhooks de pago y el retorno de Flow (llegan sin cookie) y
-   * robots.txt. Lo que se ponga aquí se SUMA a los de por defecto.
+   * defecto los webhooks de pago, el retorno de Flow, los enlaces del correo
+   * del newsletter (llegan sin cookie) y robots.txt. Lo que se ponga aquí se SUMA a los de por defecto.
    */
   rutasLibres?: string[];
   /** Días que dura el acceso de vista previa. Por defecto 30. */
@@ -43,6 +43,19 @@ export interface ConfigConstruccion {
   parametro?: string;
 }
 
-export const RUTAS_LIBRES_POR_DEFECTO = ["/api/pago/webhook-", "/api/pago/retorno-", "/robots.txt"];
+/**
+ * Pasan siempre. Los enlaces del correo del newsletter (confirmar y darse de
+ * baja) se abren desde el correo, sin la cookie de vista previa; van firmados,
+ * así que dejarlos pasar no abre nada más. Suscribirse sigue bloqueado.
+ */
+export const RUTAS_LIBRES_POR_DEFECTO = [
+  "/api/pago/webhook-",
+  "/api/pago/retorno-",
+  "/robots.txt",
+  "/newsletter/confirmar",
+  "/newsletter/baja",
+  "/api/newsletter/confirmar",
+  "/api/newsletter/baja",
+];
 export const LARGO_MINIMO_CLAVE_PREVIA = 16;
 export const NOMBRE_COOKIE = "__Host-previa";
