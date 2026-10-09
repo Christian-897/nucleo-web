@@ -4,8 +4,13 @@
  * Cloudflare no se descarga en cada página.
  *
  *   const widget = await montarTurnstile(contenedor, siteKey);
- *   const token = widget.token();   // "" mientras no se resuelva
- *   widget.reiniciar();             // tras un envío (cada token sirve una vez)
+ *   const token = await widget.esperar(); // "" si no se resolvió a tiempo
+ *   widget.reiniciar();                    // tras un envío (cada token sirve una vez)
+ *
+ * Por defecto el cuadro de Cloudflare queda OCULTO mientras la verificación
+ * pase sola ("interaction-only"): solo aparece si Cloudflare necesita que la
+ * persona haga algo. Así nadie confunde su "¡Operación exitosa!" con que ya
+ * se envió el formulario.
  */
 interface ApiTurnstile {
   render(el: HTMLElement, opciones: Record<string, unknown>): string;
@@ -41,27 +46,59 @@ export function cargarTurnstile(): Promise<ApiTurnstile> {
 }
 
 export interface WidgetTurnstile {
+  /** El token si ya está listo; "" si no. */
   token(): string;
+  /** Espera el token (la verificación suele resolverse sola en 1–2 s). "" si no llegó a tiempo. */
+  esperar(ms?: number): Promise<string>;
   reiniciar(): void;
 }
 
 export async function montarTurnstile(
   contenedor: HTMLElement,
   siteKey: string,
-  opciones: { tema?: "light" | "dark" | "auto"; idioma?: string } = {}
+  opciones: {
+    tema?: "light" | "dark" | "auto";
+    idioma?: string;
+    /** "interaction-only" (por defecto): visible solo si hace falta. "always": siempre visible. */
+    apariencia?: "interaction-only" | "always";
+  } = {}
 ): Promise<WidgetTurnstile> {
   const api = await cargarTurnstile();
   let ultimo = "";
+  let avisar: ((t: string) => void)[] = [];
+  const listo = (t: string) => {
+    ultimo = t;
+    const esperando = avisar;
+    avisar = [];
+    esperando.forEach((f) => f(t));
+  };
   const id = api.render(contenedor, {
     sitekey: siteKey,
     theme: opciones.tema ?? "light",
     language: opciones.idioma ?? "es",
-    callback: (t: string) => (ultimo = t),
+    appearance: opciones.apariencia ?? "interaction-only",
+    callback: listo,
     "expired-callback": () => (ultimo = ""),
     "error-callback": () => (ultimo = ""),
   });
+  const token = () => api.getResponse(id) || ultimo;
   return {
-    token: () => api.getResponse(id) || ultimo,
+    token,
+    esperar: (ms = 15000) => {
+      const ya = token();
+      if (ya) return Promise.resolve(ya);
+      return new Promise<string>((resolver) => {
+        const reloj = setTimeout(() => {
+          avisar = avisar.filter((f) => f !== fin);
+          resolver(token());
+        }, ms);
+        const fin = (t: string) => {
+          clearTimeout(reloj);
+          resolver(t);
+        };
+        avisar.push(fin);
+      });
+    },
     reiniciar: () => {
       ultimo = "";
       api.reset(id);
