@@ -7,7 +7,7 @@ export function correoConfirmacion(config: ConfigNewsletter, enlace: string): st
   const fondo = config.coloresCorreo?.fondo ?? "#FBF5F2";
   const nombre = escapeHtml(config.nombreSitio);
   const url = escapeHtml(enlace);
-  return `<!doctype html><html lang="es"><body style="margin:0;background:${fondo};font-family:Arial,sans-serif;color:#3a2a33">
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:${fondo};font-family:Arial,sans-serif;color:#3a2a33">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:12px;padding:32px">
 <tr><td>
@@ -25,7 +25,7 @@ export function correoBaja(config: ConfigNewsletter, enlace: string): string {
   const fondo = config.coloresCorreo?.fondo ?? "#FBF5F2";
   const nombre = escapeHtml(config.nombreSitio);
   const url = escapeHtml(enlace);
-  return `<!doctype html><html lang="es"><body style="margin:0;background:${fondo};font-family:Arial,sans-serif;color:#3a2a33">
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head><body style="margin:0;background:${fondo};font-family:Arial,sans-serif;color:#3a2a33">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:12px;padding:32px">
 <tr><td>

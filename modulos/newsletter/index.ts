@@ -22,3 +22,16 @@ export {
   type Suscriptor,
 } from "./servidor";
 export { suscribirNewsletter, confirmarNewsletter, bajaNewsletter, pedirBajaNewsletter, type ResultadoNewsletter } from "./cliente";
+export {
+  correoBoletin,
+  validarBoletin,
+  enviarBoletin,
+  enviarPrueba,
+  LIMITES_BOLETIN,
+  LIMITES_POR_DIA,
+  leerAjustes,
+  enviadosHoy,
+  horaReinicio,
+  type Boletin,
+  type ProgresoEnvio,
+} from "./boletin";

@@ -24,6 +24,8 @@
  *   functions/api/admin/contenido-foto.ts  export const { onRequestPost } = panel.contenidoFoto;
  *   functions/api/admin/carrusel-foto.ts   export const { onRequestPost } = panel.carruselFoto;
  *   functions/api/admin/suscriptores.ts    export const { onRequestGet, onRequestPost } = panel.suscriptores;
+ *   functions/api/admin/boletines.ts       export const { onRequestGet, onRequestPost } = panel.boletines;
+ *   functions/api/admin/boletin-foto.ts    export const { onRequestPost } = panel.boletinFoto;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
  *   functions/api/admin/_middleware.ts     export const { onRequest } = panel.cabeceras;
@@ -40,6 +42,7 @@ import { identificadorValido, responderFoto } from "./imagenes";
 import { crearGestionCarrusel } from "./carrusel";
 import { crearGestionCategorias } from "./categorias";
 import { crearGestionContenido } from "./contenido";
+import { type ConfigBoletines, crearGestionBoletines } from "./boletines";
 import { crearGestionPedidos } from "./pedidos";
 import { crearResumen } from "./resumen";
 import { visitasPanel } from "./visitas";
@@ -52,6 +55,11 @@ export interface OpcionesPanel extends ConfigPanel {
   carrusel?: FuenteCarrusel;
   /** Colores, tipografías y textos del sitio (crearContenidoEditable). Sin él, no hay pestaña "Diseño y textos". */
   contenido?: FuenteContenido;
+  /**
+   * Boletines a los suscriptores (la misma config del newsletter + urlPublica).
+   * Sin ella, no hay sección "Boletines" en Suscriptores.
+   */
+  boletines?: ConfigBoletines;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
   /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
@@ -67,6 +75,7 @@ export function crearPanel(opciones: OpcionesPanel) {
   const resumen = crearResumen(opciones.zonaHoraria);
   const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
   const contenido = opciones.contenido ? crearGestionContenido(opciones.contenido, opciones) : null;
+  const boletines = opciones.boletines ? crearGestionBoletines(opciones.boletines, opciones) : null;
 
   return {
     parametros: { onRequestGet: (c: Ctx) => acceso.parametros(c) },
@@ -136,6 +145,12 @@ export function crearPanel(opciones: OpcionesPanel) {
         return jsonResponse(200, { ok: true });
       },
     },
+    /** Boletines a los suscriptores (escribir, probar, enviar). */
+    boletines: {
+      onRequestGet: (c: Ctx) => (boletines ? boletines.get(c) : noDisponible()),
+      onRequestPost: (c: Ctx) => (boletines ? boletines.post(c) : noDisponible()),
+    },
+    boletinFoto: { onRequestPost: (c: Ctx) => (boletines ? boletines.foto(c) : noDisponible()) },
     /** Fotos públicas subidas desde el panel. */
     media: {
       onRequestGet: ({ env, params }: { env: EnvPanel; params: Record<string, string | string[]> }) => {

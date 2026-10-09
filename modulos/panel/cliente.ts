@@ -62,7 +62,9 @@ export async function reducirFoto(
   archivo: File,
   lado = 1200,
   maximoBytes = 900 * 1024,
-  recorte: "cuadrado" | "libre" = "cuadrado"
+  recorte: "cuadrado" | "libre" = "cuadrado",
+  /** "jpeg" para fotos que van en correos (WebP no se ve en todos los programas). */
+  formato: "webp" | "jpeg" = "webp"
 ): Promise<File> {
   const m = await medidasDeArchivo(archivo);
   if (!m) throw new Error("No pudimos leer esa foto. Usa un JPG, PNG o WebP.");
@@ -96,10 +98,10 @@ export async function reducirFoto(
 
   const aBlob = (tipo: string, calidad: number) =>
     new Promise<Blob | null>((r) => lienzo.toBlob((b) => r(b), tipo, calidad));
-  let tipo = "image/webp";
+  let tipo = formato === "jpeg" ? "image/jpeg" : "image/webp";
   let calidad = 0.85;
   let blob = await aBlob(tipo, calidad);
-  if (!blob || blob.type !== "image/webp") {
+  if (!blob || blob.type !== tipo) {
     tipo = "image/jpeg";
     blob = await aBlob(tipo, calidad);
   }
@@ -117,6 +119,13 @@ export async function subirFotoProducto(id: string, foto: File, base = "/api/adm
   form.set("id", id);
   form.set("archivo", foto);
   return llamar<{ imagen: string }>(`${base}/producto-foto`, { method: "POST", body: form });
+}
+
+/** Sube la foto de un boletín (JPG, ya reducida). */
+export async function subirFotoBoletin(foto: File, base = "/api/admin") {
+  const form = new FormData();
+  form.set("archivo", foto);
+  return llamar<{ imagen: string }>(`${base}/boletin-foto`, { method: "POST", body: form });
 }
 
 /** Sube una foto de la portada (ya reducida). Devuelve su dirección; se usa al guardar el carrusel. */

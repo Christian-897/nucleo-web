@@ -89,7 +89,37 @@ curl -H "Authorization: Bearer $NEWSLETTER_EXPORT_TOKEN" https://dominio.cl/api/
 El CSV se importa en la herramienta con que se envíen las campañas. Lee hasta
 1.000 suscriptores por llamada.
 
-## Pendiente
+## Boletines desde el panel
 
-Envío de campañas desde el sitio (hoy se exporta la lista). Cada campaña debe
-incluir el enlace de `enlaceBaja` y las cabeceras `List-Unsubscribe`.
+En **Suscriptores → Boletines** la dueña escribe un correo (asunto, título,
+mensaje, foto y botón opcionales), se envía una **prueba** a
+`ADMIN_NOTIFY_EMAIL` y después lo **envía a todos** los confirmados.
+
+- Cada correo va a una sola persona, con **su** enlace "Darme de baja" y las
+  cabeceras `List-Unsubscribe` / `List-Unsubscribe-Post` (Gmail y Outlook
+  muestran su botón "Cancelar suscripción"). No se puede enviar sin ellos.
+- Usa la API de lotes de Resend (100 por llamada). El plan gratis permite
+  **100 correos al día en total** (también cuentan confirmaciones y compras).
+  Por eso la dueña elige en el panel **cuántos correos de boletín por día**
+  (por defecto 80, `maximoPorEnvio`): ve cuántos lleva hoy, a qué hora se
+  reinicia el cupo (medianoche UTC, 21:00 en Chile en verano) y un aviso si
+  deja menos de 15 libres. Al llegar al tope, el envío queda a medias y se
+  retoma con **Seguir enviando**, sin repetirle a nadie.
+- `limiteDiarioPlan` (por defecto 100; `null` en un plan sin tope diario)
+  solo cambia los textos de ayuda.
+- Las respuestas llegan a `ADMIN_NOTIFY_EMAIL` (reply-to).
+- La foto se guarda en JPG (WebP no se ve en todos los programas de correo).
+
+```ts
+// src/servidor/panel.ts
+crearPanel({ …, boletines: { nombreSitio, coloresCorreo, urlPublica: "https://mitienda.cl" } });
+// functions/api/admin/boletines.ts
+export const { onRequestGet, onRequestPost } = panel.boletines;
+// functions/api/admin/boletin-foto.ts
+export const { onRequestPost } = panel.boletinFoto;
+```
+
+Y en la página del panel: `<PanelAdmin … boletines />`. `urlPublica` hace
+que los enlaces y fotos del correo usen el dominio oficial aunque el panel se
+abra desde otra dirección. Las fotos (`/media/`) deben pasar también con el
+sitio en construcción (`rutasLibres`).

@@ -31,10 +31,13 @@ interface Props {
   carrusel?: boolean;
   /** Muestra la pestaña "Diseño y textos" (el sitio montó el contenido editable). */
   contenido?: boolean;
+  /** Muestra "Boletines" en Suscriptores (el sitio montó panel.boletines). */
+  boletines?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false } = Astro.props;
+import { LIMITES_BOLETIN } from "../../newsletter/boletin";
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -377,7 +380,27 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <p class="pa-numero" data-total-suscriptores>—</p>
         <p class="pa-tenue">personas confirmaron su suscripción.</p>
         <button class="pa-boton" type="button" data-descargar-csv>Descargar lista (CSV)</button>
-        <p class="pa-tenue pa-chico">Ábrela en Excel o súbela a tu herramienta de correos. Cada envío debe incluir el enlace para darse de baja.</p>
+        <p class="pa-tenue pa-chico">Un respaldo de la lista para abrir en Excel. Para escribirles, usa Boletines aquí abajo.</p>
+      </div>
+      <div class="pa-caja pa-caja--ancha" data-boletines hidden={!boletines}>
+        <div class="pa-titulo pa-titulo--caja">
+          <h2>Boletines</h2>
+          <button class="pa-boton pa-boton--chico" type="button" data-nuevo-boletin>Nuevo boletín</button>
+        </div>
+        <p class="pa-tenue pa-chico">Escribe un correo para tus suscriptores. Antes de enviarlo a todos, mándate una prueba para ver cómo se ve. Cada correo lleva solo su enlace para darse de baja.</p>
+        <p class="pa-aviso" data-boletin-aviso hidden></p>
+        <div class="pa-cupo">
+          <p class="pa-cupo__hoy" data-cupo-hoy>—</p>
+          <div class="pa-barra" aria-hidden="true"><span data-cupo-barra></span></div>
+          <form class="pa-cupo__form" data-form="cupo" novalidate>
+            <label class="pa-campo pa-campo--fila">Correos de boletín por día<input type="number" name="porDia" min="1" max="1000" step="1" inputmode="numeric" required /></label>
+            <button class="pa-boton pa-boton--suave pa-boton--chico" type="submit">Guardar</button>
+          </form>
+          <p class="pa-error" role="alert" data-error></p>
+          <p class="pa-tenue pa-chico" data-cupo-ayuda></p>
+        </div>
+        <ul class="pa-lista" data-lista-boletines aria-live="polite"></ul>
+        <p class="pa-tenue pa-chico" data-nota-boletines hidden></p>
       </div>
       <div class="pa-caja pa-caja--ancha">
         <h2>Lista</h2>
@@ -581,6 +604,45 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     </form>
   </dialog>
 
+  <!-- editor de boletín -->
+  <dialog class="pa-dialogo" data-editor-boletin aria-labelledby="pa-titulo-boletin">
+    <form data-form="boletin" novalidate>
+      <h2 id="pa-titulo-boletin">Boletín</h2>
+      <div class="pa-editor pa-editor--ancho">
+        <div class="pa-editor__foto">
+          <img class="pa-foto-ancha" data-boletin-foto alt="" width="320" height="200" hidden />
+          <p class="pa-tenue pa-chico" data-boletin-sin-foto>Sin foto (es opcional).</p>
+          <label class="pa-boton pa-boton--suave pa-archivo">
+            Elegir foto
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-boletin-archivo />
+          </label>
+          <button class="pa-boton pa-boton--suave pa-boton--chico" type="button" data-boletin-quitar-foto hidden>Quitar foto</button>
+          <p class="pa-error" role="alert" data-error-foto-boletin></p>
+        </div>
+        <div class="pa-editor__campos">
+          <label class="pa-campo">Asunto (lo que se ve en la bandeja de entrada)<input name="asunto" maxlength={LIMITES_BOLETIN.asunto} required placeholder="Ej: Llegaron los nuevos gatitos tejidos" /></label>
+          <p class="pa-error" data-error-boletin="asunto"></p>
+          <label class="pa-campo">Título dentro del correo (opcional)<input name="titulo" maxlength={LIMITES_BOLETIN.titulo} /></label>
+          <p class="pa-error" data-error-boletin="titulo"></p>
+          <label class="pa-campo">Mensaje<textarea name="texto" rows="8" maxlength={LIMITES_BOLETIN.texto} required placeholder="Deja una línea en blanco para separar párrafos."></textarea></label>
+          <p class="pa-error" data-error-boletin="texto"></p>
+          <div class="pa-dos">
+            <label class="pa-campo">Texto del botón (opcional)<input name="botonTexto" maxlength={LIMITES_BOLETIN.botonTexto} placeholder="Ver la tienda" /></label>
+            <label class="pa-campo">El botón lleva a<input name="botonEnlace" maxlength={LIMITES_BOLETIN.enlace} placeholder="/tienda/" /></label>
+          </div>
+          <p class="pa-error" data-error-boletin="boton.texto"></p>
+          <p class="pa-error" data-error-boletin="boton.enlace"></p>
+          <p class="pa-tenue pa-chico">Una página de la tienda (ej. /tienda/flores/) o una dirección que empiece con https://. Deja los dos vacíos para no mostrar botón.</p>
+        </div>
+      </div>
+      <p class="pa-error" role="alert" data-error></p>
+      <div class="pa-pie-dialogo">
+        <button class="pa-boton pa-boton--suave" type="button" data-cerrar-boletin>Cancelar</button>
+        <button class="pa-boton" type="submit">Guardar borrador</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- aviso de inactividad -->
   <dialog class="pa-dialogo pa-dialogo--chico" data-aviso-inactividad>
     <h2>¿Sigues ahí?</h2>
@@ -754,6 +816,17 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-editor__foto .pa-foto-ancha { width: 320px; height: 200px; }
   .pa-fila--diapo { grid-template-columns: 112px 1fr auto; }
   .pa-fila--correo { grid-template-columns: 1fr auto; }
+  .pa-titulo--caja { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+  .pa-titulo--caja h2 { margin: 0; }
+  .pa-cupo { border: 1px solid var(--pa-borde); border-radius: 12px; padding: 12px 14px; margin: 12px 0 16px; background: #fff; }
+  .pa-cupo__hoy { margin: 0 0 8px; font-weight: 600; }
+  .pa-barra { height: 8px; border-radius: 999px; background: var(--pa-borde); overflow: hidden; margin-bottom: 12px; }
+  .pa-barra span { display: block; height: 100%; width: 0; background: var(--pa-acento); border-radius: 999px; }
+  .pa-barra span.pa-barra--lleno { background: var(--pa-error); }
+  .pa-cupo__form { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+  .pa-cupo__form .pa-campo { margin: 0; }
+  .pa-cupo__form input { width: 90px; }
+  .pa-aviso { background: #fff6e0; border: 1px solid #f0d58a; border-radius: 10px; padding: 10px 12px; font-size: .92rem; }
   .pa-fila--correo .pa-fila__nombre { overflow-wrap: anywhere; }
   .pa-fila--diapo img { width: 112px; height: 70px; }
   .pa-portada-ajustes { display: flex; gap: 8px 24px; align-items: center; flex-wrap: wrap; }
@@ -818,6 +891,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     .pa-fila--diapo img { width: 88px; height: 56px; }
     .pa-fila--correo { grid-template-columns: 1fr auto; }
     .pa-fila--correo .pa-fila__botones { grid-column: auto; }
+    .pa-fila--boletin { grid-template-columns: 1fr; }
+    .pa-fila--boletin .pa-fila__botones { grid-column: 1; }
     .pa-respaldos ul { columns: 1; }
   }
 </style>

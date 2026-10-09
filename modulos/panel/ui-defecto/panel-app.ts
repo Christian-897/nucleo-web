@@ -3,7 +3,7 @@
  * REGLA: lo que llega del servidor se escribe SIEMPRE con textContent o
  * atributos; nunca con innerHTML.
  */
-import { derivarClave, enviar, obtener, reducirFoto, subirFotoCarrusel, subirFotoCategoria, subirFotoProducto } from "../cliente";
+import { derivarClave, enviar, obtener, reducirFoto, subirFotoBoletin, subirFotoCarrusel, subirFotoCategoria, subirFotoProducto } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
 import { ayudaVendidos, textoStock } from "../texto-stock";
 import {
@@ -1316,6 +1316,7 @@ async function cargarSuscriptores() {
   $("[data-total-suscriptores]").textContent = r.ok ? String(r.datos.total) : "—";
   suscriptores = r.ok && Array.isArray(r.datos.lista) ? r.datos.lista : [];
   pintarSuscriptores();
+  if (!$("[data-boletines]").hidden) await cargarBoletines();
 }
 
 function pintarSuscriptores() {
@@ -1370,6 +1371,315 @@ $("[data-descargar-csv]").addEventListener("click", async () => {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+// ─────────────────────────── boletines ───────────────────────────
+
+interface BoletinPanel {
+  id: string;
+  asunto: string;
+  titulo: string;
+  texto: string;
+  imagen?: string;
+  boton?: { texto: string; enlace: string };
+  estado: "borrador" | "enviando" | "enviado";
+  creado: string;
+  enviado?: string;
+  enviados: number;
+}
+interface CupoBoletin {
+  porDia: number;
+  hoy: number;
+  quedan: number;
+  limitePlan: number | null;
+  reinicio: string;
+}
+interface DatosBoletines {
+  boletines: BoletinPanel[];
+  suscriptores: number;
+  correoPrueba: string | null;
+  correoConectado: boolean;
+  cupo: CupoBoletin;
+}
+let datosBoletines: DatosBoletines | null = null;
+
+const fechaCorta = (iso?: string) => {
+  const f = iso ? new Date(iso) : null;
+  return f && !Number.isNaN(f.getTime()) ? f.toLocaleDateString("es-CL") : "";
+};
+
+async function cargarBoletines() {
+  const r = await obtener<DatosBoletines>(`${API}/boletines`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    datosBoletines = null;
+    $("[data-lista-boletines]").replaceChildren();
+    const aviso = $("[data-boletin-aviso]");
+    aviso.textContent = r.datos.message || "No se pudieron cargar los boletines.";
+    aviso.hidden = false;
+    return;
+  }
+  datosBoletines = r.datos;
+  pintarBoletines();
+}
+
+function pintarCupo(c: CupoBoletin) {
+  $("[data-cupo-hoy]").textContent =
+    c.quedan === 0
+      ? `Hoy ya se enviaron los ${c.porDia} correos de boletín. Se reinicia a las ${c.reinicio}.`
+      : `Hoy: ${c.hoy} de ${c.porDia} correos de boletín usados. Se reinicia a las ${c.reinicio}.`;
+  const barra = $("[data-cupo-barra]");
+  barra.style.setProperty("width", `${Math.min(100, Math.round((c.hoy / Math.max(1, c.porDia)) * 100))}%`);
+  barra.classList.toggle("pa-barra--lleno", c.quedan === 0);
+  const campo = $<HTMLInputElement>('[data-form="cupo"] input[name="porDia"]');
+  if (document.activeElement !== campo) campo.value = String(c.porDia);
+  const ayuda = $("[data-cupo-ayuda]");
+  if (c.limitePlan === null) {
+    ayuda.textContent = "Tu plan de correos no tiene tope diario. Este número solo ordena los envíos.";
+  } else {
+    const libres = c.limitePlan - c.porDia;
+    ayuda.textContent =
+      `Tu plan de correos permite ${c.limitePlan} al día en total, contando las confirmaciones de suscripción y los correos de compra. ` +
+      (libres >= 15
+        ? `Con ${c.porDia} para boletines quedan ${libres} libres para esos correos.`
+        : `Ojo: con ${c.porDia} para boletines quedan solo ${Math.max(0, libres)} para compras y confirmaciones. Recomendamos dejar al menos 15 libres.`);
+  }
+}
+
+$<HTMLFormElement>('[data-form="cupo"]').addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget as HTMLFormElement;
+  const n = Number(new FormData(f).get("porDia"));
+  errorDe(f.parentElement!);
+  if (!Number.isInteger(n) || n < 1 || n > 1000) return errorDe(f.parentElement!, "Escribe un número entero entre 1 y 1000.");
+  await conBoton(f, async () => {
+    const r = await enviar<{ cupo: CupoBoletin }>(`${API}/boletines`, { accion: "ajustes", porDia: n });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) return errorDe(f.parentElement!, r.datos.message || "No se pudo guardar.");
+    if (datosBoletines) datosBoletines.cupo = r.datos.cupo;
+    pintarBoletines();
+    avisar(`Listo: hasta ${n} correos de boletín por día.`);
+  });
+});
+
+function pintarBoletines() {
+  const d = datosBoletines;
+  if (!d) return;
+  pintarCupo(d.cupo);
+  const aviso = $("[data-boletin-aviso]");
+  aviso.textContent = !d.correoConectado
+    ? "El correo del sitio no está conectado: se pueden escribir borradores, pero todavía no enviarlos."
+    : !d.correoPrueba
+      ? "Falta el correo de avisos (ADMIN_NOTIFY_EMAIL): sin él no se pueden enviar pruebas."
+      : "";
+  aviso.hidden = !aviso.textContent;
+
+  const lista = $("[data-lista-boletines]");
+  lista.replaceChildren(
+    ...d.boletines.map((b) => {
+      const li = crear("li", "pa-fila pa-fila--correo pa-fila--boletin");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", b.asunto));
+      const datos = crear("div", "pa-fila__datos");
+      if (b.estado === "borrador") datos.append(crear("span", "pa-etiqueta", "Borrador"), crear("span", "", `Creado el ${fechaCorta(b.creado)}`));
+      else if (b.estado === "enviando") datos.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Envío a medias"), crear("span", "", `Llegó a ${b.enviados} de ${d.suscriptores}`));
+      else datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Enviado"), crear("span", "", `El ${fechaCorta(b.enviado)} a ${b.enviados} ${b.enviados === 1 ? "persona" : "personas"}`));
+      info.append(datos);
+
+      const botones = crear("div", "pa-fila__botones");
+      const boton = (texto: string, accion: () => void, principal = false) => {
+        const x = crear("button", `pa-boton pa-boton--chico${principal ? "" : " pa-boton--suave"}`, texto);
+        x.type = "button";
+        x.addEventListener("click", accion);
+        botones.append(x);
+        return x;
+      };
+      if (b.estado === "borrador") boton("Editar", () => abrirEditorBoletin(b));
+      if (b.estado !== "enviado") {
+        const prueba = boton("Enviarme una prueba", () => probarBoletin(b, prueba));
+        prueba.disabled = !d.correoConectado || !d.correoPrueba;
+        const enviarB = boton(b.estado === "enviando" ? "Seguir enviando" : `Enviar a ${d.suscriptores}`, () => enviarBoletinA(b, enviarB), true);
+        enviarB.disabled = !d.correoConectado || d.suscriptores === 0;
+      }
+      if (b.estado === "borrador") boton("Eliminar", () => eliminarBoletin(b));
+      li.append(info, botones);
+      return li;
+    })
+  );
+  const nota = $("[data-nota-boletines]");
+  nota.textContent = d.boletines.length ? "" : "Todavía no hay boletines. Presiona “Nuevo boletín” para escribir el primero.";
+  if (d.boletines.length && d.suscriptores === 0) nota.textContent = "Todavía no hay suscriptores confirmados a quienes enviar.";
+  nota.hidden = !nota.textContent;
+}
+
+async function probarBoletin(b: BoletinPanel, boton: HTMLButtonElement) {
+  boton.disabled = true;
+  const r = await enviar<{ para: string }>(`${API}/boletines`, { accion: "probar", id: b.id });
+  boton.disabled = false;
+  if (siSeCerro(r.status)) return;
+  avisar(r.ok ? `Prueba enviada a ${r.datos.para}. Revisa también spam.` : r.datos.message || "No se pudo enviar la prueba.");
+}
+
+async function enviarBoletinA(b: BoletinPanel, boton: HTMLButtonElement) {
+  const d = datosBoletines;
+  if (!d) return;
+  if (d.cupo.quedan === 0) return avisar(`Hoy ya se usaron los ${d.cupo.porDia} correos de boletín. Sigue después de las ${d.cupo.reinicio}.`);
+  const faltan = Math.max(0, d.suscriptores - b.enviados);
+  const hoy = Math.min(faltan, d.cupo.quedan);
+  const partes = faltan > d.cupo.quedan ? ` Hoy saldrán ${hoy}; el resto, con “Seguir enviando” después de las ${d.cupo.reinicio}.` : "";
+  const pregunta =
+    b.estado === "enviando"
+      ? `¿Seguir enviando “${b.asunto}”? Faltan cerca de ${faltan}.${partes}`
+      : `¿Enviar “${b.asunto}” a ${d.suscriptores} ${d.suscriptores === 1 ? "suscriptor" : "suscriptores"}? Ya no se podrá cambiar.${partes}`;
+  if (!confirm(pregunta)) return;
+  boton.disabled = true;
+  boton.textContent = "Enviando…";
+  const r = await enviar<{ progreso: { enviados: number; pendientes: number; detenido?: string } }>(`${API}/boletines`, { accion: "enviar", id: b.id, confirmar: true });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) avisar(r.datos.message || "No se pudo enviar.");
+  else {
+    const p = r.datos.progreso;
+    if (p.pendientes === 0) avisar(`¡Listo! El boletín llegó a ${p.enviados} ${p.enviados === 1 ? "persona" : "personas"}.`);
+    else avisar(`${p.detenido ? p.detenido + " " : ""}Van ${p.enviados}; faltan ${p.pendientes}. Usa “Seguir enviando” después de las ${d.cupo.reinicio}.`);
+  }
+  await cargarBoletines();
+}
+
+async function eliminarBoletin(b: BoletinPanel) {
+  if (!confirm(`¿Eliminar el borrador “${b.asunto}”?`)) return;
+  const r = await enviar(`${API}/boletines`, { accion: "eliminar", id: b.id });
+  if (siSeCerro(r.status)) return;
+  avisar(r.ok ? "Borrador eliminado." : r.datos.message || "No se pudo eliminar.");
+  await cargarBoletines();
+}
+
+const editorBoletin = () => $("[data-editor-boletin]") as HTMLDialogElement;
+const formBoletin = () => $<HTMLFormElement>('[data-form="boletin"]');
+let boletinEditando: BoletinPanel | null = null;
+let imagenBoletin = "";
+let fotoPendienteBoletin: File | null = null;
+let vistaPreviaBoletin = "";
+
+function pintarFotoBoletin() {
+  const img = $<HTMLImageElement>("[data-boletin-foto]");
+  const src = vistaPreviaBoletin || imagenBoletin;
+  img.hidden = !src;
+  if (src) img.src = src;
+  else img.removeAttribute("src");
+  $("[data-boletin-sin-foto]").hidden = !!src;
+  $("[data-boletin-quitar-foto]").hidden = !src;
+}
+
+function limpiarErroresBoletin() {
+  for (const e of $$("[data-error-boletin]", formBoletin())) e.textContent = "";
+  $("[data-error-foto-boletin]").textContent = "";
+  errorDe(formBoletin());
+}
+
+function abrirEditorBoletin(b: BoletinPanel | null) {
+  boletinEditando = b;
+  imagenBoletin = b?.imagen ?? "";
+  fotoPendienteBoletin = null;
+  if (vistaPreviaBoletin) URL.revokeObjectURL(vistaPreviaBoletin);
+  vistaPreviaBoletin = "";
+  const f = formBoletin();
+  f.reset();
+  limpiarErroresBoletin();
+  const campo = (n: string) => f.elements.namedItem(n) as HTMLInputElement;
+  campo("asunto").value = b?.asunto ?? "";
+  campo("titulo").value = b?.titulo ?? "";
+  (f.elements.namedItem("texto") as HTMLTextAreaElement).value = b?.texto ?? "";
+  campo("botonTexto").value = b?.boton?.texto ?? "";
+  campo("botonEnlace").value = b?.boton?.enlace ?? "";
+  $("#pa-titulo-boletin").textContent = b ? "Editar boletín" : "Nuevo boletín";
+  pintarFotoBoletin();
+  editorBoletin().showModal();
+  campo("asunto").focus();
+}
+$("[data-nuevo-boletin]").addEventListener("click", () => abrirEditorBoletin(null));
+// El aviso de un campo se borra apenas se corrige.
+formBoletin().addEventListener("input", (e) => {
+  const campo = (e.target as HTMLInputElement).name;
+  const clave = campo === "botonTexto" ? "boton.texto" : campo === "botonEnlace" ? "boton.enlace" : campo;
+  const aviso = formBoletin().querySelector<HTMLElement>(`[data-error-boletin="${clave}"]`);
+  if (aviso) aviso.textContent = "";
+});
+$("[data-cerrar-boletin]").addEventListener("click", () => editorBoletin().close());
+$("[data-boletin-quitar-foto]").addEventListener("click", () => {
+  imagenBoletin = "";
+  fotoPendienteBoletin = null;
+  if (vistaPreviaBoletin) URL.revokeObjectURL(vistaPreviaBoletin);
+  vistaPreviaBoletin = "";
+  pintarFotoBoletin();
+});
+$<HTMLInputElement>("[data-boletin-archivo]").addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const archivo = input.files?.[0];
+  input.value = "";
+  const error = $("[data-error-foto-boletin]");
+  error.textContent = "";
+  if (!archivo) return;
+  try {
+    error.textContent = "Preparando la foto…";
+    // 1200 px de ancho basta para un correo; JPG porque WebP no se ve en todos los programas.
+    fotoPendienteBoletin = await reducirFoto(archivo, 1200, 500 * 1024, "libre", "jpeg");
+    error.textContent = "";
+    if (vistaPreviaBoletin) URL.revokeObjectURL(vistaPreviaBoletin);
+    vistaPreviaBoletin = URL.createObjectURL(fotoPendienteBoletin);
+    pintarFotoBoletin();
+  } catch (err) {
+    fotoPendienteBoletin = null;
+    error.textContent = err instanceof Error ? err.message : "No pudimos usar esa foto.";
+  }
+});
+
+formBoletin().addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget as HTMLFormElement;
+  const datos = new FormData(f);
+  const t = (n: string) => String(datos.get(n) || "").trim();
+  limpiarErroresBoletin();
+  await conBoton(f, async () => {
+    if (fotoPendienteBoletin) {
+      $("[data-error-foto-boletin]").textContent = "Subiendo la foto…";
+      const subida = await subirFotoBoletin(fotoPendienteBoletin);
+      if (siSeCerro(subida.status)) return;
+      if (!subida.ok) {
+        $("[data-error-foto-boletin]").textContent = subida.datos.message || "No se pudo subir la foto.";
+        return;
+      }
+      $("[data-error-foto-boletin]").textContent = "";
+      imagenBoletin = subida.datos.imagen;
+      fotoPendienteBoletin = null;
+      if (vistaPreviaBoletin) URL.revokeObjectURL(vistaPreviaBoletin);
+      vistaPreviaBoletin = "";
+    }
+    const r = await enviar<{ errores?: Record<string, string> }>(`${API}/boletines`, {
+      accion: "guardar",
+      id: boletinEditando?.id,
+      asunto: t("asunto"),
+      titulo: t("titulo"),
+      texto: String(datos.get("texto") || ""),
+      imagen: imagenBoletin || undefined,
+      boton: { texto: t("botonTexto"), enlace: t("botonEnlace") },
+    });
+    if (siSeCerro(r.status)) return;
+    if (r.ok) {
+      editorBoletin().close();
+      avisar("Borrador guardado. Ahora puedes enviarte una prueba.");
+      await cargarBoletines();
+      return;
+    }
+    let marcados = 0;
+    for (const [clave, texto] of Object.entries(r.datos.errores ?? {})) {
+      const lugar = clave === "imagen" ? $("[data-error-foto-boletin]") : f.querySelector<HTMLElement>(`[data-error-boletin="${clave}"]`);
+      if (lugar) {
+        lugar.textContent = texto;
+        marcados++;
+      }
+    }
+    if (!marcados) errorDe(f, r.datos.message || "No se pudo guardar.");
+  });
 });
 
 // ─────────────────────────── seguridad ───────────────────────────

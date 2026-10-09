@@ -83,7 +83,7 @@ const sitio = crearContenidoEditable(
   { "colores.acento": "#d81b72", "inicio.titulo": "Hola", "inicio.foto": "/img/a.webp" },
   { contraste: [{ texto: "#ffffff", fondo: "colores.acento", minimo: 4.5, descripcion: "Botones" }] }
 );
-const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio });
+const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" } });
 
 function entorno(): { env: EnvPanel; datos: ReturnType<typeof kvMemoria>["datos"] } {
   const { kv, datos } = kvMemoria();
@@ -611,6 +611,74 @@ async function run() {
 
     delete env.NEWSLETTER_SECRET;
     assert.equal((await quitar("beto@correo.cl", { cookie })).status, 503);
+  });
+
+  await prueba("boletines: guardar, probar, enviar; enviado no se edita ni se borra", async () => {
+    const { env } = entorno();
+    const SECRETO = "s".repeat(40);
+    Object.assign(env, { NEWSLETTER_SECRET: SECRETO, RESEND_API_KEY: "re_x", ADMIN_NOTIFY_EMAIL: "duena@tienda.cl" });
+    const clave = async (e: string) => "news:sub:" + (await hmacSha256Hex(SECRETO, `clave:${e}`)).slice(0, 40);
+    await env.REVIEWS_KV!.put(await clave("ana@correo.cl"), JSON.stringify({ email: "ana@correo.cl", estado: "activo", creado: "x", confirmado: "2026-10-01T00:00:00Z" }));
+    const cookie = await instalarYEntrar(env);
+    const enviados: { to: string[]; subject: string; html: string }[] = [];
+    const fetchOriginal = globalThis.fetch;
+    globalThis.fetch = (async (_u: unknown, init?: RequestInit) => {
+      for (const c of JSON.parse(String(init?.body))) enviados.push(c);
+      return new Response("{}", { status: 200 });
+    }) as typeof fetch;
+    try {
+      const post = async (cuerpo: unknown) => {
+        const r = await panel.boletines.onRequestPost({ env, request: req("/api/admin/boletines", { cuerpo, cookie }) });
+        return { status: r.status, d: await json(r) };
+      };
+      const malo = await post({ accion: "guardar", asunto: "", texto: "" });
+      assert.equal(malo.status, 400);
+      assert.ok(malo.d.errores.asunto && malo.d.errores.texto);
+      const g = await post({ accion: "guardar", asunto: "Hola", texto: "Mensaje", boton: { texto: "Ver", enlace: "/tienda/" } });
+      assert.equal(g.status, 200);
+      const id = g.d.boletin.id;
+      assert.equal((await post({ accion: "guardar", id, asunto: "Hola 2", texto: "Mensaje" })).d.boletin.asunto, "Hola 2");
+
+      const lista = await json(await panel.boletines.onRequestGet({ env, request: req("/api/admin/boletines", { cookie }) }));
+      assert.equal(lista.suscriptores, 1);
+      assert.equal(lista.correoPrueba, "d****@tienda.cl", "el correo de prueba se muestra a medias");
+      assert.equal(lista.boletines[0].entregados, undefined, "las huellas no salen al panel");
+      assert.equal(lista.cupo.porDia, 80, "por defecto 80 al día");
+
+      const p = await post({ accion: "probar", id });
+      assert.equal(p.status, 200);
+      assert.deepEqual(enviados.at(-1)!.to, ["duena@tienda.cl"]);
+      assert.match(enviados.at(-1)!.subject, /^\[Prueba\]/);
+      assert.ok(enviados.at(-1)!.html.includes("https://tienda.cl/newsletter/baja?e="), "usa la dirección pública");
+
+      assert.equal((await post({ accion: "enviar", id })).status, 400, "sin confirmar no envía");
+      // Tope por día: la dueña lo deja en 1 con 2 suscriptores.
+      await env.REVIEWS_KV!.put(await clave("beto@correo.cl"), JSON.stringify({ email: "beto@correo.cl", estado: "activo", creado: "x", confirmado: "2026-10-02T00:00:00Z" }));
+      assert.equal((await post({ accion: "ajustes", porDia: 0 })).status, 400);
+      assert.equal((await post({ accion: "ajustes", porDia: 2.5 })).status, 400);
+      const aj = await post({ accion: "ajustes", porDia: 1 });
+      assert.equal(aj.d.cupo.porDia, 1);
+      assert.equal(aj.d.cupo.limitePlan, 100);
+      const antes = enviados.length;
+      const e = await post({ accion: "enviar", id, confirmar: true });
+      assert.equal(e.status, 200);
+      assert.equal(e.d.progreso.pendientes, 1, "hoy solo sale 1");
+      assert.equal(enviados.length, antes + 1);
+      assert.equal(e.d.cupo.quedan, 0);
+      const tope = await post({ accion: "enviar", id, confirmar: true });
+      assert.equal(tope.status, 409);
+      assert.match(tope.d.message, /Sigue después de las \d\d:\d\d/);
+      // Sube el tope (como si fuera otro día con cupo): termina sin repetir.
+      await post({ accion: "ajustes", porDia: 10 });
+      const fin = await post({ accion: "enviar", id, confirmar: true });
+      assert.equal(fin.d.progreso.pendientes, 0);
+      assert.equal(new Set(enviados.slice(antes).map((c) => c.to[0])).size, 2);
+      assert.equal((await post({ accion: "enviar", id, confirmar: true })).status, 409, "no se envía dos veces");
+      assert.equal((await post({ accion: "guardar", id, asunto: "x", texto: "y" })).status, 409);
+      assert.equal((await post({ accion: "eliminar", id })).status, 409);
+    } finally {
+      globalThis.fetch = fetchOriginal;
+    }
   });
 
   await prueba("las cabeceras del panel reemplazan (no suman) y prohíben scripts externos", async () => {
