@@ -83,7 +83,7 @@ const sitio = crearContenidoEditable(
   { "colores.acento": "#d81b72", "inicio.titulo": "Hola", "inicio.foto": "/img/a.webp" },
   { contraste: [{ texto: "#ffffff", fondo: "colores.acento", minimo: 4.5, descripcion: "Botones" }] }
 );
-const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" } });
+const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" }, revisionPagos: true });
 
 function entorno(): { env: EnvPanel; datos: ReturnType<typeof kvMemoria>["datos"] } {
   const { kv, datos } = kvMemoria();
@@ -679,6 +679,16 @@ async function run() {
     } finally {
       globalThis.fetch = fetchOriginal;
     }
+  });
+
+  await prueba("revisión de pagos: solo con sesión; sin Flow dice que no está conectado", async () => {
+    const { env } = entorno();
+    assert.equal((await panel.revisionPagos.onRequestGet({ env, request: req("/api/admin/revision-pagos") })).status, 401);
+    const cookie = await instalarYEntrar(env);
+    const r = await json(await panel.revisionPagos.onRequestGet({ env, request: req("/api/admin/revision-pagos", { cookie }) }));
+    assert.equal(r.conectado, false);
+    const sin = crearPanel({ nombreSitio: "X" });
+    assert.equal((await sin.revisionPagos.onRequestGet({ env, request: req("/api/admin/revision-pagos", { cookie }) })).status, 404);
   });
 
   await prueba("las cabeceras del panel reemplazan (no suman) y prohíben scripts externos", async () => {

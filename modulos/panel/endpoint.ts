@@ -19,6 +19,7 @@
  *   functions/api/admin/pedidos.ts         export const { onRequestGet, onRequestPost } = panel.pedidos;
  *   functions/api/admin/resumen.ts         export const { onRequestGet } = panel.resumen;
  *   functions/api/admin/visitas.ts         export const { onRequestGet } = panel.visitas;
+ *   functions/api/admin/revision-pagos.ts  export const { onRequestGet } = panel.revisionPagos;
  *   functions/api/admin/carrusel.ts        export const { onRequestGet, onRequestPost } = panel.carrusel;
  *   functions/api/admin/contenido.ts       export const { onRequestGet, onRequestPost } = panel.contenido;
  *   functions/api/admin/contenido-foto.ts  export const { onRequestPost } = panel.contenidoFoto;
@@ -43,6 +44,7 @@ import { crearGestionCarrusel } from "./carrusel";
 import { crearGestionCategorias } from "./categorias";
 import { crearGestionContenido } from "./contenido";
 import { type ConfigBoletines, crearGestionBoletines } from "./boletines";
+import { type ConfigRevisionPagos, crearRevisionPagos } from "./revision-pagos";
 import { crearGestionPedidos } from "./pedidos";
 import { crearResumen } from "./resumen";
 import { visitasPanel } from "./visitas";
@@ -60,6 +62,11 @@ export interface OpcionesPanel extends ConfigPanel {
    * Sin ella, no hay sección "Boletines" en Suscriptores.
    */
   boletines?: ConfigBoletines;
+  /**
+   * Revisión de pagos con Flow (Resumen): compara lo cobrado en Flow con los
+   * pedidos. `true` o sus opciones. Sin ella, no hay cuadro "Revisión de pagos".
+   */
+  revisionPagos?: boolean | ConfigRevisionPagos;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
   /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
@@ -76,6 +83,9 @@ export function crearPanel(opciones: OpcionesPanel) {
   const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
   const contenido = opciones.contenido ? crearGestionContenido(opciones.contenido, opciones) : null;
   const boletines = opciones.boletines ? crearGestionBoletines(opciones.boletines, opciones) : null;
+  const revision = opciones.revisionPagos
+    ? crearRevisionPagos({ zonaHoraria: opciones.zonaHoraria, ...(opciones.revisionPagos === true ? {} : opciones.revisionPagos) })
+    : null;
 
   return {
     parametros: { onRequestGet: (c: Ctx) => acceso.parametros(c) },
@@ -117,6 +127,8 @@ export function crearPanel(opciones: OpcionesPanel) {
     resumen: { onRequestGet: (c: Ctx) => resumen(c) },
     /** Visitas de Cloudflare Web Analytics (si están las variables ANALITICA_*). */
     visitas: { onRequestGet: (c: Ctx) => visitasPanel(c) },
+    /** Revisión de pagos con Flow (si el sitio la activó). */
+    revisionPagos: { onRequestGet: (c: Ctx) => (revision ? revision(c) : noDisponible()) },
     suscriptores: {
       onRequestGet: async (c: Ctx) => {
         const s = await exigirSesion(c, false);

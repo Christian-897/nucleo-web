@@ -107,6 +107,28 @@ antes de volver.
 4. **Pentest** (skill `pentest-strix-sitios-dinamicos`).
 5. Recién ahí, credenciales de producción.
 
+## Revisión de pagos en el panel
+
+`crearPanel({ …, revisionPagos: true })` + `<PanelAdmin … revisionPagos />` +
+`functions/api/admin/revision-pagos.ts` (`export const { onRequestGet } = panel.revisionPagos;`).
+
+En **Resumen → Revisión de pagos** compara lo que Flow cobró en los últimos 7
+días (`payment/getPayments`, en hora de Chile) con los pedidos de la tienda:
+
+| Alerta | Qué significa |
+|---|---|
+| Cobro que no salió de la tienda | Alguien usó las claves por fuera del sitio: cambiarlas en Flow. |
+| Monto distinto | Flow cobró otro monto que el del pedido. |
+| Pagado en Flow, pendiente en la tienda | No llegó el aviso de Flow; el cliente sí pagó. |
+| Pagado en la tienda, Flow no lo reconoce | No despachar hasta confirmarlo en Flow. |
+
+Antes de alarmar por un pedido que no está en la lista, se pregunta a Flow por
+él (`getStatusByCommerceId`): pudo pagarse otro día. Solo lee; guarda el
+resultado 30 minutos ("Revisar ahora", máximo una vez por minuto). Usa las
+mismas `FLOW_*`: al cambiar las claves de prueba por las reales, revisa la
+cuenta real sin tocar nada. **No ve devoluciones** (la API no las lista): se
+revisan en Flow → Reembolsos y liquidaciones.
+
 ## Pruebas
 
 `pruebas/pago.test.ts` intenta romperlo: precio manipulado, monto distinto,

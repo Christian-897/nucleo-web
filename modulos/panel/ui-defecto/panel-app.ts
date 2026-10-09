@@ -226,7 +226,10 @@ for (const b of $$<HTMLButtonElement>("[data-tab]")) {
 
 async function abrirPestana(v: Vista) {
   mostrar(v);
-  if (v === "resumen") await cargarResumen();
+  if (v === "resumen") {
+    void cargarRevision();
+    await cargarResumen();
+  }
   if (v === "productos") await cargarProductos();
   if (v === "portada") await cargarPortada();
   if (v === "categorias") await cargarCategorias();
@@ -1066,6 +1069,118 @@ for (const b of $$<HTMLButtonElement>("[data-visitas-periodo] button")) {
   });
 }
 marcarPeriodoVisitas();
+
+// ─────────────────────────── revisión de pagos ───────────────────────────
+
+interface AlertaPagoPanel {
+  tipo: "ajeno" | "monto" | "sin-confirmar" | "no-en-flow";
+  orden: string;
+  monto?: number;
+  montoFlow?: number;
+  fecha: string;
+  pagador?: string;
+}
+interface RevisionPanel {
+  conectado: boolean;
+  sandbox?: boolean;
+  revisado?: string;
+  dias?: number;
+  pagosFlow?: number;
+  pedidosTienda?: number;
+  alertas?: AlertaPagoPanel[];
+  error?: string;
+}
+
+const TEXTO_ALERTA: Record<AlertaPagoPanel["tipo"], { titulo: string; ayuda: string }> = {
+  ajeno: {
+    titulo: "Cobro en Flow que no salió de la tienda",
+    ayuda: "Alguien creó este cobro con las claves de Flow por fuera del sitio. Si no lo reconoces, cambia las claves en Flow y avisa a quien mantiene el sitio.",
+  },
+  monto: {
+    titulo: "Flow cobró un monto distinto al del pedido",
+    ayuda: "Revisa el pedido en Flow antes de despacharlo.",
+  },
+  "sin-confirmar": {
+    titulo: "Pagado en Flow, pero el pedido sigue pendiente en la tienda",
+    ayuda: "El aviso de Flow no llegó. El cliente sí pagó: revisa el pedido y despáchalo.",
+  },
+  "no-en-flow": {
+    titulo: "Pedido pagado en la tienda que Flow no reconoce",
+    ayuda: "No despaches hasta confirmar el pago en tu cuenta de Flow.",
+  },
+};
+
+const pesos = (n?: number) => (typeof n === "number" ? formatearPrecio(n) : "—");
+
+async function cargarRevision(forzar = false) {
+  const caja = $("[data-revision]");
+  if (caja.hidden) return;
+  const estado = $("[data-revision-estado]");
+  const titulo = $("[data-revision-titulo]");
+  const detalle = $("[data-revision-detalle]");
+  const lista = $("[data-revision-alertas]");
+  if (forzar) {
+    titulo.textContent = "Revisando con Flow…";
+    detalle.textContent = "";
+  }
+  const r = await obtener<RevisionPanel>(`${API}/revision-pagos${forzar ? "?forzar=1" : ""}`);
+  if (siSeCerro(r.status)) return;
+  estado.classList.remove("pa-revision--alerta", "pa-revision--neutro");
+  lista.replaceChildren();
+  if (!r.ok) {
+    estado.classList.add("pa-revision--neutro");
+    titulo.textContent = "No se pudo hacer la revisión.";
+    detalle.textContent = r.datos.message || "";
+    return;
+  }
+  const d = r.datos;
+  if (!d.conectado) {
+    estado.classList.add("pa-revision--neutro");
+    titulo.textContent = "Flow todavía no está conectado.";
+    detalle.textContent = "Cuando se conecte tu cuenta de Flow, aquí verás si los cobros cuadran con los pedidos.";
+    return;
+  }
+  const cuando = d.revisado ? new Date(d.revisado).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }) : "";
+  const modo = d.sandbox ? " (modo de prueba de Flow)" : "";
+  if (d.error) {
+    estado.classList.add("pa-revision--neutro");
+    titulo.textContent = "No se pudo consultar a Flow ahora.";
+    detalle.textContent = `${d.error}${modo}`;
+    return;
+  }
+  const alertas = d.alertas ?? [];
+  const periodo = `Últimos ${d.dias} días: ${d.pagosFlow} ${d.pagosFlow === 1 ? "cobro" : "cobros"} en Flow y ${d.pedidosTienda} ${d.pedidosTienda === 1 ? "pedido pagado" : "pedidos pagados"} con Flow en la tienda. Revisado el ${cuando}${modo}.`;
+  if (!alertas.length) {
+    titulo.textContent = "Todo cuadra ✓";
+    detalle.textContent = periodo;
+    return;
+  }
+  estado.classList.add("pa-revision--alerta");
+  titulo.textContent = alertas.length === 1 ? "Hay 1 cosa que revisar" : `Hay ${alertas.length} cosas que revisar`;
+  detalle.textContent = periodo;
+  lista.replaceChildren(
+    ...alertas.map((a) => {
+      const li = crear("li", "pa-fila pa-fila--correo pa-fila--boletin");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", TEXTO_ALERTA[a.tipo].titulo));
+      const datos = crear("div", "pa-fila__datos");
+      datos.append(crear("span", "", `Orden ${a.orden}`));
+      if (a.monto !== undefined) datos.append(crear("span", "", `Tienda: ${pesos(a.monto)}`));
+      if (a.montoFlow !== undefined) datos.append(crear("span", "", `Flow: ${pesos(a.montoFlow)}`));
+      if (a.pagador) datos.append(crear("span", "", a.pagador));
+      if (a.fecha) datos.append(crear("span", "", a.fecha.replace("T", " ").slice(0, 16)));
+      info.append(datos, crear("p", "pa-tenue pa-chico", TEXTO_ALERTA[a.tipo].ayuda));
+      li.append(info);
+      return li;
+    })
+  );
+}
+$("[data-revision-ahora]").addEventListener("click", async (e) => {
+  const b = e.currentTarget as HTMLButtonElement;
+  b.disabled = true;
+  await cargarRevision(true);
+  b.disabled = false;
+});
 
 async function cargarVisitas() {
   const aviso = $("[data-visitas-aviso]");

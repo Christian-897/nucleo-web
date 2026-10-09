@@ -33,11 +33,13 @@ interface Props {
   contenido?: boolean;
   /** Muestra "Boletines" en Suscriptores (el sitio montó panel.boletines). */
   boletines?: boolean;
+  /** Muestra "Revisión de pagos" en Resumen (el sitio montó panel.revisionPagos). */
+  revisionPagos?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 import { LIMITES_BOLETIN } from "../../newsletter/boletin";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -229,6 +231,18 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 7 días</p><p class="pa-kpi__valor" data-kpi="d7">—</p><p class="pa-kpi__nota" data-kpi-nota="d7"></p></div>
         <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 30 días</p><p class="pa-kpi__valor" data-kpi="d30">—</p><p class="pa-kpi__nota" data-kpi-nota="d30"></p></div>
         <div class="pa-kpi"><p class="pa-kpi__titulo">Venta promedio</p><p class="pa-kpi__valor" data-kpi="ticket">—</p><p class="pa-kpi__nota">por pedido, últimos 30 días</p></div>
+      </div>
+      <div class="pa-revision" data-revision hidden={!revisionPagos}>
+        <div class="pa-titulo-seccion">
+          <h2 class="pa-subtitulo">Revisión de pagos</h2>
+          <button class="pa-boton pa-boton--suave pa-boton--chico" type="button" data-revision-ahora>Revisar ahora</button>
+        </div>
+        <div class="pa-revision__estado" data-revision-estado role="status">
+          <p class="pa-revision__titulo" data-revision-titulo>—</p>
+          <p class="pa-tenue pa-chico" data-revision-detalle></p>
+        </div>
+        <ul class="pa-lista" data-revision-alertas></ul>
+        <p class="pa-tenue pa-chico">Compara lo que cobró Flow en los últimos días con los pedidos de la tienda. Las devoluciones no aparecen aquí: revísalas una vez por semana en tu cuenta de Flow → Reembolsos.</p>
       </div>
       <div class="pa-titulo-seccion">
         <h2 class="pa-subtitulo">Visitas</h2>
@@ -818,6 +832,12 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-fila--correo { grid-template-columns: 1fr auto; }
   .pa-titulo--caja { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .pa-titulo--caja h2 { margin: 0; }
+  .pa-revision { margin: 4px 0 22px; }
+  .pa-revision__estado { border: 1px solid var(--pa-borde); border-left: 5px solid var(--pa-ok); border-radius: 12px; padding: 12px 14px; background: #fff; margin-bottom: 10px; }
+  .pa-revision__estado.pa-revision--alerta { border-left-color: var(--pa-error); background: #fff5f5; }
+  .pa-revision__estado.pa-revision--neutro { border-left-color: var(--pa-borde); }
+  .pa-revision__titulo { margin: 0 0 2px; font-weight: 700; }
+  .pa-revision__estado p:last-child { margin-bottom: 0; }
   .pa-cupo { border: 1px solid var(--pa-borde); border-radius: 12px; padding: 12px 14px; margin: 12px 0 16px; background: #fff; }
   .pa-cupo__hoy { margin: 0 0 8px; font-weight: 600; }
   .pa-barra { height: 8px; border-radius: 999px; background: var(--pa-borde); overflow: hidden; margin-bottom: 12px; }
