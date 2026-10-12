@@ -36,7 +36,14 @@ const MARGEN_RENOVACION = 5 * 60;
 
 export const COOKIE_SESION = "mc_sesion";
 export const COOKIE_PASO2 = "mc_paso2";
+/** El dueño (el que instaló el panel). Misma clave de siempre: compatible. */
 const K_USUARIO = "admin:usuario";
+/** Usuarios invitados, por nombre en minúsculas. */
+const P_INVITADO = "admin:usuarios:";
+const K_INVITADO = (nombre: string) => `${P_INVITADO}${nombre.toLowerCase()}`;
+/** Invitaciones pendientes, por el resumen SHA-256 del enlace (el enlace no se guarda). */
+const P_INVITACION = "admin:invitacion:";
+const K_INVITACION = (resumen: string) => `${P_INVITACION}${resumen}`;
 const K_SAL = "admin:sal-publica";
 const K_SESION = (id: string) => `admin:sesion:${id}`;
 const K_PASO2 = (id: string) => `admin:paso2:${id}`;
@@ -62,6 +69,10 @@ export interface UsuarioAdmin {
   /** Secreto propuesto mientras se configura el doble factor. */
   propuesta?: { secreto: string; creada: string };
   inactividadMinutos?: number;
+  /** true = entró por invitación. El dueño no lo lleva. */
+  invitado?: boolean;
+  /** Quién lo invitó. */
+  invitadoPor?: string;
 }
 
 export interface Sesion {
@@ -82,8 +93,8 @@ export function inactividadValida(valor: unknown): valor is number {
   return typeof valor === "number" && (OPCIONES_INACTIVIDAD as readonly number[]).includes(valor);
 }
 
-export async function duracionSesion(env: EnvPanel): Promise<number> {
-  const minutos = (await obtenerUsuario(env))?.inactividadMinutos;
+export async function duracionSesion(env: EnvPanel, usuario?: string): Promise<number> {
+  const minutos = (await obtenerUsuario(env, usuario))?.inactividadMinutos;
   return inactividadValida(minutos) ? minutos * 60 : DURACION_SESION;
 }
 
@@ -105,8 +116,8 @@ export async function obtenerSalPublica(env: EnvPanel): Promise<string> {
   return nueva;
 }
 
-export async function obtenerUsuario(env: EnvPanel): Promise<UsuarioAdmin | null> {
-  const crudo = await env.REVIEWS_KV?.get(K_USUARIO);
+async function leerRegistro(env: EnvPanel, clave: string): Promise<UsuarioAdmin | null> {
+  const crudo = await env.REVIEWS_KV?.get(clave);
   if (!crudo) return null;
   try {
     return JSON.parse(crudo) as UsuarioAdmin;
@@ -115,8 +126,96 @@ export async function obtenerUsuario(env: EnvPanel): Promise<UsuarioAdmin | null
   }
 }
 
+/**
+ * Sin nombre: el dueño (compatibilidad con los sitios de un solo usuario).
+ * Con nombre: ese usuario exacto, sea el dueño o un invitado.
+ */
+export async function obtenerUsuario(env: EnvPanel, usuario?: string): Promise<UsuarioAdmin | null> {
+  const dueno = await leerRegistro(env, K_USUARIO);
+  if (usuario === undefined) return dueno;
+  if (dueno && dueno.usuario === usuario) return dueno;
+  if (!/^[a-zA-Z0-9._-]{3,40}$/.test(usuario)) return null;
+  const invitado = await leerRegistro(env, K_INVITADO(usuario));
+  return invitado && invitado.usuario === usuario ? invitado : null;
+}
+
+export const esDueno = (registro: UsuarioAdmin | null | undefined) => Boolean(registro && !registro.invitado);
+
 export async function hayUsuario(env: EnvPanel): Promise<boolean> {
   return (await obtenerUsuario(env)) !== null;
+}
+
+/** ¿Ya hay alguien con ese nombre (sin distinguir mayúsculas)? */
+export async function nombreOcupado(env: EnvPanel, usuario: string): Promise<boolean> {
+  const dueno = await leerRegistro(env, K_USUARIO);
+  if (dueno && dueno.usuario.toLowerCase() === usuario.toLowerCase()) return true;
+  return (await env.REVIEWS_KV?.get(K_INVITADO(usuario))) != null;
+}
+
+export interface FichaUsuario {
+  usuario: string;
+  creado: string;
+  dueno: boolean;
+  dobleFactor: boolean;
+  invitadoPor?: string;
+}
+
+/** Todos los usuarios del panel, el dueño primero. Sin datos secretos. */
+export async function listarUsuarios(env: EnvPanel): Promise<FichaUsuario[]> {
+  const ficha = (r: UsuarioAdmin): FichaUsuario => ({
+    usuario: r.usuario,
+    creado: r.creado,
+    dueno: esDueno(r),
+    dobleFactor: Boolean(r.dosFactores),
+    ...(r.invitadoPor ? { invitadoPor: r.invitadoPor } : {}),
+  });
+  const lista: FichaUsuario[] = [];
+  const dueno = await leerRegistro(env, K_USUARIO);
+  if (dueno) lista.push(ficha(dueno));
+  const kv = env.REVIEWS_KV;
+  if (!kv) return lista;
+  const { keys } = await kv.list({ prefix: P_INVITADO, limit: 100 });
+  const invitados: UsuarioAdmin[] = [];
+  for (const { name } of keys) {
+    const r = await leerRegistro(env, name);
+    if (r) invitados.push(r);
+  }
+  invitados.sort((a, b) => a.creado.localeCompare(b.creado));
+  return lista.concat(invitados.map(ficha));
+}
+
+/** Quita a un invitado y le cierra las sesiones. Al dueño no se le puede quitar. */
+export async function quitarUsuario(env: EnvPanel, usuario: string): Promise<{ ok: boolean; motivo?: string }> {
+  const kv = env.REVIEWS_KV;
+  if (!kv) return { ok: false, motivo: "Falta la base de datos." };
+  const registro = await obtenerUsuario(env, usuario);
+  if (!registro) return { ok: false, motivo: "Ese usuario no existe." };
+  if (esDueno(registro)) return { ok: false, motivo: "Al dueño del panel no se le puede quitar el acceso." };
+  await kv.delete(K_INVITADO(usuario));
+  await cerrarSesionesDe(env, usuario);
+  return { ok: true };
+}
+
+/** Cierra todas las sesiones de un usuario (menos `salvo`, si se indica). */
+async function cerrarSesionesDe(env: EnvPanel, usuario: string, salvo?: string | null): Promise<number> {
+  const kv = env.REVIEWS_KV;
+  if (!kv) return 0;
+  const { keys } = await kv.list({ prefix: "admin:sesion:", limit: 1000 });
+  let cerradas = 0;
+  for (const { name } of keys) {
+    if (salvo && name === K_SESION(salvo)) continue;
+    const crudo = await kv.get(name);
+    let dueno = "";
+    try {
+      dueno = crudo ? String((JSON.parse(crudo) as Sesion).usuario) : "";
+    } catch {
+      dueno = "";
+    }
+    if (dueno !== usuario) continue;
+    await kv.delete(name);
+    cerradas++;
+  }
+  return cerradas;
 }
 
 /** Crea el único administrador. Nunca sobrescribe uno existente. */
@@ -136,18 +235,19 @@ export async function crearUsuario(env: EnvPanel, usuario: string, derivado: str
 
 export async function guardarUsuario(env: EnvPanel, registro: UsuarioAdmin): Promise<boolean> {
   try {
-    await env.REVIEWS_KV?.put(K_USUARIO, JSON.stringify(registro));
+    const clave = registro.invitado ? K_INVITADO(registro.usuario) : K_USUARIO;
+    await env.REVIEWS_KV?.put(clave, JSON.stringify(registro));
     return Boolean(env.REVIEWS_KV);
   } catch {
     return false;
   }
 }
 
-/** ¿Es esta la contraseña del dueño? (sin mirar el nombre: ya hay sesión). */
-export async function claveCorrecta(env: EnvPanel, derivado: string): Promise<boolean> {
+/** ¿Es esta la contraseña de este usuario? (el nombre sale de la sesión). */
+export async function claveCorrecta(env: EnvPanel, derivado: string, usuario?: string): Promise<boolean> {
   const p = pepper(env);
   if (!p) return false;
-  const registro = await obtenerUsuario(env);
+  const registro = await obtenerUsuario(env, usuario);
   const calculado = await sellar(derivado, p);
   if (!registro) {
     compararSeguro(calculado, "0".repeat(64));
@@ -160,11 +260,12 @@ export async function claveCorrecta(env: EnvPanel, derivado: string): Promise<bo
 export async function cambiarClave(
   env: EnvPanel,
   derivadoActual: string,
-  derivadoNuevo: string
+  derivadoNuevo: string,
+  usuario?: string
 ): Promise<{ ok: boolean; motivo?: string }> {
   const p = pepper(env);
   if (!p) return { ok: false, motivo: "Falta configuración en el servidor." };
-  const registro = await obtenerUsuario(env);
+  const registro = await obtenerUsuario(env, usuario);
   if (!registro) return { ok: false, motivo: "No hay usuario configurado." };
   if (!compararSeguro(await sellar(derivadoActual, p), registro.guardado)) {
     return { ok: false, motivo: "La contraseña actual no es correcta." };
@@ -180,19 +281,9 @@ export async function cambiarClave(
   return { ok: true };
 }
 
-/** Cierra todas las sesiones menos esta (al cambiar la contraseña). */
-export async function cerrarOtrasSesiones(env: EnvPanel, request: Request): Promise<number> {
-  const kv = env.REVIEWS_KV;
-  if (!kv) return 0;
-  const actual = getCookie(request, COOKIE_SESION);
-  const { keys } = await kv.list({ prefix: "admin:sesion:", limit: 1000 });
-  let cerradas = 0;
-  for (const { name } of keys) {
-    if (actual && name === K_SESION(actual)) continue;
-    await kv.delete(name);
-    cerradas++;
-  }
-  return cerradas;
+/** Cierra las otras sesiones de ESTE usuario (al cambiar su contraseña). Las de los demás siguen. */
+export async function cerrarOtrasSesiones(env: EnvPanel, request: Request, usuario: string): Promise<number> {
+  return cerrarSesionesDe(env, usuario, getCookie(request, COOKIE_SESION));
 }
 
 /**
@@ -202,7 +293,7 @@ export async function cerrarOtrasSesiones(env: EnvPanel, request: Request): Prom
 export async function credencialesValidas(env: EnvPanel, usuario: string, derivado: string): Promise<boolean> {
   const p = pepper(env);
   if (!p) return false;
-  const registro = await obtenerUsuario(env);
+  const registro = typeof usuario === "string" ? await obtenerUsuario(env, usuario) : null;
   const calculado = await sellar(derivado, p);
   if (!registro) {
     compararSeguro(calculado, "0".repeat(64));
@@ -230,7 +321,7 @@ export async function abrirSesion(env: EnvPanel, usuario: string): Promise<strin
   if (!kv) throw new Error("Falta la base de datos (REVIEWS_KV).");
   const id = idAleatorio();
   const ahora = new Date().toISOString();
-  const duracion = await duracionSesion(env);
+  const duracion = await duracionSesion(env, usuario);
   await kv.put(K_SESION(id), JSON.stringify({ usuario, creada: ahora, renovada: ahora } satisfies Sesion), {
     expirationTtl: duracion,
   });
@@ -247,7 +338,7 @@ async function reescribirSesion(env: EnvPanel, request: Request, respetarMargen:
   const ahora = Date.now();
   if (respetarMargen && ahora - new Date(sesion.renovada).getTime() < MARGEN_RENOVACION * 1000) return null;
   sesion.renovada = new Date(ahora).toISOString();
-  const duracion = await duracionSesion(env);
+  const duracion = await duracionSesion(env, sesion.usuario);
   await kv.put(K_SESION(id), JSON.stringify(sesion), { expirationTtl: duracion });
   return cookie(COOKIE_SESION, id, duracion);
 }
@@ -293,13 +384,131 @@ export async function cerrarSesion(env: EnvPanel, request: Request): Promise<str
   return cookie(COOKIE_SESION, "", 0);
 }
 
+/** La sesión de esta petición. Si al usuario le quitaron el acceso, ya no vale. */
 export async function sesionActual(env: EnvPanel, request: Request): Promise<Sesion | null> {
   const id = idDeCookie(request, COOKIE_SESION);
   const crudo = id ? await env.REVIEWS_KV?.get(K_SESION(id)) : null;
   if (!crudo) return null;
+  let sesion: Sesion;
   try {
-    return JSON.parse(crudo) as Sesion;
+    sesion = JSON.parse(crudo) as Sesion;
   } catch {
     return null;
   }
+  if (typeof sesion?.usuario !== "string" || !(await obtenerUsuario(env, sesion.usuario))) return null;
+  return sesion;
+}
+
+// ─────────────────────────── invitaciones ───────────────────────────
+
+/** Plazos que puede elegir el dueño para un enlace de invitación, en horas. */
+export const OPCIONES_VIGENCIA = [1, 24, 72] as const;
+export const vigenciaValida = (horas: unknown): horas is number =>
+  typeof horas === "number" && (OPCIONES_VIGENCIA as readonly number[]).includes(horas);
+
+export interface Invitacion {
+  /** Primeros caracteres del resumen: sirve para anularla, no para usarla. */
+  id: string;
+  creada: string;
+  vence: string;
+  por: string;
+}
+
+async function resumenEnlace(token: string): Promise<string> {
+  const datos = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(datos)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export const tokenValido = (valor: unknown): valor is string => typeof valor === "string" && /^[0-9a-f]{64}$/.test(valor);
+
+/**
+ * Crea una invitación de un solo uso. Devuelve el token EN CLARO una sola
+ * vez; en la base solo queda su resumen, así que ni quien lea la base puede
+ * armar el enlace.
+ */
+export async function crearInvitacion(env: EnvPanel, por: string, horas: number): Promise<string> {
+  const kv = env.REVIEWS_KV;
+  if (!kv) throw new Error("Falta la base de datos (REVIEWS_KV).");
+  const token = idAleatorio();
+  const resumen = await resumenEnlace(token);
+  const ahora = Date.now();
+  const datos: Invitacion = {
+    id: resumen.slice(0, 16),
+    creada: new Date(ahora).toISOString(),
+    vence: new Date(ahora + horas * 3600_000).toISOString(),
+    por,
+  };
+  await kv.put(K_INVITACION(resumen), JSON.stringify(datos), { expirationTtl: Math.max(60, horas * 3600) });
+  return token;
+}
+
+async function invitacionPorToken(env: EnvPanel, token: string): Promise<{ clave: string; datos: Invitacion } | null> {
+  const clave = K_INVITACION(await resumenEnlace(token));
+  const crudo = await env.REVIEWS_KV?.get(clave);
+  if (!crudo) return null;
+  try {
+    const datos = JSON.parse(crudo) as Invitacion;
+    if (Date.parse(datos.vence) <= Date.now()) return null;
+    return { clave, datos };
+  } catch {
+    return null;
+  }
+}
+
+export async function invitacionVigente(env: EnvPanel, token: string): Promise<boolean> {
+  return (await invitacionPorToken(env, token)) !== null;
+}
+
+export async function listarInvitaciones(env: EnvPanel): Promise<Invitacion[]> {
+  const kv = env.REVIEWS_KV;
+  if (!kv) return [];
+  const { keys } = await kv.list({ prefix: P_INVITACION, limit: 100 });
+  const lista: Invitacion[] = [];
+  for (const { name } of keys) {
+    const crudo = await kv.get(name);
+    try {
+      const d = crudo ? (JSON.parse(crudo) as Invitacion) : null;
+      if (d && Date.parse(d.vence) > Date.now()) lista.push(d);
+    } catch {
+      /* se ignora */
+    }
+  }
+  return lista.sort((a, b) => a.creada.localeCompare(b.creada));
+}
+
+export async function anularInvitacion(env: EnvPanel, id: string): Promise<boolean> {
+  const kv = env.REVIEWS_KV;
+  if (!kv || !/^[0-9a-f]{16}$/.test(id)) return false;
+  const { keys } = await kv.list({ prefix: K_INVITACION(id), limit: 2 });
+  if (keys.length !== 1) return false;
+  await kv.delete(keys[0].name);
+  return true;
+}
+
+/**
+ * Usa la invitación: crea el usuario y quema el enlace. Se borra ANTES de
+ * crear el usuario, para que dos intentos casi simultáneos no creen dos.
+ */
+export async function aceptarInvitacion(
+  env: EnvPanel,
+  token: string,
+  usuario: string,
+  derivado: string
+): Promise<{ ok: boolean; motivo?: string; status?: number }> {
+  const kv = env.REVIEWS_KV;
+  const p = pepper(env);
+  if (!kv || !p) return { ok: false, motivo: "Falta configuración en el servidor.", status: 503 };
+  const inv = await invitacionPorToken(env, token);
+  if (!inv) return { ok: false, motivo: "Este enlace ya se usó o venció. Pide uno nuevo.", status: 410 };
+  if (await nombreOcupado(env, usuario)) return { ok: false, motivo: "Ese nombre de usuario ya existe. Elige otro.", status: 409 };
+  await kv.delete(inv.clave);
+  const registro: UsuarioAdmin = {
+    usuario,
+    guardado: await sellar(derivado, p),
+    creado: new Date().toISOString(),
+    invitado: true,
+    invitadoPor: inv.datos.por,
+  };
+  await kv.put(K_INVITADO(usuario), JSON.stringify(registro));
+  return { ok: true };
 }

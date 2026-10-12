@@ -5,7 +5,13 @@ La idea: la **lógica** vive acá una vez; cada **sitio** la importa y le pone s
 propio diseño (`theme/`) y su config. Un sitio nuevo con otro diseño reusa el
 motor tal cual.
 
-Ver el plano completo en el documento de arquitectura del proyecto.
+## Documentación para empezar
+
+- [docs/CATALOGO.md](docs/CATALOGO.md) — qué módulos hay y cómo se monta cada uno.
+- [docs/SITIO-NUEVO.md](docs/SITIO-NUEVO.md) — cómo crear un sitio nuevo y las reglas de trabajo.
+- [docs/HOJA-DE-RUTA.md](docs/HOJA-DE-RUTA.md) — lo que todavía no existe.
+
+Leer estos tres al comenzar cualquier trabajo nuevo.
 
 ## Principios
 
@@ -42,7 +48,7 @@ nucleo-web/
 En el `package.json` del sitio:
 
 ```json
-{ "dependencies": { "nucleo-web": "github:TU_USUARIO/nucleo-web#v0.5.0" } }
+{ "dependencies": { "nucleo-web": "github:Christian-897/nucleo-web#vX.Y.Z" } }
 ```
 
 Cloudflare Pages instala el núcleo al construir cada sitio. El zip del sitio sigue
@@ -75,9 +81,9 @@ npm test            # corre las pruebas del módulo
 - **contenido** — diseño y textos editables desde el panel: paleta de colores (libre, con aviso de contraste), tipografías de una lista elegida (servidas desde el propio sitio), textos, enlaces de contacto y fotos. (listo)
 - **metricas** — resumen de ventas para el panel: hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, rango de fechas a elección (por día, semana o mes), gráficos de barras, línea o torta y comparación por años. (listo)
 - **visitas** — las visitas de Cloudflare Web Analytics dentro del panel (7 o 30 días, páginas, países, dispositivos, de dónde llegan y cuántos compran), con una clave de solo lectura. (listo)
-- **panel** — administración propia: login + doble factor, productos con fotos, categorías, portada (carrusel), diseño y textos, pedidos y suscriptores. (listo)
-- **newsletter** — suscripción con doble confirmación, baja con un clic y exportación protegida. (listo)
-- _por venir:_ resenas, auth (cursos con login), categorías nuevas desde el panel.
+- **panel** — administración propia: login + doble factor, productos con fotos, categorías, portada (carrusel), diseño y textos, pedidos, suscriptores con boletines y revisión de pagos con Flow. (listo)
+- **newsletter** — suscripción con doble confirmación, baja con un clic, pedir el enlace de baja por correo, boletines desde el panel y exportación protegida. (listo)
+- _por venir:_ ver [docs/HOJA-DE-RUTA.md](docs/HOJA-DE-RUTA.md).
 
 ## Entradas solo para el navegador
 

@@ -30,6 +30,25 @@ de Muebles Crea, que ya estaba probado en producción, y extendido para tiendas.
 | Inyección en el panel | CSP sin scripts en línea ni externos; las cabeceras se REEMPLAZAN (no se suman con `_headers`). |
 | Precio manipulado | El precio que se cobra sale del catálogo guardado por el panel, validado en el servidor. |
 
+## Usuarios e invitaciones
+
+El que instala el panel es el **dueño**. Para darle acceso a otra persona sin
+pasarle una contraseña, el dueño va a **Seguridad → Usuarios del panel → Invitar
+a alguien**, elige cuánto dura el enlace (1 hora, 1 día o 3 días), confirma con
+su contraseña (y su código, si tiene doble factor) y copia el enlace.
+
+- El enlace es `/admin/#invitacion=…`: va después del `#`, así que no llega a
+  los registros del servidor, y la pantalla lo borra de la barra al leerlo.
+- Sirve **una sola vez** y vence solo. En la base queda solo su resumen
+  SHA-256: quien lea la base no puede armar el enlace.
+- Quien lo abre elige su usuario y contraseña. Cada uno tiene su propio doble
+  factor, su plazo de inactividad y sus sesiones.
+- Los invitados usan toda la tienda, pero no ven ni manejan usuarios. El dueño
+  puede anular enlaces sin usar y **quitar el acceso**: la sesión abierta del
+  invitado deja de servir al instante.
+- No usa `ADMIN_SETUP_TOKEN` ni archivos nuevos en `functions/`: la invitación
+  entra por `/api/admin/instalar` y se maneja desde `/api/admin/seguridad`.
+
 ## Variables (Secrets en Cloudflare)
 
 | Variable | Para qué |

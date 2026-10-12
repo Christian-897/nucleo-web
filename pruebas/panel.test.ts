@@ -700,6 +700,129 @@ async function run() {
     assert.equal(r.headers.get("Cache-Control"), "no-store, max-age=0");
   });
 
+  console.log("Panel — usuarios invitados:");
+
+  const D3 = "c".repeat(64);
+  async function invitar(env: EnvPanel, cookie: string, horas = 24) {
+    const r = await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas, derivado: D1 } }) });
+    return { status: r.status, datos: await json(r) };
+  }
+  const aceptar = (env: EnvPanel, invitacion: unknown, usuario = "clienta", derivado = D3) =>
+    panel.instalar.onRequestPost({ env, request: req("/api/admin/instalar", { cuerpo: { invitacion, usuario, derivado } }) });
+
+  await prueba("invitar pide la contraseña del dueño; sin ella o con plazo raro, no", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const sinClave = await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas: 24, derivado: D2 } }) });
+    assert.equal(sinClave.status, 400);
+    const plazo = await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas: 9999, derivado: D1 } }) });
+    assert.equal(plazo.status, 400);
+    const sinSesion = await panel.seguridad.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "invitar", horas: 24, derivado: D1 } }) });
+    assert.equal(sinSesion.status, 401);
+  });
+
+  await prueba("el enlace sirve UNA vez, no se guarda en claro y crea un usuario que entra con lo suyo", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const { status, datos: inv } = await invitar(env, cookie);
+    assert.equal(status, 200);
+    assert.match(inv.token, /^[0-9a-f]{64}$/);
+    assert.ok(![...datos.entries()].some(([k, v]) => k.includes(inv.token) || String(v.v).includes(inv.token)), "el token no queda en la base");
+    const revisar = await panel.instalar.onRequestPost({ env, request: req("/x", { cuerpo: { invitacion: inv.token, accion: "revisar" } }) });
+    assert.equal(revisar.status, 200);
+    assert.equal((await aceptar(env, inv.token)).status, 200);
+    assert.equal((await aceptar(env, inv.token, "otra")).status, 410, "segundo uso del mismo enlace");
+    const entra = await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D3 } }) });
+    assert.equal(entra.status, 200);
+    assert.ok(cookieDe(entra, "mc_sesion"));
+    const cruzado = await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D1 } }) });
+    assert.equal(cruzado.status, 401, "la contraseña del dueño no abre la cuenta de la invitada");
+    assert.equal((await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "sasha", derivado: D1 } }) })).status, 200, "el dueño sigue entrando");
+  });
+
+  await prueba("enlace inventado, vencido o anulado no crea nada", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    assert.equal((await aceptar(env, "f".repeat(64))).status, 410);
+    assert.equal((await aceptar(env, "<script>")).status, 410);
+    const { datos: inv } = await invitar(env, cookie, 1);
+    for (const [k, v] of datos) {
+      if (k.startsWith("admin:invitacion:")) v.v = JSON.stringify({ ...JSON.parse(String(v.v)), vence: new Date(Date.now() - 1000).toISOString() });
+    }
+    assert.equal((await aceptar(env, inv.token)).status, 410, "vencido");
+    const { datos: inv2 } = await invitar(env, cookie);
+    const seg = await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const pendiente = seg.invitaciones.find((i: { id: string }) => i.id);
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "anular-invitacion", id: pendiente.id } }) })).status, 200);
+    assert.equal((await aceptar(env, inv2.token)).status, 410, "anulado");
+    assert.equal((await listarUsuariosDe(env, cookie)).length, 1);
+  });
+
+  async function listarUsuariosDe(env: EnvPanel, cookie: string) {
+    return (await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).usuarios as { usuario: string }[];
+  }
+
+  await prueba("no se puede usar el nombre del dueño (ni con otras mayúsculas) ni pisarlo", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const { datos: inv } = await invitar(env, cookie);
+    assert.equal((await aceptar(env, inv.token, "SASHA")).status, 409);
+    assert.equal((await aceptar(env, inv.token, "sasha")).status, 409);
+    assert.equal((await aceptar(env, inv.token, "a b")).status, 400);
+    assert.equal((await aceptar(env, inv.token, "clienta")).status, 200, "el enlace no se quemó con los intentos fallidos");
+    assert.equal((await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "sasha", derivado: D1 } }) })).status, 200);
+  });
+
+  await prueba("la invitada no ve ni maneja usuarios; el dueño le quita el acceso y su sesión muere", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const { datos: inv } = await invitar(env, cookie);
+    await aceptar(env, inv.token);
+    const suya = cookieDe(await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D3 } }) }), "mc_sesion");
+    const vista = await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie: suya }) }));
+    assert.equal(vista.dueno, false);
+    assert.equal(vista.usuarios, undefined);
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: suya, cuerpo: { accion: "invitar", horas: 24, derivado: D3 } }) })).status, 403);
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: suya, cuerpo: { accion: "quitar-usuario", usuario: "sasha" } }) })).status, 403);
+    assert.equal((await panel.productos.onRequestGet({ env, request: req("/x", { cookie: suya }) })).status, 200, "puede trabajar en la tienda");
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "quitar-usuario", usuario: "sasha" } }) })).status, 400, "el dueño no se quita a sí mismo");
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "quitar-usuario", usuario: "clienta" } }) })).status, 200);
+    assert.equal((await panel.productos.onRequestGet({ env, request: req("/x", { cookie: suya }) })).status, 401, "su sesión abierta deja de servir");
+    assert.equal((await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D3 } }) })).status, 401);
+    assert.equal((await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) })).status, 200, "el dueño sigue adentro");
+  });
+
+  await prueba("cada uno con su contraseña, su doble factor y sus sesiones", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const { datos: inv } = await invitar(env, cookie);
+    await aceptar(env, inv.token);
+    const suya = cookieDe(await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D3 } }) }), "mc_sesion");
+    // Ella activa su doble factor: al dueño no le cambia nada.
+    await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: suya, cuerpo: { accion: "proponer" } }) });
+    const reg = await obtenerUsuario(env, "clienta");
+    const secreto = (await descifrarSecreto(reg!.propuesta!.secreto, PEPPER))!;
+    const act = await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: suya, cuerpo: { accion: "activar", codigo: await codigoPara(secreto, Math.floor(Date.now() / 1000 / PERIODO)) } }) });
+    assert.equal(act.status, 200);
+    assert.equal((await obtenerUsuario(env))!.dosFactores, undefined, "el dueño sigue sin doble factor");
+    assert.equal((await json(await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D3 } }) }))).segundoFactor, true);
+    assert.equal((await json(await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "sasha", derivado: D1 } }) }))).segundoFactor, undefined);
+    // El dueño cambia su contraseña: la sesión de ella sigue abierta.
+    const cambio = await json(await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "cambiar-clave", derivadoActual: D1, derivadoNuevo: D2 } }) }));
+    assert.equal(cambio.ok, true);
+    assert.equal((await panel.productos.onRequestGet({ env, request: req("/x", { cookie: suya }) })).status, 200);
+    assert.equal((await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "clienta", derivado: D3 } }) })).status, 200);
+  });
+
+  await prueba("el enlace de invitación no necesita ADMIN_SETUP_TOKEN (ya borrada)", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    delete env.ADMIN_SETUP_TOKEN;
+    const { datos: inv } = await invitar(env, cookie);
+    assert.equal((await aceptar(env, inv.token)).status, 200);
+    assert.equal((await panel.instalar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "x", derivado: D1, claveInstalacion: TOKEN } }) })).status, 503, "sin la variable, la instalación normal sigue cerrada");
+  });
+
   console.log(`\n${pasaron} pruebas pasaron.`);
 }
 

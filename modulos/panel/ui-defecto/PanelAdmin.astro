@@ -121,6 +121,28 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       </form>
     </section>
 
+    <section class="pa-vista pa-centro" data-vista="invitacion" hidden>
+      <form class="pa-caja" data-form="invitacion" novalidate>
+        {logo && <img class="pa-logo-grande" src={logo} alt="" width="96" height="96" />}
+        <h1>Te invitaron al panel</h1>
+        <p class="pa-tenue">Elige tu usuario y tu contraseña. Este enlace sirve una sola vez.</p>
+        <label class="pa-campo">Usuario<input name="usuario" autocomplete="username" required minlength="3" maxlength="40" /></label>
+        <p class="pa-tenue pa-chico">Letras, números, punto o guion, sin espacios. Ejemplo: sasha</p>
+        <label class="pa-campo">Contraseña (mínimo 10 caracteres)<input name="clave" type="password" autocomplete="new-password" required minlength="10" /></label>
+        <label class="pa-campo">Repite la contraseña<input name="repetir" type="password" autocomplete="new-password" required /></label>
+        <p class="pa-error" role="alert" data-error></p>
+        <button class="pa-boton" type="submit">Crear mi usuario</button>
+      </form>
+    </section>
+
+    <section class="pa-vista pa-centro" data-vista="invitacion-vencida" hidden>
+      <div class="pa-caja">
+        <h1>Este enlace ya no sirve</h1>
+        <p>Se usó o venció. Pide uno nuevo a quien te invitó.</p>
+        <button class="pa-enlace" type="button" data-ir-entrar>Ya tengo usuario: entrar</button>
+      </div>
+    </section>
+
     <section class="pa-vista pa-centro" data-vista="entrar" hidden>
       <form class="pa-caja" data-form="entrar" novalidate>
         {logo && <img class="pa-logo-grande" src={logo} alt="" width="96" height="96" />}
@@ -482,6 +504,36 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <p class="pa-error" role="alert" data-error></p>
           <button class="pa-boton" type="submit">Cambiar contraseña</button>
         </form>
+      </div>
+
+      <div class="pa-caja pa-caja--ancha" data-usuarios-caja hidden>
+        <h2>Usuarios del panel</h2>
+        <p class="pa-tenue">Para darle acceso a alguien sin pasarle tu contraseña: crea un enlace y mándaselo. Sirve una sola vez y vence solo.</p>
+        <ul class="pa-lista" data-lista-usuarios></ul>
+
+        <h3 class="pa-subtitulo">Invitar a alguien</h3>
+        <form data-form="invitar" novalidate>
+          <label class="pa-campo pa-campo--fila">El enlace vence en
+            <select name="horas" data-vigencia></select>
+          </label>
+          <label class="pa-campo">Tu contraseña<input name="clave" type="password" autocomplete="current-password" required /></label>
+          <label class="pa-campo" data-si-2fa hidden>Código de tu app<input name="codigo" inputmode="numeric" maxlength="11" /></label>
+          <p class="pa-error" role="alert" data-error></p>
+          <button class="pa-boton" type="submit">Crear enlace</button>
+        </form>
+        <div class="pa-respaldos" data-enlace-invitacion hidden>
+          <p><strong>Copia este enlace y mándaselo.</strong> No se volverá a mostrar. Sirve una sola vez; vence <span data-enlace-vence></span>.</p>
+          <input class="pa-enlace-copiar" data-enlace-texto readonly aria-label="Enlace de invitación" />
+          <div class="pa-fila__botones">
+            <button class="pa-boton" type="button" data-enlace-copiar>Copiar enlace</button>
+            <button class="pa-boton pa-boton--suave" type="button" data-enlace-listo>Listo</button>
+          </div>
+        </div>
+
+        <div data-invitaciones-caja hidden>
+          <h3 class="pa-subtitulo">Enlaces sin usar</h3>
+          <ul class="pa-lista" data-lista-invitaciones></ul>
+        </div>
       </div>
 
       <div class="pa-caja pa-caja--ancha">
@@ -888,6 +940,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-propuesta { display: grid; gap: 10px; margin-top: 12px; }
   .pa-propuesta img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--pa-borde); border-radius: 8px; padding: 8px; }
   .pa-propuesta ol { margin: 0; padding-left: 20px; }
+  .pa-subtitulo { font-size: 1rem; margin: 20px 0 8px; }
+  .pa-enlace-copiar { width: 100%; font: inherit; font-family: ui-monospace, monospace; font-size: .85rem; padding: 10px; border: 1px solid var(--pa-borde); border-radius: 10px; background: #fff; }
   .pa-respaldos { background: #fff8e1; border-radius: 12px; padding: 14px; display: grid; gap: 8px; }
   .pa-respaldos ul { columns: 2; font-family: ui-monospace, monospace; font-size: 1.05rem; margin: 0; }
   .pa-en-linea { display: grid; gap: 8px; }

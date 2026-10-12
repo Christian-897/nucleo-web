@@ -25,7 +25,7 @@ import {
 } from "./resumen-vista";
 import { crearVistaSitio } from "./sitio-vista";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "suscriptores" | "seguridad";
+type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "suscriptores" | "seguridad";
 const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
@@ -127,7 +127,25 @@ function siSeCerro(status: number): boolean {
 
 // ─────────────────────────── acceso ───────────────────────────
 
+/**
+ * Enlace de invitación: /admin/#invitacion=TOKEN. Va después del "#" para que
+ * nunca llegue a los registros del servidor ni a otros sitios; se borra de la
+ * barra apenas se lee.
+ */
+let tokenInvitacion = "";
+function leerInvitacion(): string {
+  const m = /(?:^#|&)invitacion=([0-9a-f]{64})(?:&|$)/.exec(location.hash);
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  return m ? m[1] : "";
+}
+
 async function iniciar() {
+  const invitacion = leerInvitacion();
+  if (invitacion) {
+    tokenInvitacion = invitacion;
+    const r = await enviar(`${API}/instalar`, { invitacion, accion: "revisar" });
+    return mostrar(r.ok ? "invitacion" : "invitacion-vencida");
+  }
   const par = await obtener<{ configurado: boolean; listoParaConfigurar: boolean }>(`${API}/parametros`);
   if (!par.ok) {
     $("[data-no-disponible-texto]").textContent = par.datos.message || "Falta configuración en el servidor.";
@@ -166,6 +184,31 @@ $<HTMLFormElement>('[data-form="instalar"]').addEventListener("submit", async (e
     aviso.hidden = false;
   });
 });
+
+$<HTMLFormElement>('[data-form="invitacion"]').addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget as HTMLFormElement;
+  const d = new FormData(f);
+  const usuario = String(d.get("usuario") || "").trim();
+  const clave = String(d.get("clave") || "");
+  errorDe(f);
+  if (!/^[a-zA-Z0-9._-]{3,40}$/.test(usuario)) return errorDe(f, "El usuario: 3 a 40 letras, números, punto o guion, sin espacios.");
+  if (clave.length < 10) return errorDe(f, "La contraseña debe tener al menos 10 caracteres.");
+  if (clave !== d.get("repetir")) return errorDe(f, "Las contraseñas no coinciden.");
+  await conBoton(f, async () => {
+    const r = await enviar(`${API}/instalar`, { invitacion: tokenInvitacion, usuario, derivado: await derivarClave(clave, usuario) });
+    if (r.status === 410) return mostrar("invitacion-vencida");
+    if (!r.ok) return errorDe(f, r.datos.message || "No se pudo crear el usuario.");
+    tokenInvitacion = "";
+    f.reset();
+    ($('[data-form="entrar"] input[name="usuario"]') as HTMLInputElement).value = usuario;
+    mostrar("entrar");
+    const aviso = $("[data-aviso-entrar]");
+    aviso.textContent = "Listo, tu usuario quedó creado. Entra con tu contraseña. Después te recomendamos activar el doble factor en Seguridad.";
+    aviso.hidden = false;
+  });
+});
+$("[data-ir-entrar]").addEventListener("click", () => mostrar("entrar"));
 
 $<HTMLFormElement>('[data-form="entrar"]').addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -1802,8 +1845,98 @@ formBoletin().addEventListener("submit", async (e) => {
 let usuarioActual = "";
 let dobleFactorActivo = false;
 
+interface FichaUsuario {
+  usuario: string;
+  creado: string;
+  dueno: boolean;
+  dobleFactor: boolean;
+  invitadoPor?: string;
+}
+interface InvitacionPendiente {
+  id: string;
+  creada: string;
+  vence: string;
+  por: string;
+}
+
+const fechaHora = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("es-CL", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+};
+const textoVigencia = (h: number) => (h === 1 ? "1 hora" : h % 24 === 0 ? `${h / 24} día${h === 24 ? "" : "s"}` : `${h} horas`);
+
+function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendiente[]) {
+  $("[data-lista-usuarios]").replaceChildren(
+    ...usuarios.map((u) => {
+      const li = crear("li", "pa-fila pa-fila--correo");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", u.usuario + (u.usuario === usuarioActual ? " (tú)" : "")));
+      const datos = crear("div", "pa-fila__datos");
+      datos.append(crear("span", "", u.dueno ? "Dueño del panel" : `Invitado${u.invitadoPor ? ` por ${u.invitadoPor}` : ""}`));
+      const desde = new Date(u.creado);
+      if (!Number.isNaN(desde.getTime())) datos.append(crear("span", "", `desde el ${desde.toLocaleDateString("es-CL")}`));
+      datos.append(crear("span", "", u.dobleFactor ? "con doble factor" : "sin doble factor"));
+      info.append(datos);
+      li.append(info);
+      if (!u.dueno) {
+        const quitar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Quitar acceso");
+        quitar.type = "button";
+        quitar.addEventListener("click", () => quitarUsuarioPanel(u.usuario));
+        const botones = crear("div", "pa-fila__botones");
+        botones.append(quitar);
+        li.append(botones);
+      }
+      return li;
+    })
+  );
+  $("[data-invitaciones-caja]").hidden = invitaciones.length === 0;
+  $("[data-lista-invitaciones]").replaceChildren(
+    ...invitaciones.map((i) => {
+      const li = crear("li", "pa-fila pa-fila--correo");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", `Enlace creado el ${fechaHora(i.creada)}`));
+      info.append(crear("div", "pa-fila__datos", `Vence el ${fechaHora(i.vence)} · lo creó ${i.por}`));
+      const anular = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Anular");
+      anular.type = "button";
+      anular.addEventListener("click", () => anularInvitacionPanel(i.id));
+      const botones = crear("div", "pa-fila__botones");
+      botones.append(anular);
+      li.append(info, botones);
+      return li;
+    })
+  );
+}
+
+async function quitarUsuarioPanel(usuario: string) {
+  if (!confirm(`¿Quitarle el acceso al panel a ${usuario}? Se le cierra la sesión al tiro.`)) return;
+  const r = await enviar(`${API}/seguridad`, { accion: "quitar-usuario", usuario });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo quitar.");
+  avisar(`${usuario} ya no tiene acceso.`);
+  await cargarSeguridad();
+}
+
+async function anularInvitacionPanel(id: string) {
+  if (!confirm("¿Anular este enlace? Ya no servirá para crear un usuario.")) return;
+  const r = await enviar(`${API}/seguridad`, { accion: "anular-invitacion", id });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) avisar(r.datos.message || "No se pudo anular.");
+  else avisar("Enlace anulado.");
+  await cargarSeguridad();
+}
+
 async function cargarSeguridad() {
-  const r = await obtener<{ activo: boolean; respaldosRestantes: number; usuario: string; inactividadMinutos: number; opcionesInactividad: number[] }>(`${API}/seguridad`);
+  const r = await obtener<{
+    activo: boolean;
+    respaldosRestantes: number;
+    usuario: string;
+    inactividadMinutos: number;
+    opcionesInactividad: number[];
+    dueno?: boolean;
+    usuarios?: FichaUsuario[];
+    invitaciones?: InvitacionPendiente[];
+    opcionesVigencia?: number[];
+  }>(`${API}/seguridad`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudo cargar la seguridad.");
   usuarioActual = r.datos.usuario;
@@ -1814,7 +1947,14 @@ async function cargarSeguridad() {
   $("[data-2fa-apagado]").hidden = r.datos.activo;
   $("[data-2fa-encendido]").hidden = !r.datos.activo;
   $("[data-2fa-propuesta]").hidden = true;
-  $("[data-si-2fa]").hidden = !r.datos.activo;
+  for (const el of $$("[data-si-2fa]")) el.hidden = !r.datos.activo;
+  $("[data-usuarios-caja]").hidden = !r.datos.dueno;
+  if (r.datos.dueno) {
+    const vig = $<HTMLSelectElement>("[data-vigencia]");
+    vig.replaceChildren(...(r.datos.opcionesVigencia || []).map((h) => new Option(textoVigencia(h), String(h))));
+    vig.value = "24";
+    pintarUsuarios(r.datos.usuarios || [], r.datos.invitaciones || []);
+  }
   const sel = $<HTMLSelectElement>("[data-inactividad]");
   sel.replaceChildren(...r.datos.opcionesInactividad.map((m) => new Option(`${m} minutos`, String(m))));
   sel.value = String(r.datos.inactividadMinutos);
@@ -1891,6 +2031,39 @@ formSeguridad(
   },
   (datos) => avisar(datos.sesionesCerradas ? `Contraseña cambiada. Cerramos ${datos.sesionesCerradas} sesión(es) en otros equipos.` : "Contraseña cambiada.")
 );
+
+formSeguridad(
+  "invitar",
+  async (d) => ({
+    accion: "invitar",
+    horas: Number(d.get("horas")),
+    derivado: await derivarClave(String(d.get("clave") || ""), usuarioActual),
+    codigo: dobleFactorActivo ? String(d.get("codigo") || "").trim() : "",
+  }),
+  async (datos) => {
+    const enlace = `${location.origin}/admin/#invitacion=${datos.token}`;
+    $<HTMLInputElement>("[data-enlace-texto]").value = enlace;
+    $("[data-enlace-vence]").textContent = `en ${textoVigencia(datos.horas)}`;
+    $("[data-enlace-invitacion]").hidden = false;
+    $<HTMLFormElement>('[data-form="invitar"]').hidden = true;
+    await cargarSeguridad();
+  }
+);
+$("[data-enlace-copiar]").addEventListener("click", async () => {
+  const campo = $<HTMLInputElement>("[data-enlace-texto]");
+  try {
+    await navigator.clipboard.writeText(campo.value);
+    avisar("Enlace copiado. Pégalo en WhatsApp o en un correo.");
+  } catch {
+    campo.select();
+    avisar("Selecciónalo y cópialo con Ctrl+C (o mantén presionado en el celular).");
+  }
+});
+$("[data-enlace-listo]").addEventListener("click", () => {
+  $<HTMLInputElement>("[data-enlace-texto]").value = "";
+  $("[data-enlace-invitacion]").hidden = true;
+  $<HTMLFormElement>('[data-form="invitar"]').hidden = false;
+});
 
 $<HTMLSelectElement>("[data-inactividad]").addEventListener("change", async (e) => {
   const minutos = Number((e.currentTarget as HTMLSelectElement).value);

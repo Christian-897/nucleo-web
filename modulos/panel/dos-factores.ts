@@ -45,10 +45,10 @@ export interface Propuesta {
   secretoLegible?: string;
 }
 
-export async function proponer(env: EnvPanel, nombreSitio: string): Promise<Propuesta> {
+export async function proponer(env: EnvPanel, nombreSitio: string, usuario?: string): Promise<Propuesta> {
   const p = pepper(env);
   if (!p) return SIN_CONFIG;
-  const registro = await obtenerUsuario(env);
+  const registro = await obtenerUsuario(env, usuario);
   if (!registro) return { ok: false, motivo: "No hay usuario configurado." };
   if (registro.dosFactores) return { ok: false, motivo: "El doble factor ya está activo." };
   const secreto = nuevoSecreto();
@@ -70,10 +70,10 @@ async function resumenes(codigos: string[], p: string) {
   return Promise.all(codigos.map((c) => resumenRespaldo(c, p)));
 }
 
-export async function activar(env: EnvPanel, codigo: string): Promise<Activacion> {
+export async function activar(env: EnvPanel, codigo: string, usuario?: string): Promise<Activacion> {
   const p = pepper(env);
   if (!p) return SIN_CONFIG;
-  const registro = await obtenerUsuario(env);
+  const registro = await obtenerUsuario(env, usuario);
   if (!registro) return { ok: false, motivo: "No hay usuario configurado." };
   if (registro.dosFactores) return { ok: false, motivo: "El doble factor ya está activo." };
   if (!registro.propuesta) return { ok: false, motivo: "Vuelve a empezar: no hay una configuración en curso." };
@@ -98,9 +98,9 @@ export async function activar(env: EnvPanel, codigo: string): Promise<Activacion
   return { ok: true, respaldos };
 }
 
-export async function desactivar(env: EnvPanel, codigo: string): Promise<{ ok: boolean; motivo?: string }> {
+export async function desactivar(env: EnvPanel, codigo: string, usuario?: string): Promise<{ ok: boolean; motivo?: string }> {
   if (!pepper(env)) return SIN_CONFIG;
-  const registro = await obtenerUsuario(env);
+  const registro = await obtenerUsuario(env, usuario);
   if (!registro?.dosFactores) return { ok: false, motivo: "El doble factor no está activo." };
   const c = await comprobarSegundoFactor(env, registro, codigo);
   if (!c.ok) return { ok: false, motivo: c.motivo };
@@ -110,10 +110,10 @@ export async function desactivar(env: EnvPanel, codigo: string): Promise<{ ok: b
   return { ok: true };
 }
 
-export async function renovarRespaldos(env: EnvPanel, codigo: string): Promise<Activacion> {
+export async function renovarRespaldos(env: EnvPanel, codigo: string, usuario?: string): Promise<Activacion> {
   const p = pepper(env);
   if (!p) return SIN_CONFIG;
-  const registro = await obtenerUsuario(env);
+  const registro = await obtenerUsuario(env, usuario);
   if (!registro?.dosFactores) return { ok: false, motivo: "El doble factor no está activo." };
   const c = await comprobarSegundoFactor(env, registro, codigo);
   if (!c.ok) return { ok: false, motivo: c.motivo };
