@@ -29,6 +29,8 @@ export async function iniciarCompra(params: {
   tipos: Record<string, "fisico" | "digital">;
   proveedor?: Proveedor;
   endpoint?: string;
+  /** El total que la persona vio en pantalla. Si no calza con el del servidor, no se cobra. */
+  totalVisto?: number;
 }): Promise<ResultadoCompra> {
   if (!params.items.length) return { ok: false, message: "Tu carrito está vacío." };
   const despacho = necesitaDespacho(params.items, params.tipos);
@@ -41,6 +43,7 @@ export async function iniciarCompra(params: {
       proveedor: params.proveedor,
       items: params.items.map((i) => ({ productoId: i.productoId, cantidad: i.cantidad })),
       comprador: v.datos,
+      ...(typeof params.totalVisto === "number" ? { totalVisto: params.totalVisto } : {}),
     },
     { endpoint: params.endpoint }
   );

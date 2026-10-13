@@ -13,6 +13,7 @@ cliente. Todos van primero en el núcleo.
 | **Redirigir `.pages.dev`** | No duplicar el sitio en Google | 301 hacia el dominio propio. |
 | **Geolocalización** | Punto de retiro más cercano, despacho según comuna o distancia | Después del mapa. |
 | **Cuentas de clientes** | Registro, pedidos y datos de despacho guardados | Opcional por sitio; 2–3 sesiones. |
+| **Entrega digital automática** | Mandar el enlace del curso o patrón en el correo de confirmación, sin intervención | Campo oculto por producto digital (nunca en APIs públicas); solo tras pago confirmado. Gratis. Primer uso: Sasha. |
 | **Cursos con videos largos protegidos** | Vender cursos online | Video con acceso protegido (Cloudflare Stream con enlaces firmados, Vimeo u otro, de pago) y probablemente cuentas de clientes. |
 | **Reseñas** | Opiniones de compradores | — |
 | **Categorías nuevas desde el panel** | Crear y borrar categorías sin tocar el código | Hoy se editan nombre y foto de las existentes. |

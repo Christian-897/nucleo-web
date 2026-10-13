@@ -18,6 +18,8 @@
  *   export const { onRequestGet, onRequestPost } = tienda.pago.estado;
  *   // functions/api/pago/retorno-flow.ts  (Flow vuelve con POST)
  *   export const { onRequestGet, onRequestPost } = tienda.pago.retornoFlow;
+ *   // functions/api/despacho.ts  (si el sitio pasó `despacho`)
+ *   export const { onRequestGet } = tienda.despacho;
  */
 import { crearEndpointCarrito } from "../carrito/endpoint";
 import { crearEndpointStock } from "../catalogo/endpoint";
@@ -26,6 +28,7 @@ import { fuenteCarrito } from "../catalogo/stock";
 import { crearEndpointsPago } from "../pago/endpoint";
 import type { ConfigCompra } from "./config";
 import { crearConfigPagoCompra } from "./servidor";
+import { crearEndpointDespacho } from "../despacho/endpoint";
 
 export function crearEndpointsCompra(config: ConfigCompra) {
   return {
@@ -34,5 +37,19 @@ export function crearEndpointsCompra(config: ConfigCompra) {
     /** GET /api/catalogo: lista pública del catálogo vigente. */
     catalogo: crearEndpointCatalogoPublico(config.catalogo),
     pago: crearEndpointsPago(crearConfigPagoCompra(config)),
+    /** GET /api/despacho: tarifas y textos públicos. Sin `despacho` responde "por pagar". */
+    despacho: config.despacho
+      ? crearEndpointDespacho(config.despacho)
+      : {
+          onRequestGet: async () =>
+            new Response(
+              JSON.stringify({
+                tarifas: { modo: "por-pagar", rm: 0, regiones: 0, extremas: 0, gratisDesde: null },
+                textos: { corto: "Envíos a todo Chile", ficha: `${config.envio.modalidad} a todo Chile`, detalle: config.envio.detalle, filaSinRegion: config.envio.modalidad },
+                zonasExtremas: [],
+              }),
+              { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } }
+            ),
+        },
   };
 }

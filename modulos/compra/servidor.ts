@@ -20,12 +20,24 @@ import { ErrorPedido } from "../pago/tipos";
 import type { ConfigCompra, EnvCompra } from "./config";
 import { type Comprador, validarComprador } from "./esquema";
 import { correoComprador, correoTienda } from "./plantilla-correo";
+import { calcularDespacho, type ModoDespacho, type ZonaDespacho } from "../despacho/calculo";
+import { formatearPrecio } from "../carrito/formato";
+
+/** Lo que se cobró de despacho en este pedido (queda en la metadata). */
+export interface DespachoPedido {
+  modo: ModoDespacho;
+  costo: number;
+  zona?: ZonaDespacho;
+  gratisPorMonto: boolean;
+}
 
 export interface MetadataCompra {
   lineas: LineaValidada[];
   comprador: Comprador;
   requiereDespacho: boolean;
   tieneDigitales: boolean;
+  /** Solo en pedidos con productos físicos y con el módulo despacho. */
+  despacho?: DespachoPedido;
   [k: string]: unknown;
 }
 
@@ -72,9 +84,24 @@ export function crearConfigPagoCompra(config: ConfigCompra): ConfigPago {
         requiereDespacho,
         tieneDigitales,
       };
+      // El despacho lo calcula SIEMPRE el servidor, con la región ya validada
+      // y las tarifas vigentes: nada de lo que mande el navegador cuenta.
+      let costoDespacho = 0;
+      if (requiereDespacho && config.despacho) {
+        const tarifas = await config.despacho.obtener(env);
+        const c = calcularDespacho(tarifas, comprador.datos.region, carrito.total, config.despacho.zonasExtremas);
+        costoDespacho = c.costo;
+        metadata.despacho = { modo: c.modo, costo: c.costo, gratisPorMonto: c.gratisPorMonto, ...(c.zona ? { zona: c.zona } : {}) };
+      }
+      const monto = carrito.total + costoDespacho;
+      // Si el carrito mostró otro total (tarifas cambiadas mientras compraba),
+      // se avisa en vez de cobrar algo distinto a lo que la persona vio.
+      if (typeof cuerpo.totalVisto === "number" && cuerpo.totalVisto !== monto) {
+        throw new ErrorPedido(`El total cambió a ${formatearPrecio(monto)}. Revisa el resumen y vuelve a presionar Pagar.`);
+      }
       return {
         descripcion: `Compra en ${config.nombreSitio}`,
-        monto: carrito.total,
+        monto,
         email: comprador.datos.email,
         metadata,
       };

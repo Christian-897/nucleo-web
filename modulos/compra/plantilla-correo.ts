@@ -3,6 +3,8 @@ import { formatearPrecio } from "../carrito/formato";
 import type { LineaValidada } from "../carrito/tipos";
 import type { ConfigCompra } from "./config";
 import type { Comprador } from "./esquema";
+import type { DespachoPedido } from "./servidor";
+import { ZONAS } from "../despacho/calculo";
 
 export interface DatosCorreoPedido {
   orden: string;
@@ -11,6 +13,16 @@ export interface DatosCorreoPedido {
   comprador: Comprador;
   requiereDespacho: boolean;
   tieneDigitales: boolean;
+  despacho?: DespachoPedido;
+}
+
+/** "$4.500 (Regiones)", "Gratis (compra sobre el monto)" o null si es por pagar. */
+function textoDespachoCobrado(d: DatosCorreoPedido): string | null {
+  const x = d.despacho;
+  if (!d.requiereDespacho || !x || x.modo !== "tarifa") return null;
+  const zona = ZONAS.find((z) => z.id === x.zona)?.nombre;
+  if (x.costo > 0) return `${formatearPrecio(x.costo)}${zona ? ` (${zona})` : ""}`;
+  return x.gratisPorMonto ? "Gratis (tu compra superó el monto para despacho gratis)" : "Gratis";
 }
 
 function marco(config: ConfigCompra, cuerpo: string): string {
@@ -31,7 +43,11 @@ function tablaLineas(d: DatosCorreoPedido): string {
     )
     .join("");
   return `<table role="presentation" width="100%" style="border-collapse:collapse;font-size:15px;border-top:1px solid #eee;border-bottom:1px solid #eee;margin:12px 0">
-${filas}<tr><td style="padding:8px 0;font-weight:bold">Total pagado</td>
+${filas}${
+    textoDespachoCobrado(d)
+      ? `<tr><td style="padding:6px 0">Despacho</td><td style="padding:6px 0;text-align:right">${escapeHtml(textoDespachoCobrado(d)!)}</td></tr>`
+      : ""
+  }<tr><td style="padding:8px 0;font-weight:bold">Total pagado</td>
 <td style="padding:8px 0;text-align:right;font-weight:bold">${formatearPrecio(d.monto)}</td></tr></table>`;
 }
 
@@ -45,7 +61,9 @@ export function correoComprador(config: ConfigCompra, d: DatosCorreoPedido) {
   ];
   if (d.requiereDespacho) {
     partes.push(
-      p(`<strong>${escapeHtml(config.envio.modalidad)}</strong>: ${escapeHtml(config.envio.detalle)}`),
+      textoDespachoCobrado(d)
+        ? p("Despacharemos tu pedido a la dirección que indicaste.")
+        : p(`<strong>${escapeHtml(config.envio.modalidad)}</strong>: ${escapeHtml(config.envio.detalle)}`),
       p(
         `Dirección: ${escapeHtml(d.comprador.direccion ?? "")}, ${escapeHtml(d.comprador.comuna ?? "")}, ${escapeHtml(d.comprador.region ?? "")}.`
       )

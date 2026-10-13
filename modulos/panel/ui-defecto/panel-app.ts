@@ -24,6 +24,7 @@ import {
   type TipoTiempo,
 } from "./resumen-vista";
 import { crearVistaSitio } from "./sitio-vista";
+import { textosDespacho, ZONAS, type TarifasDespacho } from "../../despacho/calculo";
 
 type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "suscriptores" | "seguridad";
 const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "suscriptores", "seguridad"];
@@ -51,6 +52,7 @@ interface Pedido {
   lineas?: { nombre: string; cantidad: number; subtotal: number }[];
   requiereDespacho?: boolean;
   tieneDigitales?: boolean;
+  despacho?: { modo: string; costo: number; zona?: string; gratisPorMonto?: boolean };
   enviado: string | null;
 }
 
@@ -277,7 +279,10 @@ async function abrirPestana(v: Vista) {
   if (v === "portada") await cargarPortada();
   if (v === "categorias") await cargarCategorias();
   if (v === "sitio") await vistaSitio.cargar();
-  if (v === "pedidos") await cargarPedidos();
+  if (v === "pedidos") {
+    if (!$("[data-despacho-caja]").hidden) void cargarDespacho();
+    await cargarPedidos();
+  }
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
 }
@@ -971,6 +976,12 @@ async function cargarPedidos() {
       const dato = (t: string) => li.append(crear("p", "pa-pedido__dato", t));
       dato(`${String(c.nombre ?? "")} · ${p.email}${c.telefono ? " · " + String(c.telefono) : ""}`);
       if (p.requiereDespacho) dato(`Despacho: ${String(c.direccion ?? "")}, ${String(c.comuna ?? "")}, ${String(c.region ?? "")}`);
+      if (p.despacho?.modo === "tarifa") {
+        const zona = ZONAS.find((z) => z.id === p.despacho!.zona)?.nombre;
+        dato(p.despacho.costo > 0
+          ? `Despacho cobrado: ${formatearPrecio(p.despacho.costo)}${zona ? ` (${zona})` : ""}`
+          : `Despacho gratis${p.despacho.gratisPorMonto ? " (compra sobre el monto)" : ""}`);
+      } else if (p.requiereDespacho && p.despacho?.modo === "por-pagar") dato("Despacho por pagar (lo paga el comprador al recibir).");
       if (c.notas) dato(`Notas: ${String(c.notas)}`);
       if (p.lineas?.length) {
         const ul = crear("ul");
@@ -999,6 +1010,80 @@ async function cargarPedidos() {
   );
 }
 $("[data-pedidos-todos]").addEventListener("change", cargarPedidos);
+
+// ─────────────────────────── despacho ───────────────────────────
+
+let despachoBase: { detallePorPagar: string; zonasExtremas: string[] } = { detallePorPagar: "", zonasExtremas: [] };
+const formDespacho = $<HTMLFormElement>('[data-form="despacho"]');
+/** "3.500", "$3500" o "3 500" → 3500. Vacío → null. */
+const leerPesos = (v: FormDataEntryValue | null): number | null => {
+  const t = String(v ?? "").replace(/[^0-9]/g, "");
+  return t ? Number(t) : null;
+};
+const mostrarPesos = (n: number | null) => (n === null ? "" : n.toLocaleString("es-CL"));
+
+function tarifasDelFormulario(): Record<string, unknown> {
+  const d = new FormData(formDespacho);
+  return {
+    modo: d.get("modo"),
+    rm: leerPesos(d.get("rm")) ?? "",
+    regiones: leerPesos(d.get("regiones")) ?? "",
+    extremas: leerPesos(d.get("extremas")) ?? "",
+    gratisDesde: leerPesos(d.get("gratisDesde")),
+  };
+}
+
+function vistaDespacho() {
+  const t = tarifasDelFormulario();
+  $("[data-despacho-tarifas]").hidden = t.modo !== "tarifa";
+  const num = (x: unknown) => (typeof x === "number" ? x : 0);
+  const tx = textosDespacho(
+    { modo: t.modo === "tarifa" ? "tarifa" : "por-pagar", rm: num(t.rm), regiones: num(t.regiones), extremas: num(t.extremas), gratisDesde: (t.gratisDesde as number | null) ?? null },
+    despachoBase.detallePorPagar,
+    despachoBase.zonasExtremas
+  );
+  $("[data-despacho-vista-corto]").textContent = `Texto sugerido para la franja de arriba (se cambia en Diseño y textos): “${tx.corto}”`;
+  $("[data-despacho-vista-ficha]").textContent = `Ficha del producto: “${tx.ficha}”`;
+}
+
+function llenarDespacho(t: TarifasDespacho) {
+  for (const r of $$<HTMLInputElement>('input[name="modo"]', formDespacho)) r.checked = r.value === t.modo;
+  for (const z of ["rm", "regiones", "extremas"] as const) $<HTMLInputElement>(`input[name="${z}"]`, formDespacho).value = mostrarPesos(t[z]);
+  $<HTMLInputElement>('input[name="gratisDesde"]', formDespacho).value = mostrarPesos(t.gratisDesde);
+  const tx = textosDespacho(t, despachoBase.detallePorPagar, despachoBase.zonasExtremas);
+  $("[data-despacho-resumen]").textContent = t.modo === "tarifa" ? tx.corto : "Por pagar";
+  vistaDespacho();
+}
+
+async function cargarDespacho() {
+  const r = await obtener<{ tarifas: TarifasDespacho; zonasExtremas: string[]; detallePorPagar: string }>(`${API}/despacho`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo cargar el despacho.");
+  despachoBase = { detallePorPagar: r.datos.detallePorPagar, zonasExtremas: r.datos.zonasExtremas };
+  const nombres = r.datos.zonasExtremas.map((x) => x.split(" del ")[0].split(" y de ")[0]);
+  $("[data-despacho-extremas]").textContent = nombres.length ? `Zonas extremas: ${nombres.join(", ")}. Regiones: todas las demás.` : "";
+  errorDe(formDespacho);
+  llenarDespacho(r.datos.tarifas);
+}
+
+formDespacho.addEventListener("input", vistaDespacho);
+formDespacho.addEventListener("change", vistaDespacho);
+formDespacho.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  errorDe(formDespacho);
+  const tarifas = tarifasDelFormulario();
+  if (!tarifas.modo) return errorDe(formDespacho, "Elige cómo se cobra el despacho.");
+  await conBoton(formDespacho, async () => {
+    const r = await enviar<{ tarifas: TarifasDespacho; errores?: Record<string, string> }>(`${API}/despacho`, { accion: "guardar", tarifas });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) {
+      const errores = Object.values(r.datos.errores ?? {});
+      return errorDe(formDespacho, errores.length ? errores[0] : r.datos.message || "No se pudo guardar.");
+    }
+    llenarDespacho(r.datos.tarifas);
+    avisar("Despacho guardado. La tienda lo muestra en menos de un minuto.");
+  });
+});
 
 // ─────────────────────────── resumen (métricas) ───────────────────────────
 

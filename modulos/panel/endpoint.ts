@@ -27,6 +27,7 @@
  *   functions/api/admin/suscriptores.ts    export const { onRequestGet, onRequestPost } = panel.suscriptores;
  *   functions/api/admin/boletines.ts       export const { onRequestGet, onRequestPost } = panel.boletines;
  *   functions/api/admin/boletin-foto.ts    export const { onRequestPost } = panel.boletinFoto;
+ *   functions/api/admin/despacho.ts        export const { onRequestGet, onRequestPost } = panel.despacho;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
  *   functions/api/admin/_middleware.ts     export const { onRequest } = panel.cabeceras;
@@ -34,6 +35,7 @@
 import type { FuenteCarrusel } from "../carrusel/almacen";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import type { FuenteContenido } from "../contenido/almacen";
+import type { FuenteDespacho } from "../despacho/almacen";
 import { listarActivos, quitarPorCorreo, respuestaCsv } from "../newsletter/servidor";
 import * as acceso from "./acceso";
 import type { ConfigPanel, EnvPanel } from "./config";
@@ -67,6 +69,8 @@ export interface OpcionesPanel extends ConfigPanel {
    * pedidos. `true` o sus opciones. Sin ella, no hay cuadro "Revisión de pagos".
    */
   revisionPagos?: boolean | ConfigRevisionPagos;
+  /** Tarifas de despacho (crearDespachoEditable), la misma fuente que usa la tienda. Sin ella, no hay cuadro "Despacho". */
+  despacho?: FuenteDespacho;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
   /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
@@ -163,6 +167,28 @@ export function crearPanel(opciones: OpcionesPanel) {
       onRequestPost: (c: Ctx) => (boletines ? boletines.post(c) : noDisponible()),
     },
     boletinFoto: { onRequestPost: (c: Ctx) => (boletines ? boletines.foto(c) : noDisponible()) },
+    /** Tarifas de despacho (cuadro "Despacho" en Pedidos). */
+    despacho: {
+      onRequestGet: async (c: Ctx) => {
+        const fuente = opciones.despacho;
+        if (!fuente) return noDisponible();
+        const s = await exigirSesion(c, false);
+        if (s instanceof Response) return s;
+        const tarifas = await fuente.obtener(c.env);
+        return jsonResponse(200, { tarifas, textos: fuente.textos(tarifas), zonasExtremas: fuente.zonasExtremas, detallePorPagar: fuente.detallePorPagar });
+      },
+      onRequestPost: async (c: Ctx) => {
+        const fuente = opciones.despacho;
+        if (!fuente) return noDisponible();
+        const s = await exigirSesion(c, true);
+        if (s instanceof Response) return s;
+        const cuerpo = await leerJson(c.request);
+        if (cuerpo?.accion !== "guardar") return jsonResponse(400, { message: "Acción no válida." });
+        const r = await fuente.guardar(c.env, cuerpo.tarifas);
+        if (!r.ok) return jsonResponse(400, { message: r.motivo, errores: r.errores });
+        return jsonResponse(200, { ok: true, tarifas: r.tarifas, textos: fuente.textos(r.tarifas) });
+      },
+    },
     /** Fotos públicas subidas desde el panel. */
     media: {
       onRequestGet: ({ env, params }: { env: EnvPanel; params: Record<string, string | string[]> }) => {

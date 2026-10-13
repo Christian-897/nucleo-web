@@ -2,6 +2,7 @@ import type { EnvPago } from "../pago/config";
 import type { ConfirmacionPago, PedidoGuardado } from "../pago/config";
 import type { CatalogoODinamico } from "../catalogo/almacen";
 import type { Proveedor } from "../pago/tipos";
+import type { FuenteDespacho } from "../despacho/almacen";
 
 export type EnvCompra = EnvPago;
 
@@ -17,6 +18,11 @@ export interface ConfigCompra {
     /** Explicación para el comprador. */
     detalle: string;
   };
+  /**
+   * Cobro del despacho por zona, editable en el panel (crearDespachoEditable).
+   * Sin esto, el despacho es siempre "por pagar" (como antes).
+   */
+  despacho?: FuenteDespacho;
   /** Texto del correo al comprador cuando compra productos digitales. */
   mensajeDigital?: string;
   remitentePorDefecto?: string;

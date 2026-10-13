@@ -22,6 +22,8 @@ export interface PedidoPanel {
   lineas?: { nombre: string; cantidad: number; subtotal: number }[];
   requiereDespacho?: boolean;
   tieneDigitales?: boolean;
+  /** Lo que se cobró de despacho (módulo despacho). */
+  despacho?: { modo: string; costo: number; zona?: string; gratisPorMonto?: boolean };
   enviado: string | null;
 }
 
@@ -59,6 +61,7 @@ export async function listarPedidos(ctx: Ctx, incluirNoPagados: boolean): Promis
       lineas,
       requiereDespacho: meta.requiereDespacho === true,
       tieneDigitales: meta.tieneDigitales === true,
+      ...(meta.despacho && typeof meta.despacho === "object" ? { despacho: meta.despacho as PedidoPanel["despacho"] } : {}),
       enviado: await kv.get(CLAVE_ENVIO(p.orden)),
     });
   }

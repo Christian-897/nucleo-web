@@ -35,11 +35,13 @@ interface Props {
   boletines?: boolean;
   /** Muestra "Revisión de pagos" en Resumen (el sitio montó panel.revisionPagos). */
   revisionPagos?: boolean;
+  /** Muestra el cuadro "Despacho" en Pedidos (el sitio montó panel.despacho). */
+  despacho?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 import { LIMITES_BOLETIN } from "../../newsletter/boletin";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -405,6 +407,35 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <h1>Pedidos</h1>
         <label class="pa-casilla"><input type="checkbox" data-pedidos-todos /> Ver también los no pagados</label>
       </div>
+      <details class="pa-caja pa-caja--ancha pa-despacho" data-despacho-caja hidden={!despacho}>
+        <summary><h2>Despacho</h2> <span class="pa-tenue" data-despacho-resumen></span></summary>
+        <p class="pa-tenue">Cómo se cobra el despacho de los productos físicos. Los cursos y patrones nunca pagan despacho.</p>
+        <form data-form="despacho" novalidate>
+          <fieldset class="pa-opciones">
+            <legend>¿Cómo se cobra?</legend>
+            <label class="pa-casilla"><input type="radio" name="modo" value="por-pagar" /> Por pagar: el comprador lo paga al recibir, según el courier</label>
+            <label class="pa-casilla"><input type="radio" name="modo" value="tarifa" /> Se suma al total según la región de entrega</label>
+          </fieldset>
+          <div data-despacho-tarifas>
+            <div class="pa-grilla-3">
+              <label class="pa-campo">Región Metropolitana<input name="rm" inputmode="numeric" autocomplete="off" placeholder="Ej: 3.500" /></label>
+              <label class="pa-campo">Regiones<input name="regiones" inputmode="numeric" autocomplete="off" placeholder="Ej: 5.500" /></label>
+              <label class="pa-campo">Zonas extremas<input name="extremas" inputmode="numeric" autocomplete="off" placeholder="Ej: 9.000" /></label>
+            </div>
+            <p class="pa-tenue pa-chico" data-despacho-extremas></p>
+            <label class="pa-campo">Despacho gratis en compras desde (opcional)<input name="gratisDesde" inputmode="numeric" autocomplete="off" placeholder="Ej: 30.000 — vacío si no lo usas" /></label>
+            <p class="pa-tenue pa-chico">Pon 0 en una zona para que ahí sea gratis. Con 0 en las tres, el sitio dice “Despacho gratis a todo Chile”.</p>
+          </div>
+          <div class="pa-aviso">
+            <strong>Así se verá en la tienda</strong>
+            <p class="pa-chico">La ficha de cada producto y el carrito se actualizan solos.</p>
+            <p class="pa-chico" data-despacho-vista-corto></p>
+            <p class="pa-chico" data-despacho-vista-ficha></p>
+          </div>
+          <p class="pa-error" role="alert" data-error></p>
+          <button class="pa-boton" type="submit">Guardar despacho</button>
+        </form>
+      </details>
       <p class="pa-tenue" data-resumen-pedidos></p>
       <ul class="pa-lista" data-lista-pedidos aria-live="polite"></ul>
     </section>
@@ -941,6 +972,17 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-propuesta img { width: 200px; height: 200px; background: #fff; border: 1px solid var(--pa-borde); border-radius: 8px; padding: 8px; }
   .pa-propuesta ol { margin: 0; padding-left: 20px; }
   .pa-subtitulo { font-size: 1rem; margin: 20px 0 8px; }
+  .pa-despacho summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; list-style: none; }
+  .pa-despacho summary::-webkit-details-marker { display: none; }
+  .pa-despacho summary h2 { margin: 0; }
+  .pa-despacho summary::before { content: "▸"; color: var(--pa-acento); }
+  .pa-despacho[open] summary::before { content: "▾"; }
+  .pa-despacho form { display: grid; gap: 12px; margin-top: 12px; }
+  .pa-opciones { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .pa-opciones legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
+  .pa-grilla-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .pa-aviso p { margin: 4px 0 0; }
+  @media (max-width: 640px) { .pa-grilla-3 { grid-template-columns: 1fr; } }
   .pa-enlace-copiar { width: 100%; font: inherit; font-family: ui-monospace, monospace; font-size: .85rem; padding: 10px; border: 1px solid var(--pa-borde); border-radius: 10px; background: #fff; }
   .pa-respaldos { background: #fff8e1; border-radius: 12px; padding: 14px; display: grid; gap: 8px; }
   .pa-respaldos ul { columns: 2; font-family: ui-monospace, monospace; font-size: 1.05rem; margin: 0; }

@@ -17,6 +17,7 @@ import { diaLocal } from "../modulos/metricas/index";
 import { crearCarruselEditable } from "../modulos/carrusel/index";
 import { crearContenidoEditable } from "../modulos/contenido/index";
 import { hmacSha256Hex } from "../core/cripto";
+import { crearDespachoEditable } from "../modulos/despacho/index";
 const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
@@ -83,7 +84,8 @@ const sitio = crearContenidoEditable(
   { "colores.acento": "#d81b72", "inicio.titulo": "Hola", "inicio.foto": "/img/a.webp" },
   { contraste: [{ texto: "#ffffff", fondo: "colores.acento", minimo: 4.5, descripcion: "Botones" }] }
 );
-const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" }, revisionPagos: true });
+const despachoFuente = crearDespachoEditable({ detallePorPagar: "Se paga al recibir." });
+const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" }, revisionPagos: true, despacho: despachoFuente });
 
 function entorno(): { env: EnvPanel; datos: ReturnType<typeof kvMemoria>["datos"] } {
   const { kv, datos } = kvMemoria();
@@ -821,6 +823,40 @@ async function run() {
     const { datos: inv } = await invitar(env, cookie);
     assert.equal((await aceptar(env, inv.token)).status, 200);
     assert.equal((await panel.instalar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "x", derivado: D1, claveInstalacion: TOKEN } }) })).status, 503, "sin la variable, la instalación normal sigue cerrada");
+  });
+
+  console.log("Panel — despacho:");
+
+  await prueba("despacho: sin sesión nada; desde otro sitio no guarda; sin módulo no existe", async () => {
+    const { env } = entorno();
+    assert.equal((await panel.despacho.onRequestGet({ env, request: req("/x") })).status, 401);
+    const cookie = await instalarYEntrar(env);
+    const t = { modo: "tarifa", rm: 3500, regiones: 5000, extremas: 7000, gratisDesde: 30000 };
+    assert.equal((await panel.despacho.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "guardar", tarifas: t } }) })).status, 401);
+    assert.equal((await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.cl", cuerpo: { accion: "guardar", tarifas: t } }) })).status, 403);
+    const sin = crearPanel({ nombreSitio: "X" });
+    assert.equal((await sin.despacho.onRequestGet({ env, request: req("/x", { cookie }) })).status, 404);
+  });
+
+  await prueba("despacho: por defecto por pagar; guardar cambia la tienda; lo inválido no se guarda", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const antes = await json(await panel.despacho.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(antes.tarifas.modo, "por-pagar");
+    const malo = await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", tarifas: { modo: "tarifa", rm: -5, regiones: 0, extremas: 0 } } }) });
+    assert.equal(malo.status, 400);
+    assert.ok((await json(malo)).errores.rm);
+    const ok = await json(await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", tarifas: { modo: "tarifa", rm: 3500, regiones: 5000, extremas: 7000, gratisDesde: 30000 } } }) }));
+    assert.equal(ok.textos.corto, "Despacho gratis desde $30.000");
+    assert.equal((await despachoFuente.obtener(env)).extremas, 7000, "la tienda lee lo mismo que guardó el panel");
+  });
+
+  await prueba("pedidos: muestra el despacho cobrado", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    datos.set("pago:pedido:o9", { v: JSON.stringify({ orden: "o9", creado: new Date().toISOString(), estado: "pagada", monto: 25000, proveedor: "flow", email: "a@b.cl", metadata: { lineas: [], comprador: {}, requiereDespacho: true, tieneDigitales: false, despacho: { modo: "tarifa", costo: 7000, zona: "extremas", gratisPorMonto: false } } }) });
+    const r = await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(r.pedidos[0].despacho.costo, 7000);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);
