@@ -13,7 +13,7 @@ export function crearEndpointDespacho(fuente: FuenteDespacho) {
   return {
     async onRequestGet({ env }: { env: EnvBase }): Promise<Response> {
       const tarifas = await fuente.obtener(env);
-      return new Response(JSON.stringify({ tarifas, textos: fuente.textos(tarifas), zonasExtremas: fuente.zonasExtremas }), {
+      return new Response(JSON.stringify({ tarifas, textos: fuente.textos(tarifas) }), {
         headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
       });
     },

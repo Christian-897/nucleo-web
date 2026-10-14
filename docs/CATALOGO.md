@@ -13,7 +13,7 @@ Para formularios de presupuesto: **Muebles Crea**.
 | `catalogo` | Productos (JSON inicial + lo editado en el panel), stock real en KV, categorías editables, ficha `/producto/<id>/`, sitemap | `nucleo-web/catalogo` | `crearCatalogoEditable`, `crearBordeCatalogo`, `crearFichaProducto`, `crearSitemap` |
 | `carrito` | Carrito en el navegador y validación de precio y stock en el servidor | `nucleo-web/carrito` (+ `Carrito.astro`, `BotonAgregar.astro`) | lo arma `compra` |
 | `pago` | Flow y Mercado Pago bajo una interfaz; webhooks verificados contra el proveedor | `nucleo-web/pago` | lo arma `compra` |
-| `despacho` | Cobro del despacho por zona (RM, regiones, extremas), "gratis desde $X" o por pagar; avisos sin sorpresas | `nucleo-web/despacho` (+ `despacho/cliente`) | `crearDespachoEditable` → `crearEndpointsCompra({ despacho })`, `crearPanel({ despacho })`, `tienda.despacho`, `panel.despacho` |
+| `despacho` | Cobro del despacho por comunas de la RM (centro/alejada) y regiones (cercana/extrema) con casillas; el comprador paga ahora o al recibir; "gratis desde $X"; avisos sin sorpresas | `nucleo-web/despacho` (+ `despacho/cliente`) | `crearDespachoEditable` → `crearEndpointsCompra({ despacho })`, `crearPanel({ despacho })`, `tienda.despacho`, `panel.despacho` |
 | `compra` | Todo junto: catálogo + carrito + pago + datos del comprador + correos de venta | `nucleo-web/compra` | `crearEndpointsCompra({ catalogo, proveedores, envio, … })` → `tienda.carrito`, `tienda.stock`, `tienda.catalogo`, `tienda.pago.{iniciar,estado,retornoFlow,webhookFlow,webhookMercadoPago}` |
 
 ## Contenido editable

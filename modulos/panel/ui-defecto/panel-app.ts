@@ -24,7 +24,7 @@ import {
   type TipoTiempo,
 } from "./resumen-vista";
 import { crearVistaSitio } from "./sitio-vista";
-import { textosDespacho, ZONAS, type TarifasDespacho } from "../../despacho/calculo";
+import { nombreZona, textosDespacho, type TarifasDespacho } from "../../despacho/calculo";
 
 type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "suscriptores" | "seguridad";
 const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "suscriptores", "seguridad"];
@@ -52,7 +52,7 @@ interface Pedido {
   lineas?: { nombre: string; cantidad: number; subtotal: number }[];
   requiereDespacho?: boolean;
   tieneDigitales?: boolean;
-  despacho?: { modo: string; costo: number; zona?: string; gratisPorMonto?: boolean };
+  despacho?: { forma: string; costo: number; zona?: string; gratisPorMonto?: boolean };
   enviado: string | null;
 }
 
@@ -976,12 +976,13 @@ async function cargarPedidos() {
       const dato = (t: string) => li.append(crear("p", "pa-pedido__dato", t));
       dato(`${String(c.nombre ?? "")} · ${p.email}${c.telefono ? " · " + String(c.telefono) : ""}`);
       if (p.requiereDespacho) dato(`Despacho: ${String(c.direccion ?? "")}, ${String(c.comuna ?? "")}, ${String(c.region ?? "")}`);
-      if (p.despacho?.modo === "tarifa") {
-        const zona = ZONAS.find((z) => z.id === p.despacho!.zona)?.nombre;
-        dato(p.despacho.costo > 0
-          ? `Despacho cobrado: ${formatearPrecio(p.despacho.costo)}${zona ? ` (${zona})` : ""}`
-          : `Despacho gratis${p.despacho.gratisPorMonto ? " (compra sobre el monto)" : ""}`);
-      } else if (p.requiereDespacho && p.despacho?.modo === "por-pagar") dato("Despacho por pagar (lo paga el comprador al recibir).");
+      if (p.despacho) {
+        const zona = nombreZona(p.despacho.zona);
+        const enZona = zona ? ` · ${zona}` : "";
+        if (p.despacho.forma === "al-recibir") dato(`Despacho por pagar: lo paga el comprador al recibir${enZona}.`);
+        else if (p.despacho.costo > 0) dato(`Despacho cobrado: ${formatearPrecio(p.despacho.costo)}${enZona}`);
+        else dato(`Despacho gratis${p.despacho.gratisPorMonto ? " (compra sobre el monto)" : ""}${enZona}`);
+      }
       if (c.notas) dato(`Notas: ${String(c.notas)}`);
       if (p.lineas?.length) {
         const ul = crear("ul");
@@ -1013,7 +1014,7 @@ $("[data-pedidos-todos]").addEventListener("change", cargarPedidos);
 
 // ─────────────────────────── despacho ───────────────────────────
 
-let despachoBase: { detallePorPagar: string; zonasExtremas: string[] } = { detallePorPagar: "", zonasExtremas: [] };
+let despachoBase = { detallePorPagar: "", comunasRM: [] as string[], regiones: [] as string[] };
 const formDespacho = $<HTMLFormElement>('[data-form="despacho"]');
 /** "3.500", "$3500" o "3 500" → 3500. Vacío → null. */
 const leerPesos = (v: FormDataEntryValue | null): number | null => {
@@ -1021,58 +1022,107 @@ const leerPesos = (v: FormDataEntryValue | null): number | null => {
   return t ? Number(t) : null;
 };
 const mostrarPesos = (n: number | null) => (n === null ? "" : n.toLocaleString("es-CL"));
+const marcadas = (tipo: "comunas" | "regiones") =>
+  $$<HTMLInputElement>(`[data-casillas-${tipo}] input:checked`, formDespacho).map((c) => c.value);
 
 function tarifasDelFormulario(): Record<string, unknown> {
   const d = new FormData(formDespacho);
   return {
-    modo: d.get("modo"),
-    rm: leerPesos(d.get("rm")) ?? "",
-    regiones: leerPesos(d.get("regiones")) ?? "",
-    extremas: leerPesos(d.get("extremas")) ?? "",
+    pagarAhora: d.get("pagarAhora") === "on",
+    pagarAlRecibir: true,
+    centro: leerPesos(d.get("centro")) ?? "",
+    alejada: leerPesos(d.get("alejada")) ?? "",
+    cercana: leerPesos(d.get("cercana")) ?? "",
+    extrema: leerPesos(d.get("extrema")) ?? "",
+    comunasCentro: marcadas("comunas"),
+    regionesCercanas: marcadas("regiones"),
     gratisDesde: leerPesos(d.get("gratisDesde")),
   };
 }
 
+function contarCasillas() {
+  for (const tipo of ["comunas", "regiones"] as const) {
+    const todas = $$<HTMLInputElement>(`[data-casillas-${tipo}] input`, formDespacho);
+    const n = todas.filter((c) => c.checked).length;
+    $(`[data-cuenta-${tipo}]`, formDespacho).textContent = `${n} de ${todas.length}`;
+    const maestra = $<HTMLInputElement>(`[data-todas="${tipo}"]`, formDespacho);
+    maestra.checked = n === todas.length;
+    maestra.indeterminate = n > 0 && n < todas.length;
+  }
+}
+
 function vistaDespacho() {
   const t = tarifasDelFormulario();
-  $("[data-despacho-tarifas]").hidden = t.modo !== "tarifa";
+  $("[data-despacho-tarifas]").hidden = t.pagarAhora !== true;
+  contarCasillas();
   const num = (x: unknown) => (typeof x === "number" ? x : 0);
   const tx = textosDespacho(
-    { modo: t.modo === "tarifa" ? "tarifa" : "por-pagar", rm: num(t.rm), regiones: num(t.regiones), extremas: num(t.extremas), gratisDesde: (t.gratisDesde as number | null) ?? null },
-    despachoBase.detallePorPagar,
-    despachoBase.zonasExtremas
+    {
+      pagarAhora: t.pagarAhora === true,
+      pagarAlRecibir: t.pagarAlRecibir === true,
+      centro: num(t.centro), alejada: num(t.alejada), cercana: num(t.cercana), extrema: num(t.extrema),
+      comunasCentro: t.comunasCentro as string[], regionesCercanas: t.regionesCercanas as string[],
+      gratisDesde: (t.gratisDesde as number | null) ?? null,
+    },
+    despachoBase.detallePorPagar
   );
   $("[data-despacho-vista-corto]").textContent = `Texto sugerido para la franja de arriba (se cambia en Diseño y textos): “${tx.corto}”`;
   $("[data-despacho-vista-ficha]").textContent = `Ficha del producto: “${tx.ficha}”`;
 }
 
+function casillas(tipo: "comunas" | "regiones", nombres: string[], marcadasAhora: string[]) {
+  $(`[data-casillas-${tipo}]`, formDespacho).replaceChildren(
+    ...nombres.map((n) => {
+      const l = crear("label", "pa-casilla");
+      const c = crear("input");
+      c.type = "checkbox";
+      c.value = n;
+      c.checked = marcadasAhora.includes(n);
+      l.append(c, document.createTextNode(" " + n));
+      return l;
+    })
+  );
+}
+
 function llenarDespacho(t: TarifasDespacho) {
-  for (const r of $$<HTMLInputElement>('input[name="modo"]', formDespacho)) r.checked = r.value === t.modo;
-  for (const z of ["rm", "regiones", "extremas"] as const) $<HTMLInputElement>(`input[name="${z}"]`, formDespacho).value = mostrarPesos(t[z]);
+  $<HTMLInputElement>('input[name="pagarAhora"]', formDespacho).checked = t.pagarAhora;
+  for (const z of ["centro", "alejada", "cercana", "extrema"] as const) $<HTMLInputElement>(`input[name="${z}"]`, formDespacho).value = mostrarPesos(t[z]);
   $<HTMLInputElement>('input[name="gratisDesde"]', formDespacho).value = mostrarPesos(t.gratisDesde);
-  const tx = textosDespacho(t, despachoBase.detallePorPagar, despachoBase.zonasExtremas);
-  $("[data-despacho-resumen]").textContent = t.modo === "tarifa" ? tx.corto : "Por pagar";
+  casillas("comunas", despachoBase.comunasRM, t.comunasCentro);
+  casillas("regiones", despachoBase.regiones, t.regionesCercanas);
+  const tx = textosDespacho(t, despachoBase.detallePorPagar);
+  $("[data-despacho-resumen]").textContent = t.pagarAhora ? tx.corto : "Por pagar";
   vistaDespacho();
 }
 
 async function cargarDespacho() {
-  const r = await obtener<{ tarifas: TarifasDespacho; zonasExtremas: string[]; detallePorPagar: string }>(`${API}/despacho`);
+  const r = await obtener<{ tarifas: TarifasDespacho; detallePorPagar: string; comunasRM: string[]; regiones: string[] }>(`${API}/despacho`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudo cargar el despacho.");
-  despachoBase = { detallePorPagar: r.datos.detallePorPagar, zonasExtremas: r.datos.zonasExtremas };
-  const nombres = r.datos.zonasExtremas.map((x) => x.split(" del ")[0].split(" y de ")[0]);
-  $("[data-despacho-extremas]").textContent = nombres.length ? `Zonas extremas: ${nombres.join(", ")}. Regiones: todas las demás.` : "";
+  despachoBase = { detallePorPagar: r.datos.detallePorPagar, comunasRM: r.datos.comunasRM, regiones: r.datos.regiones };
   errorDe(formDespacho);
   llenarDespacho(r.datos.tarifas);
 }
 
+// "Seleccionar todas" marca o desmarca solo las que se ven (respeta el buscador).
+for (const maestra of $$<HTMLInputElement>("[data-todas]", formDespacho)) {
+  maestra.addEventListener("change", () => {
+    for (const c of $$<HTMLInputElement>(`[data-casillas-${maestra.dataset.todas}] label:not([hidden]) input`, formDespacho)) c.checked = maestra.checked;
+    vistaDespacho();
+  });
+}
+$<HTMLInputElement>("[data-buscar-comuna]", formDespacho).addEventListener("input", (e) => {
+  const q = (e.currentTarget as HTMLInputElement).value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  for (const l of $$<HTMLLabelElement>("[data-casillas-comunas] label", formDespacho)) {
+    l.hidden = !!q && !l.textContent!.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(q);
+  }
+});
 formDespacho.addEventListener("input", vistaDespacho);
 formDespacho.addEventListener("change", vistaDespacho);
 formDespacho.addEventListener("submit", async (e) => {
   e.preventDefault();
   errorDe(formDespacho);
   const tarifas = tarifasDelFormulario();
-  if (!tarifas.modo) return errorDe(formDespacho, "Elige cómo se cobra el despacho.");
   await conBoton(formDespacho, async () => {
     const r = await enviar<{ tarifas: TarifasDespacho; errores?: Record<string, string> }>(`${API}/despacho`, { accion: "guardar", tarifas });
     if (siSeCerro(r.status)) return;
@@ -1081,7 +1131,7 @@ formDespacho.addEventListener("submit", async (e) => {
       return errorDe(formDespacho, errores.length ? errores[0] : r.datos.message || "No se pudo guardar.");
     }
     llenarDespacho(r.datos.tarifas);
-    avisar("Despacho guardado. La tienda lo muestra en menos de un minuto.");
+    avisar("Despacho guardado. La tienda lo muestra en unos segundos.");
   });
 });
 

@@ -412,20 +412,42 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <p class="pa-tenue">Cómo se cobra el despacho de los productos físicos. Los cursos y patrones nunca pagan despacho.</p>
         <form data-form="despacho" novalidate>
           <fieldset class="pa-opciones">
-            <legend>¿Cómo se cobra?</legend>
-            <label class="pa-casilla"><input type="radio" name="modo" value="por-pagar" /> Por pagar: el comprador lo paga al recibir, según el courier</label>
-            <label class="pa-casilla"><input type="radio" name="modo" value="tarifa" /> Se suma al total según la región de entrega</label>
+            <label class="pa-casilla"><input type="checkbox" name="pagarAhora" /> <strong>Cobrar el despacho según la zona</strong></label>
+            <p class="pa-tenue pa-chico">Encendido: en el carrito el comprador elige si lo paga junto con la compra o al recibir. Apagado: todo es “por pagar” al recibir.</p>
           </fieldset>
-          <div data-despacho-tarifas>
-            <div class="pa-grilla-3">
-              <label class="pa-campo">Región Metropolitana<input name="rm" inputmode="numeric" autocomplete="off" placeholder="Ej: 3.500" /></label>
-              <label class="pa-campo">Regiones<input name="regiones" inputmode="numeric" autocomplete="off" placeholder="Ej: 5.500" /></label>
-              <label class="pa-campo">Zonas extremas<input name="extremas" inputmode="numeric" autocomplete="off" placeholder="Ej: 9.000" /></label>
-            </div>
-            <p class="pa-tenue pa-chico" data-despacho-extremas></p>
+
+          <div data-despacho-tarifas class="pa-despacho__tarifas">
+            <section class="pa-despacho__bloque">
+              <h3>Región Metropolitana</h3>
+              <div class="pa-grilla-2">
+                <label class="pa-campo">Zona centro<input name="centro" inputmode="numeric" autocomplete="off" placeholder="Ej: 3.500" /></label>
+                <label class="pa-campo">Zona alejada<input name="alejada" inputmode="numeric" autocomplete="off" placeholder="Ej: 5.000" /></label>
+              </div>
+              <details class="pa-despacho__lista">
+                <summary>Comunas de la <strong>zona centro</strong>: <span data-cuenta-comunas></span> <span class="pa-tenue">(las que no marques son zona alejada)</span></summary>
+                <input type="search" class="pa-despacho__buscar" data-buscar-comuna placeholder="Buscar comuna…" aria-label="Buscar comuna" />
+                <label class="pa-casilla pa-casilla--todas"><input type="checkbox" data-todas="comunas" /> Seleccionar todas</label>
+                <div class="pa-despacho__casillas" data-casillas-comunas></div>
+              </details>
+            </section>
+
+            <section class="pa-despacho__bloque">
+              <h3>Regiones</h3>
+              <div class="pa-grilla-2">
+                <label class="pa-campo">Zona cercana<input name="cercana" inputmode="numeric" autocomplete="off" placeholder="Ej: 5.500" /></label>
+                <label class="pa-campo">Zona extrema<input name="extrema" inputmode="numeric" autocomplete="off" placeholder="Ej: 7.000" /></label>
+              </div>
+              <details class="pa-despacho__lista">
+                <summary>Regiones de la <strong>zona cercana</strong>: <span data-cuenta-regiones></span> <span class="pa-tenue">(las que no marques son zona extrema)</span></summary>
+                <label class="pa-casilla pa-casilla--todas"><input type="checkbox" data-todas="regiones" /> Seleccionar todas</label>
+                <div class="pa-despacho__casillas" data-casillas-regiones></div>
+              </details>
+            </section>
+
             <label class="pa-campo">Despacho gratis en compras desde (opcional)<input name="gratisDesde" inputmode="numeric" autocomplete="off" placeholder="Ej: 30.000 — vacío si no lo usas" /></label>
-            <p class="pa-tenue pa-chico">Pon 0 en una zona para que ahí sea gratis. Con 0 en las tres, el sitio dice “Despacho gratis a todo Chile”.</p>
+            <p class="pa-tenue pa-chico">Pon 0 en una zona para que ahí sea gratis.</p>
           </div>
+
           <div class="pa-aviso">
             <strong>Así se verá en la tienda</strong>
             <p class="pa-chico">La ficha de cada producto y el carrito se actualizan solos.</p>
@@ -981,8 +1003,16 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-opciones { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
   .pa-opciones legend { font-weight: 700; margin-bottom: 6px; padding: 0; }
   .pa-grilla-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .pa-grilla-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .pa-despacho__tarifas { display: grid; gap: 16px; }
+  .pa-despacho__bloque { border: 1px solid var(--pa-borde); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
+  .pa-despacho__bloque h3 { margin: 0; font-size: 1rem; }
+  .pa-despacho__lista > summary { cursor: pointer; font-size: .95rem; padding: 6px 0; }
+  .pa-despacho__buscar { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--pa-borde); border-radius: 10px; margin: 8px 0; }
+  .pa-despacho__casillas { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; max-height: 320px; overflow: auto; padding: 4px 2px; }
+  .pa-casilla--todas { font-weight: 700; margin: 6px 0; }
   .pa-aviso p { margin: 4px 0 0; }
-  @media (max-width: 640px) { .pa-grilla-3 { grid-template-columns: 1fr; } }
+  @media (max-width: 640px) { .pa-grilla-3, .pa-grilla-2 { grid-template-columns: 1fr; } }
   .pa-enlace-copiar { width: 100%; font: inherit; font-family: ui-monospace, monospace; font-size: .85rem; padding: 10px; border: 1px solid var(--pa-borde); border-radius: 10px; background: #fff; }
   .pa-respaldos { background: #fff8e1; border-radius: 12px; padding: 14px; display: grid; gap: 8px; }
   .pa-respaldos ul { columns: 2; font-family: ui-monospace, monospace; font-size: 1.05rem; margin: 0; }

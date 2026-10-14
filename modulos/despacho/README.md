@@ -1,19 +1,32 @@
 # despacho
 
-Cobro del despacho por zona, editable desde el panel (Pedidos → Despacho).
+Cobro del despacho, editable desde el panel (Pedidos → Despacho), pensado
+para que la dueña solo marque casillas:
 
-- **Por pagar**: el comprador lo paga al recibir (como antes). No suma nada.
-- **Tarifa por zona**: Región Metropolitana, regiones y zonas extremas (por
-  defecto Arica y Parinacota, Aysén y Magallanes), cada una con su valor.
-  `0` = gratis en esa zona. Opcional: **gratis desde $X** en productos.
+- **Cobrar el despacho según la zona** (un interruptor). Encendido: el
+  comprador SIEMPRE elige en el carrito si lo paga junto con la compra (se
+  suma al total) o al recibir. Apagado: todo "por pagar".
+- **Región Metropolitana:** valor de **zona centro** y de **zona alejada**, y
+  las 52 comunas con casillas (marcadas = centro; el resto = alejada).
+- **Regiones:** valor de **zona cercana** y de **zona extrema**, y las 15
+  regiones con casillas (marcadas = cercana; el resto = extrema).
+- Opcional: **gratis desde $X** en productos. `0` = gratis en esa zona.
+
+De fábrica: Gran Santiago + Puente Alto + San Bernardo = centro; Arica y
+Parinacota, Aysén y Magallanes = extremas; modo "por pagar".
 
 Los cursos y patrones (productos digitales) nunca pagan despacho.
 
+En el carrito, si la región es la RM la comuna se elige de la lista
+(`COMUNAS_RM`, exportada en `despacho/cliente`): el servidor rechaza una
+comuna de la RM que no esté en la lista.
+
 ## Seguridad
 
-El monto lo calcula **siempre el servidor** al iniciar el pago: región ya
-validada (una de las 16) + tarifas vigentes en KV. Lo que mande el navegador
-(montos, zona, "gratis") se ignora. Flow cobra productos + despacho en un
+El monto lo calcula **siempre el servidor** al iniciar el pago: región y
+comuna validadas + tarifas vigentes en KV. Del navegador solo cuenta la forma
+elegida (`formaDespacho`), y solo si está permitida; montos, zona o "gratis"
+se ignoran. Si llega `totalVisto` y no calza, no se cobra y se avisa. Flow cobra productos + despacho en un
 solo pago, y la verificación de monto del módulo `pago` lo cubre igual que
 antes.
 

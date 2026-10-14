@@ -831,7 +831,7 @@ async function run() {
     const { env } = entorno();
     assert.equal((await panel.despacho.onRequestGet({ env, request: req("/x") })).status, 401);
     const cookie = await instalarYEntrar(env);
-    const t = { modo: "tarifa", rm: 3500, regiones: 5000, extremas: 7000, gratisDesde: 30000 };
+    const t = { ...despachoFuente.inicial, pagarAhora: true, centro: 3500 };
     assert.equal((await panel.despacho.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "guardar", tarifas: t } }) })).status, 401);
     assert.equal((await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.cl", cuerpo: { accion: "guardar", tarifas: t } }) })).status, 403);
     const sin = crearPanel({ nombreSitio: "X" });
@@ -842,19 +842,22 @@ async function run() {
     const { env } = entorno();
     const cookie = await instalarYEntrar(env);
     const antes = await json(await panel.despacho.onRequestGet({ env, request: req("/x", { cookie }) }));
-    assert.equal(antes.tarifas.modo, "por-pagar");
-    const malo = await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", tarifas: { modo: "tarifa", rm: -5, regiones: 0, extremas: 0 } } }) });
+    assert.equal(antes.tarifas.pagarAhora, false);
+    assert.equal(antes.comunasRM.length, 52);
+    assert.equal(antes.regiones.length, 15);
+    const malo = await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", tarifas: { ...antes.tarifas, centro: -5 } } }) });
     assert.equal(malo.status, 400);
-    assert.ok((await json(malo)).errores.rm);
-    const ok = await json(await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", tarifas: { modo: "tarifa", rm: 3500, regiones: 5000, extremas: 7000, gratisDesde: 30000 } } }) }));
+    assert.ok((await json(malo)).errores.centro);
+    const nueva = { ...antes.tarifas, pagarAhora: true, centro: 3500, alejada: 5000, cercana: 5500, extrema: 7000, gratisDesde: 30000 };
+    const ok = await json(await panel.despacho.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", tarifas: nueva } }) }));
     assert.equal(ok.textos.corto, "Despacho gratis desde $30.000");
-    assert.equal((await despachoFuente.obtener(env)).extremas, 7000, "la tienda lee lo mismo que guardó el panel");
+    assert.equal((await despachoFuente.obtener(env)).extrema, 7000, "la tienda lee lo mismo que guardó el panel");
   });
 
   await prueba("pedidos: muestra el despacho cobrado", async () => {
     const { env, datos } = entorno();
     const cookie = await instalarYEntrar(env);
-    datos.set("pago:pedido:o9", { v: JSON.stringify({ orden: "o9", creado: new Date().toISOString(), estado: "pagada", monto: 25000, proveedor: "flow", email: "a@b.cl", metadata: { lineas: [], comprador: {}, requiereDespacho: true, tieneDigitales: false, despacho: { modo: "tarifa", costo: 7000, zona: "extremas", gratisPorMonto: false } } }) });
+    datos.set("pago:pedido:o9", { v: JSON.stringify({ orden: "o9", creado: new Date().toISOString(), estado: "pagada", monto: 25000, proveedor: "flow", email: "a@b.cl", metadata: { lineas: [], comprador: {}, requiereDespacho: true, tieneDigitales: false, despacho: { forma: "ahora", costo: 7000, zona: "extrema", gratisPorMonto: false } } }) });
     const r = await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie }) }));
     assert.equal(r.pedidos[0].despacho.costo, 7000);
   });

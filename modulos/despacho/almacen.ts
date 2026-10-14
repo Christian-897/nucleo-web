@@ -6,25 +6,22 @@
  * carrito y la ficha las piden seguido y KV gratis da 100.000 lecturas al día.
  */
 import type { EnvBase } from "../../core/tipos";
-import { type TarifasDespacho, type TextosDespacho, textosDespacho, validarTarifas, ZONAS_EXTREMAS_POR_DEFECTO } from "./calculo";
+import { type TarifasDespacho, type TextosDespacho, textosDespacho, validarTarifas } from "./calculo";
 
 export const CLAVE_DESPACHO = "despacho:tarifas";
 const CACHE_MS = 10_000;
 
 export interface OpcionesDespacho {
-  /** Lo que rige mientras nadie edite. Por defecto: por pagar. */
+  /** Lo que rige mientras nadie edite. Por defecto: por pagar, con las zonas de fábrica. */
   inicial?: Partial<TarifasDespacho>;
   /** Texto del modo "por pagar" (el que el sitio ya tenía). */
   detallePorPagar: string;
-  /** Regiones de la zona extrema. Por defecto Arica y Parinacota, Aysén y Magallanes. */
-  zonasExtremas?: readonly string[];
   clave?: string;
 }
 
 export interface FuenteDespacho {
   readonly clave: string;
   readonly inicial: TarifasDespacho;
-  readonly zonasExtremas: readonly string[];
   readonly detallePorPagar: string;
   obtener(env: EnvBase): Promise<TarifasDespacho>;
   textos(tarifas: TarifasDespacho): TextosDespacho;
@@ -34,11 +31,10 @@ export interface FuenteDespacho {
 export class ErrorDespacho extends Error {}
 
 export function crearDespachoEditable(opciones: OpcionesDespacho): FuenteDespacho {
-  const v = validarTarifas({ modo: "por-pagar", rm: 0, regiones: 0, extremas: 0, gratisDesde: null, ...opciones.inicial });
+  const v = validarTarifas(opciones.inicial ?? {});
   if (!v.ok) throw new ErrorDespacho(`Las tarifas iniciales no son válidas: ${JSON.stringify(v.errores)}`);
   const base = v.datos;
   const clave = opciones.clave ?? CLAVE_DESPACHO;
-  const zonasExtremas = opciones.zonasExtremas ?? ZONAS_EXTREMAS_POR_DEFECTO;
   const caches = new WeakMap<object, { tarifas: TarifasDespacho; hasta: number }>();
   const SIN_KV = {};
   const llave = (env: EnvBase) => (env.REVIEWS_KV as object | undefined) ?? SIN_KV;
@@ -46,9 +42,8 @@ export function crearDespachoEditable(opciones: OpcionesDespacho): FuenteDespach
   return {
     clave,
     inicial: base,
-    zonasExtremas,
     detallePorPagar: opciones.detallePorPagar,
-    textos: (t) => textosDespacho(t, opciones.detallePorPagar, zonasExtremas),
+    textos: (t) => textosDespacho(t, opciones.detallePorPagar),
     async obtener(env) {
       const ahora = Date.now();
       const c = caches.get(llave(env));

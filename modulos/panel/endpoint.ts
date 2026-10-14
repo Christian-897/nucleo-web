@@ -36,6 +36,7 @@ import type { FuenteCarrusel } from "../carrusel/almacen";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import type { FuenteContenido } from "../contenido/almacen";
 import type { FuenteDespacho } from "../despacho/almacen";
+import { COMUNAS_RM, REGIONES_FUERA_RM } from "../despacho/calculo";
 import { listarActivos, quitarPorCorreo, respuestaCsv } from "../newsletter/servidor";
 import * as acceso from "./acceso";
 import type { ConfigPanel, EnvPanel } from "./config";
@@ -175,7 +176,7 @@ export function crearPanel(opciones: OpcionesPanel) {
         const s = await exigirSesion(c, false);
         if (s instanceof Response) return s;
         const tarifas = await fuente.obtener(c.env);
-        return jsonResponse(200, { tarifas, textos: fuente.textos(tarifas), zonasExtremas: fuente.zonasExtremas, detallePorPagar: fuente.detallePorPagar });
+        return jsonResponse(200, { tarifas, textos: fuente.textos(tarifas), detallePorPagar: fuente.detallePorPagar, comunasRM: COMUNAS_RM, regiones: REGIONES_FUERA_RM });
       },
       onRequestPost: async (c: Ctx) => {
         const fuente = opciones.despacho;

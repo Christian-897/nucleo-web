@@ -245,7 +245,7 @@ async function run() {
   console.log("Despacho por zona:");
 
   const despacho = crearDespachoEditable({
-    inicial: { modo: "tarifa", rm: 3500, regiones: 5500, extremas: 9000, gratisDesde: 40000 },
+    inicial: { pagarAhora: true, pagarAlRecibir: true, centro: 3500, alejada: 5000, cercana: 5500, extrema: 7000, gratisDesde: 40000 },
     detallePorPagar: "Se paga al recibir.",
   });
   const configDespacho = { ...config, despacho };
@@ -264,105 +264,125 @@ async function run() {
     const k = [...datos.keys()].find((x) => x.startsWith("pago:pedido:"))!;
     return JSON.parse(datos.get(k)!) as { monto: number; metadata: Record<string, any> };
   };
+  const RM = "Metropolitana de Santiago";
+  const destino = (region: string, comuna: string) => ({ ...comprador, region, comuna });
+  const gatito = [{ productoId: "gatito", cantidad: 1 }];
 
-  await prueba("el despacho se suma según la región y queda en el pedido", async () => {
-    for (const [region, esperado, zona] of [
-      ["Metropolitana de Santiago", 18000 + 3500, "rm"],
-      ["Valparaíso", 18000 + 5500, "regiones"],
-      ["Magallanes y de la Antártica Chilena", 18000 + 9000, "extremas"],
+  await prueba("el despacho sale de la comuna (RM) o la región, según las casillas", async () => {
+    for (const [region, comuna, esperado, zona] of [
+      [RM, "Providencia", 18000 + 3500, "centro"],
+      [RM, "Buin", 18000 + 5000, "alejada"],
+      [RM, "Lampa", 18000 + 5000, "alejada"],
+      ["Valparaíso", "Viña del Mar", 18000 + 5500, "cercana"],
+      ["Magallanes y de la Antártica Chilena", "Punta Arenas", 18000 + 7000, "extrema"],
     ] as const) {
       const { env, datos } = entorno();
-      const r = await iniciarConDespacho(env, { items: [{ productoId: "gatito", cantidad: 1 }], comprador: { ...comprador, region } });
-      assert.equal(r.status, 200, region);
-      assert.equal(cobrado(), esperado, region);
+      const r = await iniciarConDespacho(env, { items: gatito, comprador: destino(region, comuna), formaDespacho: "ahora" });
+      assert.equal(r.status, 200, comuna);
+      assert.equal(cobrado(), esperado, comuna);
       const p = pedidoGuardado(datos);
-      assert.equal(p.monto, esperado);
       assert.equal(p.metadata.despacho.zona, zona);
+      assert.equal(p.metadata.despacho.forma, "ahora");
     }
   });
 
-  await prueba("el navegador no puede bajar ni inventar el despacho", async () => {
-    const { env } = entorno();
-    const r = await iniciarConDespacho(env, {
-      items: [{ productoId: "gatito", cantidad: 1 }],
-      comprador: { ...comprador, region: "Magallanes y de la Antártica Chilena" },
-      despacho: 0, costoDespacho: 0, monto: 18000, zona: "rm", gratisDesde: 1,
-    });
-    assert.equal(r.status, 200);
-    assert.equal(cobrado(), 27000);
-    const malo = await iniciarConDespacho(env, { items: [{ productoId: "gatito", cantidad: 1 }], comprador: { ...comprador, region: "Santiago Centro" } });
-    assert.equal(malo.status, 400, "una región inventada no pasa (no cae en una zona barata)");
+  await prueba("el comprador elige pagarlo al recibir: no se suma", async () => {
+    const { env, datos } = entorno();
+    await iniciarConDespacho(env, { items: gatito, comprador: destino(RM, "Buin"), formaDespacho: "al-recibir" });
+    assert.equal(cobrado(), 18000);
+    assert.equal(pedidoGuardado(datos).metadata.despacho.forma, "al-recibir");
   });
 
-  await prueba("si el total que vio la persona no calza (tarifas cambiaron), no se cobra y se avisa", async () => {
+  await prueba("el navegador no puede inventar zona, monto ni forma no permitida", async () => {
     const { env } = entorno();
-    const cuerpo = { items: [{ productoId: "gatito", cantidad: 1 }], comprador: { ...comprador, region: "Valparaíso" } };
+    const r = await iniciarConDespacho(env, {
+      items: gatito, comprador: destino("Magallanes y de la Antártica Chilena", "Punta Arenas"),
+      formaDespacho: "ahora", despacho: 0, monto: 18000, zona: "centro", gratisDesde: 1,
+    });
+    assert.equal(r.status, 200);
+    assert.equal(cobrado(), 25000);
+    const comunaFalsa = await iniciarConDespacho(env, { items: gatito, comprador: destino(RM, "Santiago Centro") });
+    assert.equal(comunaFalsa.status, 400, "en la RM la comuna tiene que ser de la lista");
+    const regionFalsa = await iniciarConDespacho(env, { items: gatito, comprador: destino("Santiago", "Providencia") });
+    assert.equal(regionFalsa.status, 400);
+    const { env: env2 } = entorno();
+    await despacho.guardar(env2, { ...despacho.inicial, pagarAlRecibir: false });
+    await iniciarConDespacho(env2, { items: gatito, comprador: destino(RM, "Providencia"), formaDespacho: "al-recibir" });
+    assert.equal(cobrado(), 18000, "pagar al recibir siempre queda disponible para el comprador");
+  });
+
+  await prueba("si el total que vio la persona no calza, no se cobra y se avisa", async () => {
+    const { env } = entorno();
+    const cuerpo = { items: gatito, comprador: destino("Valparaíso", "Viña del Mar"), formaDespacho: "ahora" };
     const r = await iniciarConDespacho(env, { ...cuerpo, totalVisto: 18000 });
     assert.equal(r.status, 400);
     assert.match(((await r.json()) as { message: string }).message, /El total cambió a \$23\.500/);
     assert.equal((await iniciarConDespacho(env, { ...cuerpo, totalVisto: 23500 })).status, 200);
   });
 
-  await prueba("gratis desde el monto (en productos) y nunca cobra despacho a un curso", async () => {
+  await prueba("gratis desde el monto y nunca cobra despacho a un curso", async () => {
     const { env } = entorno();
-    await iniciarConDespacho(env, { items: [{ productoId: "gatito", cantidad: 2 }, { productoId: "curso", cantidad: 1 }], comprador: { ...comprador, region: "Valparaíso" } });
-    assert.equal(cobrado(), 36000 + 15000, "51.000 en productos ≥ 40.000: despacho gratis");
+    await iniciarConDespacho(env, { items: [{ productoId: "gatito", cantidad: 2 }, { productoId: "curso", cantidad: 1 }], comprador: destino("Valparaíso", "Viña"), formaDespacho: "ahora" });
+    assert.equal(cobrado(), 36000 + 15000);
     const { env: env2, datos } = entorno();
     const sinDireccion = { nombre: "Ana", email: "ana@correo.cl", telefono: "+56 9 1234 5678", aceptaPolitica: true };
-    const r = await iniciarConDespacho(env2, { items: [{ productoId: "curso", cantidad: 1 }], comprador: sinDireccion });
-    assert.equal(r.status, 200);
+    assert.equal((await iniciarConDespacho(env2, { items: [{ productoId: "curso", cantidad: 1 }], comprador: sinDireccion })).status, 200);
     assert.equal(cobrado(), 15000);
     assert.equal(pedidoGuardado(datos).metadata.despacho, undefined);
   });
 
-  await prueba("lo que se edita en el panel rige para el próximo pago; por pagar no suma nada", async () => {
+  await prueba("mover una comuna de zona en el panel cambia el cobro siguiente", async () => {
     const { env } = entorno();
-    const g = await despacho.guardar(env, { modo: "tarifa", rm: 0, regiones: 0, extremas: 0, gratisDesde: null });
-    assert.equal(g.ok, true);
-    await iniciarConDespacho(env, { items: [{ productoId: "gatito", cantidad: 1 }], comprador: { ...comprador, region: "Aysén del General Carlos Ibáñez del Campo" } });
-    assert.equal(cobrado(), 18000);
-    await despacho.guardar(env, { modo: "por-pagar", rm: 9000, regiones: 9000, extremas: 9000, gratisDesde: null });
-    await iniciarConDespacho(env, { items: [{ productoId: "gatito", cantidad: 1 }], comprador });
-    assert.equal(cobrado(), 18000);
-    const pub = (await (await tiendaDespacho.despacho.onRequestGet({ env })).json()) as { textos: { corto: string } };
-    assert.equal(pub.textos.corto, "Envíos a todo Chile");
+    const t = await despacho.obtener(env);
+    await despacho.guardar(env, { ...t, comunasCentro: [...t.comunasCentro, "Buin"] });
+    await iniciarConDespacho(env, { items: gatito, comprador: destino(RM, "Buin"), formaDespacho: "ahora" });
+    assert.equal(cobrado(), 21500);
   });
 
-  await prueba("tarifas inválidas no se guardan (negativas, decimales, texto, gratis absurdo)", async () => {
+  await prueba("tarifas inválidas no se guardan", async () => {
     const { env } = entorno();
+    const base = despacho.inicial;
     for (const malo of [
-      { modo: "tarifa", rm: -1, regiones: 0, extremas: 0, gratisDesde: null },
-      { modo: "tarifa", rm: 3500.5, regiones: 0, extremas: 0, gratisDesde: null },
-      { modo: "tarifa", rm: "3500", regiones: 0, extremas: 0, gratisDesde: null },
-      { modo: "tarifa", rm: 0, regiones: 0, extremas: 0, gratisDesde: 5 },
-      { modo: "gratis", rm: 0, regiones: 0, extremas: 0, gratisDesde: null },
-      { modo: "tarifa", rm: 999999999, regiones: 0, extremas: 0, gratisDesde: null },
+      { ...base, centro: -1 }, { ...base, centro: 3500.5 }, { ...base, centro: "3500" }, { ...base, gratisDesde: 5 },
+      { ...base, pagarAhora: "si" }, { ...base, comunasCentro: ["Providencia", "Mendoza"] },
+      { ...base, regionesCercanas: ["Metropolitana de Santiago"] }, { ...base, extrema: 999999999 },
     ]) {
-      assert.equal((await despacho.guardar(env, malo)).ok, false, JSON.stringify(malo));
+      assert.equal((await despacho.guardar(env, malo)).ok, false, JSON.stringify(malo).slice(0, 80));
     }
-    assert.equal(validarTarifas({ modo: "tarifa", rm: 0, regiones: 0, extremas: 0 }).ok, true, "gratisDesde opcional");
+  });
+
+  await prueba("lo guardado con la versión anterior (rm/regiones/extremas) sigue sirviendo", () => {
+    const r = validarTarifas({ modo: "tarifa", rm: 3500, regiones: 5000, extremas: 7000, gratisDesde: 30000 });
+    assert.equal(r.ok, true);
+    if (r.ok) {
+      assert.equal(r.datos.pagarAhora, true);
+      assert.equal(r.datos.centro, 3500);
+      assert.equal(r.datos.extrema, 7000);
+      assert.ok(r.datos.comunasCentro.includes("Providencia"));
+    }
+    const pp = validarTarifas({ modo: "por-pagar", rm: 0, regiones: 0, extremas: 0, gratisDesde: null });
+    assert.ok(pp.ok && pp.datos.pagarAlRecibir && !pp.datos.pagarAhora);
   });
 
   await prueba("los avisos nunca dicen gratis si hay cobro, y la ficha muestra los valores", () => {
-    const t = (x: object) => textosDespacho({ modo: "tarifa", rm: 3500, regiones: 5500, extremas: 9000, gratisDesde: null, ...x }, "Por pagar.");
+    const base = { ...despacho.inicial, gratisDesde: null };
+    const t = (x: object) => textosDespacho({ ...base, ...x }, "Por pagar.");
     assert.equal(t({}).corto, "Envíos a todo Chile");
-    assert.match(t({}).ficha, /Región Metropolitana \$3\.500 · Regiones \$5\.500 · Zonas extremas \$9\.000/);
+    assert.match(t({}).ficha, /Santiago zona centro \$3\.500 · Santiago zona alejada \$5\.000 · Regiones zona cercana \$5\.500 · Regiones zona extrema \$7\.000/);
+    assert.match(t({}).ficha, /También puedes pagarlo al recibir/);
     assert.doesNotMatch(t({}).ficha + t({}).corto + t({}).detalle, /gratis/i);
     assert.equal(t({ gratisDesde: 30000 }).corto, "Despacho gratis desde $30.000");
-    assert.equal(t({ rm: 0, regiones: 0, extremas: 0 }).corto, "Despacho gratis a todo Chile");
-    assert.equal(t({ rm: 5000, regiones: 5000, extremas: 5000 }).ficha, "Despacho: $5.000 a todo Chile.");
-    assert.match(t({ rm: 0 }).ficha, /Región Metropolitana gratis/);
-    assert.equal(calcularDespacho({ modo: "tarifa", rm: 0, regiones: 5000, extremas: 5000, gratisDesde: 1000 }, "Metropolitana de Santiago", 5000).gratisPorMonto, false, "si ya era gratis no se marca 'por monto'");
+    assert.equal(t({ centro: 0, alejada: 0, cercana: 0, extrema: 0 }).corto, "Despacho gratis a todo Chile");
+    assert.equal(t({ pagarAhora: false }).ficha, "Envío por pagar a todo Chile");
+    assert.equal(calcularDespacho({ ...base, centro: 0 }, { region: RM, comuna: "Providencia" }, 5000, "al-recibir").forma, "ahora", "si es gratis no hay nada que pagar al recibir");
   });
 
-  await prueba("correos: el despacho cobrado sale separado; por pagar mantiene su texto", () => {
+  await prueba("correos: despacho cobrado o por pagar, con la zona", () => {
     const base = { orden: "o1", monto: 23500, lineas: [{ productoId: "gatito", nombre: "Gatito", cantidad: 1, precioUnitario: 18000, subtotal: 18000 }], comprador: { ...comprador, notas: "", aceptaPolitica: true as const }, requiereDespacho: true, tieneDigitales: false };
-    const c = correoComprador(configDespacho, { ...base, despacho: { modo: "tarifa", costo: 5500, zona: "regiones", gratisPorMonto: false } });
-    assert.match(c.html, /Despacho<\/td><td[^>]*>\$5\.500 \(Regiones\)/);
-    assert.match(correoTienda(configDespacho, { ...base, despacho: { modo: "tarifa", costo: 0, zona: "rm", gratisPorMonto: true } }).html, /Gratis \(tu compra superó/);
-    const porPagar = correoComprador(config, base);
-    assert.match(porPagar.html, /Envío por pagar<\/strong>: Se paga al recibir/);
-    assert.doesNotMatch(porPagar.html, /Despacho<\/td>/);
+    const c = correoComprador(configDespacho, { ...base, despacho: { forma: "ahora", costo: 5500, zona: "cercana", gratisPorMonto: false } });
+    assert.match(c.html, /Despacho<\/td><td[^>]*>\$5\.500 \(Regiones zona cercana\)/);
+    assert.match(correoTienda(configDespacho, { ...base, despacho: { forma: "al-recibir", costo: 0, zona: "alejada", gratisPorMonto: false } }).html, /Por pagar al recibir \(Santiago zona alejada\)/);
+    assert.match(correoComprador(config, base).html, /Envío por pagar<\/strong>: Se paga al recibir/);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

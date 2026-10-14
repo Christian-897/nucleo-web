@@ -4,7 +4,7 @@ import type { LineaValidada } from "../carrito/tipos";
 import type { ConfigCompra } from "./config";
 import type { Comprador } from "./esquema";
 import type { DespachoPedido } from "./servidor";
-import { ZONAS } from "../despacho/calculo";
+import { nombreZona } from "../despacho/calculo";
 
 export interface DatosCorreoPedido {
   orden: string;
@@ -19,9 +19,11 @@ export interface DatosCorreoPedido {
 /** "$4.500 (Regiones)", "Gratis (compra sobre el monto)" o null si es por pagar. */
 function textoDespachoCobrado(d: DatosCorreoPedido): string | null {
   const x = d.despacho;
-  if (!d.requiereDespacho || !x || x.modo !== "tarifa") return null;
-  const zona = ZONAS.find((z) => z.id === x.zona)?.nombre;
-  if (x.costo > 0) return `${formatearPrecio(x.costo)}${zona ? ` (${zona})` : ""}`;
+  if (!d.requiereDespacho || !x) return null;
+  const zona = nombreZona(x.zona);
+  const enZona = zona ? ` (${zona})` : "";
+  if (x.forma === "al-recibir") return `Por pagar al recibir${enZona}`;
+  if (x.costo > 0) return `${formatearPrecio(x.costo)}${enZona}`;
   return x.gratisPorMonto ? "Gratis (tu compra superó el monto para despacho gratis)" : "Gratis";
 }
 

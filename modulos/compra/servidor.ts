@@ -20,14 +20,15 @@ import { ErrorPedido } from "../pago/tipos";
 import type { ConfigCompra, EnvCompra } from "./config";
 import { type Comprador, validarComprador } from "./esquema";
 import { correoComprador, correoTienda } from "./plantilla-correo";
-import { calcularDespacho, type ModoDespacho, type ZonaDespacho } from "../despacho/calculo";
+import { calcularDespacho, esComunaRM, REGION_RM, type FormaDespacho, type ZonaDespacho } from "../despacho/calculo";
 import { formatearPrecio } from "../carrito/formato";
 
 /** Lo que se cobró de despacho en este pedido (queda en la metadata). */
 export interface DespachoPedido {
-  modo: ModoDespacho;
+  /** "ahora": se cobró con la compra. "al-recibir": lo paga el comprador al courier. */
+  forma: FormaDespacho;
   costo: number;
-  zona?: ZonaDespacho;
+  zona: ZonaDespacho;
   gratisPorMonto: boolean;
 }
 
@@ -84,14 +85,20 @@ export function crearConfigPagoCompra(config: ConfigCompra): ConfigPago {
         requiereDespacho,
         tieneDigitales,
       };
-      // El despacho lo calcula SIEMPRE el servidor, con la región ya validada
-      // y las tarifas vigentes: nada de lo que mande el navegador cuenta.
+      // El despacho lo calcula SIEMPRE el servidor, con la región y la comuna
+      // ya validadas y las tarifas vigentes. Del navegador solo cuenta la forma
+      // elegida (ahora o al recibir), y solo si está permitida.
       let costoDespacho = 0;
       if (requiereDespacho && config.despacho) {
+        const { region, comuna } = comprador.datos;
+        // En la RM la zona depende de la comuna: tiene que ser una de la lista.
+        if (region === REGION_RM && !esComunaRM(comuna ?? "")) {
+          throw new ErrorPedido("Revisa tus datos: elige tu comuna de la lista.");
+        }
         const tarifas = await config.despacho.obtener(env);
-        const c = calcularDespacho(tarifas, comprador.datos.region, carrito.total, config.despacho.zonasExtremas);
+        const c = calcularDespacho(tarifas, { region, comuna }, carrito.total, cuerpo.formaDespacho);
         costoDespacho = c.costo;
-        metadata.despacho = { modo: c.modo, costo: c.costo, gratisPorMonto: c.gratisPorMonto, ...(c.zona ? { zona: c.zona } : {}) };
+        metadata.despacho = { forma: c.forma, costo: c.costo, zona: c.zona, gratisPorMonto: c.gratisPorMonto };
       }
       const monto = carrito.total + costoDespacho;
       // Si el carrito mostró otro total (tarifas cambiadas mientras compraba),

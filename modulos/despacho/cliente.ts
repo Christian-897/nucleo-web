@@ -7,10 +7,11 @@
  */
 import { calcularDespacho, type CalculoDespacho, type TarifasDespacho, type TextosDespacho } from "./calculo";
 
+export { COMUNAS_RM, REGION_RM, nombreZona, type FormaDespacho } from "./calculo";
+
 export interface DatosDespacho {
   tarifas: TarifasDespacho;
   textos: TextosDespacho;
-  zonasExtremas: string[];
 }
 
 let pedido: Promise<DatosDespacho | null> | null = null;
@@ -36,6 +37,11 @@ export async function pintarAvisosDespacho(raiz: ParentNode = document): Promise
   return d;
 }
 
-export function calcularEnNavegador(d: DatosDespacho, region: string | undefined, subtotal: number): CalculoDespacho {
-  return calcularDespacho(d.tarifas, region, subtotal, d.zonasExtremas);
+export function calcularEnNavegador(
+  d: DatosDespacho,
+  destino: { region?: string; comuna?: string },
+  subtotal: number,
+  forma?: unknown
+): CalculoDespacho {
+  return calcularDespacho(d.tarifas, destino, subtotal, forma);
 }
