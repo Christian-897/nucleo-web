@@ -19,6 +19,8 @@ export interface ProductoCatalogo extends Producto {
   imagen?: string;
   /** Fotos extra de la galería, en orden (sin la principal). Máximo MAXIMO_FOTOS - 1. */
   fotos?: string[];
+  /** Código de un video de YouTube (11 caracteres). Opcional. Ver video.ts. */
+  video?: string;
   destacado?: boolean;
 }
 

@@ -15,6 +15,7 @@ import type { FuenteCatalogo } from "../catalogo/almacen";
 import { ID_VALIDO, MAXIMO_FOTOS } from "../catalogo/catalogo";
 import { productoDisponible, reponerStock, unidadesVendidas } from "../catalogo/stock";
 import type { ProductoCatalogo } from "../catalogo/tipos";
+import { idVideoYoutube } from "../catalogo/video";
 import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
 import { borrarFoto, direccionMediaValida, guardarFoto, medidasAceptables, tipoRealDeImagen } from "./imagenes";
@@ -66,6 +67,8 @@ export interface EntradaProducto {
   tipo: "fisico" | "digital";
   descripcion: string;
   destacado: boolean;
+  /** Código del video de YouTube, o null si no tiene. */
+  video: string | null;
 }
 
 /** Valida y limpia lo que mandó la pantalla. Devuelve errores por campo. */
@@ -103,6 +106,13 @@ export function validarEntrada(
   const tipo = o.tipo === "digital" ? "digital" : o.tipo === "fisico" ? "fisico" : null;
   if (!tipo) e.tipo = "Elige si es físico o digital.";
 
+  let video: string | null = null;
+  const textoVideo = typeof o.video === "string" ? o.video.trim() : "";
+  if (textoVideo) {
+    video = idVideoYoutube(textoVideo);
+    if (!video) e.video = "Pega el enlace de un video de YouTube (ej: https://youtu.be/…), o déjalo vacío.";
+  }
+
   const id = o.id === undefined || o.id === null || o.id === "" ? undefined : o.id;
   if (id !== undefined && (typeof id !== "string" || !ID_VALIDO.test(id))) e.id = "Producto inválido.";
 
@@ -118,6 +128,7 @@ export function validarEntrada(
       categoria,
       tipo: tipo as "fisico" | "digital",
       destacado: o.destacado === true,
+      video,
     },
   };
 }
@@ -162,6 +173,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
         descripcion: entrada.descripcion,
         destacado: entrada.destacado,
       };
+      if (entrada.video) producto.video = entrada.video;
+      else delete producto.video;
       if (entrada.disponible !== disponibleAhora) {
         reponer = true;
         if (entrada.disponible === null) delete producto.stock;
@@ -177,6 +190,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
         tipo: entrada.tipo,
         descripcion: entrada.descripcion,
         destacado: entrada.destacado,
+        ...(entrada.video ? { video: entrada.video } : {}),
         ...(entrada.disponible === null ? {} : { stock: entrada.disponible }),
       };
       reponer = true;

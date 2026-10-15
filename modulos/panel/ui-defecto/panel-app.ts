@@ -40,6 +40,7 @@ interface Producto {
   destacado?: boolean;
   imagen?: string;
   fotos?: string[];
+  video?: string;
   disponible: number | null;
   vendidos: number | null;
 }
@@ -395,6 +396,7 @@ function pintarProductos() {
       }
       if (p.tipo === "digital") datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Digital"));
       if (p.destacado) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Destacado"));
+      if (p.video) datos.append(crear("span", "pa-etiqueta pa-etiqueta--suave", "Con video"));
       if (!p.imagen) datos.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Sin foto"));
       info.append(nombre, datos);
       const botones = crear("div", "pa-fila__botones");
@@ -505,6 +507,7 @@ function abrirEditor(p: Producto | null) {
   for (const r of $$<HTMLInputElement>('input[name="tipo"]', f)) r.checked = r.value === (p?.tipo ?? "fisico");
   (f.elements.namedItem("descripcion") as HTMLTextAreaElement).value = p?.descripcion ?? "";
   campo("destacado").checked = Boolean(p?.destacado);
+  campo("video").value = p?.video ? `https://youtu.be/${p.video}` : "";
   soltarVistasPrevias();
   fotosOriginales = p ? [...(p.imagen ? [p.imagen] : []), ...(p.fotos ?? [])] : [];
   fotosEditor = fotosOriginales.map((url) => ({ url }));
@@ -556,6 +559,7 @@ formProducto().addEventListener("submit", async (e) => {
     tipo: String(d.get("tipo") || ""),
     descripcion: String(d.get("descripcion") || ""),
     destacado: d.get("destacado") === "on",
+    video: String(d.get("video") || "").trim(),
   };
   await conBoton(f, async () => {
     const r = await enviar<{ producto: Producto; errores?: Record<string, string> }>(`${API}/productos`, {

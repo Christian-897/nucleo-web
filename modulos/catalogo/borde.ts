@@ -12,7 +12,8 @@
  *  - FICHA: `/producto/<id>/` se arma desde UNA plantilla, llenando los
  *    `data-ficha="campo"`. Así un producto creado hoy ya tiene página.
  *    `data-ficha="galeria"` (una <ul>) recibe las miniaturas de todas las
- *    fotos; con una sola foto se oculta. Ver `galeria.ts` (navegador).
+ *    fotos (y del video, si tiene, al final); con una sola foto y sin
+ *    video se oculta. Ver `galeria.ts` (navegador).
  *  - CATEGORÍAS: si se cambió el nombre o la foto de una categoría en el
  *    panel, todo elemento `data-categoria="<id>"` se pone al día según
  *    `data-categoria-campo` (uno o varios, separados por espacio):
@@ -33,6 +34,7 @@ import { formatearPrecio } from "../carrito/formato";
 import { type CatalogoODinamico, esDinamico, resolverCatalogo } from "./almacen";
 import { ID_VALIDO } from "./catalogo";
 import type { Catalogo, ProductoCatalogo } from "./tipos";
+import { ID_VIDEO } from "./video";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
 interface ElementoHtml {
@@ -104,17 +106,24 @@ export function fotosSeguras(p: Pick<ProductoCatalogo, "imagen" | "fotos">): str
 /**
  * Miniaturas de la galería. Las direcciones ya pasaron por `imagenSegura`
  * (solo letras, números, / _ . -), así que no pueden cerrar el atributo ni
- * meter marcado.
+ * meter marcado. El video es solo su código de YouTube (letras, números,
+ * - y _), revisado aquí de nuevo.
  */
-export function htmlGaleria(fotos: string[]): string {
-  return fotos
-    .map(
-      (f, i) =>
-        `<li><button type="button" class="galeria__mini" data-galeria-foto="${f}" aria-label="Ver foto ${i + 1} de ${fotos.length}"${
-          i === 0 ? ' aria-current="true"' : ""
-        }><img src="${f}" alt="" width="72" height="72" loading="lazy" decoding="async"></button></li>`
-    )
-    .join("");
+export function htmlGaleria(fotos: string[], video?: string): string {
+  const conVideo = typeof video === "string" && ID_VIDEO.test(video);
+  const total = fotos.length + (conVideo ? 1 : 0);
+  const minis = fotos.map(
+    (f, i) =>
+      `<li><button type="button" class="galeria__mini" data-galeria-foto="${f}" aria-label="Ver foto ${i + 1} de ${total}"${
+        i === 0 ? ' aria-current="true"' : ""
+      }><img src="${f}" alt="" width="72" height="72" loading="lazy" decoding="async"></button></li>`
+  );
+  if (conVideo) {
+    minis.push(
+      `<li><button type="button" class="galeria__mini galeria__mini--video" data-galeria-video="${video}" aria-label="Ver el video del producto"><span class="galeria__play" aria-hidden="true">▶</span><span class="galeria__mini-texto">Video</span></button></li>`
+    );
+  }
+  return minis.join("");
 }
 
 // ───────────────────────────── relleno de campos ─────────────────────────────
@@ -355,10 +364,13 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
               } else if (campo === "categoria-nombre") {
                 el.setInnerContent(cat?.nombre ?? "", { html: false });
               } else if (campo === "galeria") {
-                if (galeria.length < 2) el.setAttribute("hidden", "");
+                const video = p.video && ID_VIDEO.test(p.video) ? p.video : undefined;
+                // Con video y sin fotos, la primera miniatura es la foto por defecto.
+                const fotos = video && !galeria.length ? [imagen] : galeria;
+                if (fotos.length + (video ? 1 : 0) < 2) el.setAttribute("hidden", "");
                 else {
                   el.removeAttribute("hidden");
-                  el.setInnerContent(htmlGaleria(galeria), { html: true });
+                  el.setInnerContent(htmlGaleria(fotos, video), { html: true });
                 }
               } else if (campo === "cantidad") {
                 el.setAttribute("max", p.stock === undefined ? "99" : String(Math.max(1, p.stock)));

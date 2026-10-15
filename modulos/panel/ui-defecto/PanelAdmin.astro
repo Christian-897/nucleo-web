@@ -634,6 +634,9 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <p class="pa-error" data-error-campo="tipo"></p>
           <label class="pa-campo">Descripción<textarea name="descripcion" rows="4" maxlength="1000"></textarea></label>
           <p class="pa-error" data-error-campo="descripcion"></p>
+          <label class="pa-campo">Video (opcional)<input name="video" inputmode="url" maxlength="300" placeholder="Pega aquí el enlace de YouTube" autocomplete="off" /></label>
+          <p class="pa-tenue pa-chico">Sube el video a YouTube (puede ser un Short o "no listado"), toca Compartir → Copiar enlace y pégalo aquí. Para quitarlo, deja el campo vacío.</p>
+          <p class="pa-error" data-error-campo="video"></p>
           <label class="pa-casilla"><input type="checkbox" name="destacado" /> Mostrar en "Productos destacados" del inicio</label>
         </div>
       </div>

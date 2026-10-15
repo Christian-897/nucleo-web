@@ -5,6 +5,7 @@
  * llegue a cobrarse.
  */
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
+import { ID_VIDEO } from "./video";
 
 export const ID_VALIDO = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** Fotos por producto, contando la principal. */
@@ -52,6 +53,9 @@ export function validarCatalogo(
       if (!Array.isArray(p.fotos) || p.fotos.length > MAXIMO_FOTOS - 1 || p.fotos.some((f) => !RUTA_FOTO.test(String(f)) || String(f).includes(".."))) {
         throw new ErrorCatalogo(`"${p.id}" tiene fotos inválidas (máximo ${MAXIMO_FOTOS}, solo propias)`);
       }
+    }
+    if (p.video !== undefined && (typeof p.video !== "string" || !ID_VIDEO.test(p.video))) {
+      throw new ErrorCatalogo(`"${p.id}" tiene un video inválido (solo el código de YouTube)`);
     }
     if (idsCategorias.size && !idsCategorias.has(p.categoria)) {
       throw new ErrorCatalogo(`"${p.id}" apunta a una categoría que no existe: "${p.categoria}"`);

@@ -65,4 +65,26 @@ En la ficha:
 ```
 
 El borde llena la `<ul>` con las miniaturas (solo direcciones propias) y la
-oculta si hay una sola foto. El JSON-LD lleva todas las fotos.
+oculta si hay una sola foto y no hay video. El JSON-LD lleva todas las fotos.
+
+## Video del producto (opcional, uno por producto)
+
+En el editor del panel, campo **Video**: la dueña pega el enlace de YouTube
+tal como lo copia (`youtu.be/…`, `youtube.com/watch?v=…`, `youtube.com/shorts/…`).
+Se guarda **solo el código** del video (`video`, 11 caracteres); cualquier
+otro sitio se rechaza. Vacío = sin video.
+
+En la ficha aparece como la última miniatura (▶ Video, clase
+`galeria__mini--video`). Al tocarla, `iniciarGaleria()` pone un `<iframe
+class="galeria__video">` de **youtube-nocookie.com** en el lugar de la foto
+grande; al volver a una foto se quita (deja de sonar). Nada se carga desde
+YouTube hasta que el comprador lo toca.
+
+El sitio debe permitirlo en su CSP (`public/_headers`):
+
+```
+frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com
+```
+
+`idVideoYoutube(texto)`, `urlInsercionVideo(id)` y `ID_VIDEO` están en
+`nucleo-web/catalogo`.

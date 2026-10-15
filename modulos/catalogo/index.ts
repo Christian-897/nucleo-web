@@ -46,3 +46,4 @@ export {
   type EnvBorde,
 } from "./borde";
 export { crearSitemap } from "./sitemap";
+export { ID_VIDEO, idVideoYoutube, urlInsercionVideo, enlaceVideo } from "./video";

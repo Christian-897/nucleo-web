@@ -8,7 +8,7 @@ cliente. Todos van primero en el núcleo.
 | **Mapa de Google** | Mostrar la tienda o punto de retiro | Inserción gratuita (sin clave) que carga solo al tocarla; ajustar `frame-src` en la CSP. Primer uso: Isatin. |
 | **Rutina en pasos** | Pasos numerados con fotos y flechas, editables | Del diseño de Isatin. |
 | **Mosaico con frase** | Fotos en grilla con una frase destacada | Del diseño de Isatin. |
-| **Videos cortos** | Tutoriales verticales (YouTube Shorts o reels de Instagram) | Portada con ▶ y el reproductor se carga al tocar; editable desde el panel (enlace, título, orden, producto). Instagram se ve con su marco blanco y pesa más. |
+| **Videos cortos en la portada** | Tutoriales verticales (YouTube Shorts o reels de Instagram) | Portada con ▶ y el reproductor se carga al tocar; editable desde el panel (enlace, título, orden). Instagram se ve con su marco blanco y pesa más. El video **por producto** ya existe (v0.22.0, YouTube): reutilizar `catalogo/video`. |
 | **Antes y después** | Dos fotos con barra deslizable | Mouse, dedo y teclado; editable desde el panel. Las fotos deben tener el mismo encuadre. |
 | **Redirigir `.pages.dev`** | No duplicar el sitio en Google | 301 hacia el dominio propio. |
 | **Geolocalización** | Punto de retiro más cercano, despacho según comuna o distancia | Después del mapa. |

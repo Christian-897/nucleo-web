@@ -242,6 +242,30 @@ async function run() {
     assert.throws(() => crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", fotos: new Array(20).fill("/media/a-1") }], [{ id: "x", nombre: "X" }]), "máximo 20 contando la principal");
   });
 
+  await prueba("video del producto: solo YouTube, se guarda el código y la miniatura no mete marcado", async () => {
+    const { idVideoYoutube, urlInsercionVideo } = await import("../modulos/catalogo/video");
+    const { htmlGaleria } = await import("../modulos/catalogo/borde");
+    const id = "dQw4w9WgXcQ";
+    for (const e of [
+      `https://youtu.be/${id}`, `https://youtu.be/${id}?si=abc`, `youtu.be/${id}`,
+      `https://www.youtube.com/watch?v=${id}&t=3s`, `https://m.youtube.com/watch?v=${id}`,
+      `https://youtube.com/shorts/${id}?feature=share`, `https://www.youtube.com/embed/${id}`, id,
+    ]) assert.equal(idVideoYoutube(e), id, e);
+    for (const e of [
+      "", "hola", "https://vimeo.com/123456", `https://evil.com/watch?v=${id}`, `https://youtube.com.evil.cl/watch?v=${id}`,
+      `javascript:alert(1)//youtu.be/${id}`, `https://youtu.be/${id}"><script>`, `https://www.youtube.com/watch?v=abc`, 42, null,
+    ]) assert.equal(idVideoYoutube(e), null, String(e));
+    assert.equal(urlInsercionVideo(id), `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`);
+    assert.throws(() => urlInsercionVideo('x"><script>'));
+    const html = htmlGaleria(["/media/a-1"], id);
+    assert.equal((html.match(/<li>/g) || []).length, 2);
+    assert.match(html, /aria-label="Ver foto 1 de 2"/);
+    assert.match(html, new RegExp(`data-galeria-video="${id}"`));
+    assert.doesNotMatch(htmlGaleria(["/media/a-1"], '"><script>alert(1)</script>'), /script|galeria-video/);
+    assert.ok(crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", video: id }], [{ id: "x", nombre: "X" }]));
+    assert.throws(() => crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", video: "https://youtu.be/" + id }], [{ id: "x", nombre: "X" }]));
+  });
+
   await prueba("sitemap con el catálogo editado (y escapado)", async () => {
     const { env } = entorno();
     const fuente = crearCatalogoEditable([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico" }], [{ id: "x", nombre: "X" }]);

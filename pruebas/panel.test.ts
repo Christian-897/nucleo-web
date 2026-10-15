@@ -270,6 +270,23 @@ async function run() {
     assert.ok(e.nombre && e.precio && e.categoria && e.tipo);
   });
 
+  await prueba("video del producto: se guarda el código de YouTube, se rechaza otro sitio y se quita dejándolo vacío", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const base = { id: "gatito", nombre: "Gatito", precio: 21000, disponible: 3, categoria: "peluches", tipo: "fisico" };
+    const guardar = (video: unknown) =>
+      panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", producto: { ...base, video } } }) });
+    const a = await json(await guardar("https://youtube.com/shorts/dQw4w9WgXcQ?feature=share"));
+    assert.equal(a.producto.video, "dQw4w9WgXcQ");
+    const malo = await guardar("https://evil.com/watch?v=dQw4w9WgXcQ");
+    assert.equal(malo.status, 400);
+    assert.ok((await json(malo)).errores.video);
+    assert.equal((await catalogo.obtener(env)).buscar("gatito")!.video, "dQw4w9WgXcQ");
+    const sin = await json(await guardar(""));
+    assert.equal(sin.producto.video, undefined);
+    assert.equal((await catalogo.obtener(env)).buscar("gatito")!.video, undefined);
+  });
+
   await prueba("el precio editado en el panel es el que se cobra", async () => {
     const { env } = entorno();
     const cookie = await instalarYEntrar(env);
