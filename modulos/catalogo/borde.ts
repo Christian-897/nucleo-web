@@ -34,7 +34,7 @@ import { formatearPrecio } from "../carrito/formato";
 import { type CatalogoODinamico, esDinamico, resolverCatalogo } from "./almacen";
 import { ID_VALIDO } from "./catalogo";
 import type { Catalogo, ProductoCatalogo } from "./tipos";
-import { ID_VIDEO } from "./video";
+import { ID_VIDEO, miniaturaVideo } from "./video";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
 interface ElementoHtml {
@@ -120,7 +120,7 @@ export function htmlGaleria(fotos: string[], video?: string): string {
   );
   if (conVideo) {
     minis.push(
-      `<li><button type="button" class="galeria__mini galeria__mini--video" data-galeria-video="${video}" aria-label="Ver el video del producto"><span class="galeria__play" aria-hidden="true">▶</span><span class="galeria__mini-texto">Video</span></button></li>`
+      `<li><button type="button" class="galeria__mini galeria__mini--video" data-galeria-video="${video}" aria-label="Ver el video del producto"><img src="${miniaturaVideo(video!)}" alt="" width="72" height="72" loading="lazy" decoding="async" referrerpolicy="no-referrer"><span class="galeria__play" aria-hidden="true">▶</span></button></li>`
     );
   }
   return minis.join("");

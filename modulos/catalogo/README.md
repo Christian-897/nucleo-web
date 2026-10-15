@@ -74,17 +74,18 @@ tal como lo copia (`youtu.be/…`, `youtube.com/watch?v=…`, `youtube.com/short
 Se guarda **solo el código** del video (`video`, 11 caracteres); cualquier
 otro sitio se rechaza. Vacío = sin video.
 
-En la ficha aparece como la última miniatura (▶ Video, clase
-`galeria__mini--video`). Al tocarla, `iniciarGaleria()` pone un `<iframe
+En la ficha aparece como la última miniatura (clase `galeria__mini--video`):
+la portada del video que pone YouTube con un ▶ encima (`.galeria__play`). Al tocarla, `iniciarGaleria()` pone un `<iframe
 class="galeria__video">` de **youtube-nocookie.com** en el lugar de la foto
-grande; al volver a una foto se quita (deja de sonar). Nada se carga desde
-YouTube hasta que el comprador lo toca.
+grande; al volver a una foto se quita (deja de sonar). Antes de tocarlo solo
+se carga la imagen de portada (sin cookies); el reproductor, recién al tocar.
 
 El sitio debe permitirlo en su CSP (`public/_headers`):
 
 ```
 frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com
+img-src 'self' data: https://i.ytimg.com
 ```
 
-`idVideoYoutube(texto)`, `urlInsercionVideo(id)` y `ID_VIDEO` están en
+`idVideoYoutube(texto)`, `urlInsercionVideo(id)`, `miniaturaVideo(id)` y `ID_VIDEO` están en
 `nucleo-web/catalogo`.

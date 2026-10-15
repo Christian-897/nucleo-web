@@ -6,9 +6,12 @@
  * números, - y _), nunca la dirección: así lo que llega a la página no puede
  * apuntar a otro sitio ni meter marcado.
  *
- * En la ficha se inserta desde youtube-nocookie.com (sin cookies de
- * seguimiento hasta que se reproduce), y solo cuando el comprador lo toca.
- * El sitio debe permitirlo en su CSP:  frame-src https://www.youtube-nocookie.com
+ * En la ficha, la miniatura muestra la portada del video (i.ytimg.com) con
+ * un ▶ encima; el reproductor se inserta desde youtube-nocookie.com (sin
+ * cookies de seguimiento hasta que se reproduce) solo cuando el comprador lo
+ * toca. El sitio debe permitirlo en su CSP:
+ *   frame-src https://www.youtube-nocookie.com
+ *   img-src   https://i.ytimg.com
  */
 
 export const ID_VIDEO = /^[A-Za-z0-9_-]{11}$/;
@@ -43,6 +46,12 @@ export function idVideoYoutube(texto: unknown): string | null {
 export function urlInsercionVideo(id: string): string {
   if (!ID_VIDEO.test(id)) throw new Error("código de video inválido");
   return `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&playsinline=1`;
+}
+
+/** Portada del video que pone YouTube (320×180). */
+export function miniaturaVideo(id: string): string {
+  if (!ID_VIDEO.test(id)) throw new Error("código de video inválido");
+  return `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
 }
 
 /** Enlace para mostrarle a la dueña en el panel. */

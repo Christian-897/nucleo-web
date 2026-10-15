@@ -261,6 +261,7 @@ async function run() {
     assert.equal((html.match(/<li>/g) || []).length, 2);
     assert.match(html, /aria-label="Ver foto 1 de 2"/);
     assert.match(html, new RegExp(`data-galeria-video="${id}"`));
+    assert.match(html, new RegExp(`src="https://i.ytimg.com/vi/${id}/mqdefault.jpg"`));
     assert.doesNotMatch(htmlGaleria(["/media/a-1"], '"><script>alert(1)</script>'), /script|galeria-video/);
     assert.ok(crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", video: id }], [{ id: "x", nombre: "X" }]));
     assert.throws(() => crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", video: "https://youtu.be/" + id }], [{ id: "x", nombre: "X" }]));
