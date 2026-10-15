@@ -7,6 +7,10 @@
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 
 export const ID_VALIDO = /^[a-z0-9][a-z0-9-]{0,63}$/;
+/** Fotos por producto, contando la principal. */
+export const MAXIMO_FOTOS = 20;
+/** Solo fotos propias: subidas al panel (/media/) o del sitio (/img/). */
+const RUTA_FOTO = /^\/(media|img)\/[a-zA-Z0-9/_.-]{1,150}$/;
 const PRECIO_MAXIMO = 100_000_000;
 
 export class ErrorCatalogo extends Error {
@@ -43,6 +47,11 @@ export function validarCatalogo(
     }
     if (p.tipo !== "fisico" && p.tipo !== "digital") {
       throw new ErrorCatalogo(`"${p.id}" debe tener tipo "fisico" o "digital"`);
+    }
+    if (p.fotos !== undefined) {
+      if (!Array.isArray(p.fotos) || p.fotos.length > MAXIMO_FOTOS - 1 || p.fotos.some((f) => !RUTA_FOTO.test(String(f)) || String(f).includes(".."))) {
+        throw new ErrorCatalogo(`"${p.id}" tiene fotos inválidas (máximo ${MAXIMO_FOTOS}, solo propias)`);
+      }
     }
     if (idsCategorias.size && !idsCategorias.has(p.categoria)) {
       throw new ErrorCatalogo(`"${p.id}" apunta a una categoría que no existe: "${p.categoria}"`);

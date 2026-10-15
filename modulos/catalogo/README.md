@@ -39,3 +39,30 @@ Campos: `nombre` (por defecto), `corto`, `imagen` (src), `alt`, `texto` y
 `content` (estos dos con la plantilla, `{nombre}` y `{corto}`). Todo texto va
 escapado. Panel: `functions/api/admin/categorias.ts` (`panel.categorias`) y
 `functions/api/admin/categoria-foto.ts` (`panel.categoriaFoto`).
+
+## Galería de fotos (hasta 20 por producto)
+
+Cada producto tiene `imagen` (la principal: listas, carrito, redes) y
+`fotos` (las demás, en orden; máximo 19). En el panel se suben varias a la
+vez, se ordenan con ◀ ▶ (la primera es la principal) y se quitan con ✕; al
+quitar una o eliminar el producto, la foto se borra del almacén. Las fotos de
+galería se reducen a 1200 px y ~400 KB para que quepan muchas en el KV gratis.
+
+En la ficha:
+
+```astro
+<div class="ficha__foto" data-galeria>
+  <img data-ficha="imagen-alt" data-galeria-principal … />
+  <button type="button" data-galeria-anterior hidden aria-label="Foto anterior">‹</button>
+  <button type="button" data-galeria-siguiente hidden aria-label="Foto siguiente">›</button>
+  <span data-galeria-contador hidden></span>
+</div>
+<ul data-ficha="galeria" hidden></ul>
+<script>
+  import { iniciarGaleria } from "nucleo-web/catalogo/galeria";
+  iniciarGaleria();
+</script>
+```
+
+El borde llena la `<ul>` con las miniaturas (solo direcciones propias) y la
+oculta si hay una sola foto. El JSON-LD lleva todas las fotos.

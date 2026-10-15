@@ -1,5 +1,6 @@
 /**
- * PRODUCTOS DESDE EL PANEL: crear, editar, eliminar y cambiar la foto.
+ * PRODUCTOS DESDE EL PANEL: crear, editar, eliminar y manejar sus fotos
+ * (hasta MAXIMO_FOTOS; la primera es la principal).
  *
  * Todo lo que llega se valida y se limpia aquí (nunca se confía en la
  * pantalla). El id del producto se crea una vez desde el nombre y no
@@ -11,7 +12,7 @@
  */
 import { normalizeInput } from "../../core/validar";
 import type { FuenteCatalogo } from "../catalogo/almacen";
-import { ID_VALIDO } from "../catalogo/catalogo";
+import { ID_VALIDO, MAXIMO_FOTOS } from "../catalogo/catalogo";
 import { productoDisponible, reponerStock, unidadesVendidas } from "../catalogo/stock";
 import type { ProductoCatalogo } from "../catalogo/tipos";
 import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
@@ -40,6 +41,19 @@ export function idDesdeNombre(nombre: string, usados: Set<string>): string {
 /** Imagen aceptable: una foto subida al panel o una del propio sitio. */
 function imagenValida(v: unknown): v is string {
   return direccionMediaValida(v) || (typeof v === "string" && /^\/img\/[a-zA-Z0-9/_.-]{1,150}$/.test(v) && !v.includes(".."));
+}
+
+/** Todas las fotos de un producto, la principal primero. */
+export function fotosDe(p: Pick<ProductoCatalogo, "imagen" | "fotos">): string[] {
+  return [...(p.imagen ? [p.imagen] : []), ...(p.fotos ?? [])];
+}
+
+/** Deja `fotos` como galería: la primera pasa a ser la principal. */
+function ponerFotos(p: ProductoCatalogo, todas: string[]) {
+  if (todas.length) p.imagen = todas[0];
+  else delete p.imagen;
+  if (todas.length > 1) p.fotos = todas.slice(1);
+  else delete p.fotos;
 }
 
 export interface EntradaProducto {
@@ -182,9 +196,9 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     if (!quitado) return jsonResponse(404, { message: "Ese producto ya no existe." });
     const r = await catalogo.guardar(ctx.env, vigente.productos.filter((p) => p.id !== id));
     if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudo eliminar." });
-    // La foto se borra DESPUÉS de sacar el producto: si algo falla a mitad,
+    // Las fotos se borran DESPUÉS de sacar el producto: si algo falla a mitad,
     // nunca queda un producto apuntando a una foto que no existe.
-    if (quitado.imagen) await borrarFoto(ctx.env, quitado.imagen);
+    for (const f of fotosDe(quitado)) await borrarFoto(ctx.env, f);
     await reponerStock(ctx.env, id);
     return jsonResponse(200, { ok: true });
   }
@@ -195,6 +209,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     const cuerpo = await leerJson(ctx.request);
     if (!cuerpo) return jsonResponse(400, { message: "Solicitud inválida." });
     if (cuerpo.accion === "eliminar") return eliminar(ctx, cuerpo.id);
+    if (cuerpo.accion === "fotos") return ordenarFotos(ctx, cuerpo.id, cuerpo.fotos);
     if (cuerpo.accion === "guardar") {
       const v = validarEntrada(cuerpo.producto, catalogo.categorias);
       if (!v.ok) return jsonResponse(400, { message: "Revisa los campos marcados.", errores: v.errores });
@@ -203,7 +218,37 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     return jsonResponse(400, { message: "Esa acción no existe." });
   }
 
-  /** POST multipart: id + archivo. La foto ya viene reducida desde el navegador. */
+  /**
+   * Orden final de las fotos de un producto: la primera es la principal.
+   * Solo se aceptan fotos que el producto YA tiene (reordenar o quitar);
+   * las que se quitan se borran del almacén.
+   */
+  async function ordenarFotos(ctx: Ctx, id: unknown, fotos: unknown): Promise<Response> {
+    if (typeof id !== "string" || !ID_VALIDO.test(id)) return jsonResponse(400, { message: "Producto inválido." });
+    if (!Array.isArray(fotos) || fotos.length > MAXIMO_FOTOS || fotos.some((f) => typeof f !== "string")) {
+      return jsonResponse(400, { message: "La lista de fotos no es válida." });
+    }
+    const vigente = await catalogo.obtener(ctx.env);
+    const lista = vigente.productos.map((p) => ({ ...p }));
+    const i = lista.findIndex((p) => p.id === id);
+    if (i < 0) return jsonResponse(404, { message: "Ese producto ya no existe. Recarga la página." });
+    const actuales = fotosDe(lista[i]);
+    const nuevas = [...new Set(fotos as string[])];
+    if (nuevas.some((f) => !actuales.includes(f))) {
+      return jsonResponse(400, { message: "Las fotos cambiaron mientras editabas. Recarga la página." });
+    }
+    ponerFotos(lista[i], nuevas);
+    const r = await catalogo.guardar(ctx.env, lista);
+    if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudieron guardar las fotos." });
+    for (const f of actuales) if (!nuevas.includes(f)) await borrarFoto(ctx.env, f);
+    return jsonResponse(200, { ok: true, imagen: lista[i].imagen ?? null, fotos: lista[i].fotos ?? [] });
+  }
+
+  /**
+   * POST multipart: id + archivo (+ modo). La foto ya viene reducida desde el navegador.
+   *   modo "agregar": se suma al final de la galería (hasta MAXIMO_FOTOS).
+   *   sin modo: reemplaza la foto principal (como antes).
+   */
   async function foto(ctx: Ctx): Promise<Response> {
     const s = await exigirSesion(ctx, true);
     if (s instanceof Response) return s;
@@ -219,6 +264,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     }
     const id = form.get("id");
     const archivo = form.get("archivo");
+    const agregar = form.get("modo") === "agregar";
     if (typeof id !== "string" || !ID_VALIDO.test(id)) return jsonResponse(400, { message: "Producto inválido." });
     if (!archivo || typeof archivo === "string") return jsonResponse(400, { message: "No llegó ninguna foto." });
     if (archivo.size === 0) return jsonResponse(400, { message: "El archivo está vacío." });
@@ -235,18 +281,22 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     const lista = vigente.productos.map((p) => ({ ...p }));
     const i = lista.findIndex((p) => p.id === id);
     if (i < 0) return jsonResponse(404, { message: "Ese producto ya no existe. Recarga la página." });
+    if (agregar && fotosDe(lista[i]).length >= MAXIMO_FOTOS) {
+      return jsonResponse(400, { message: `Cada producto puede tener hasta ${MAXIMO_FOTOS} fotos.` });
+    }
 
     const guardada = await guardarFoto(ctx.env, `producto-${id}`, datos, tipo);
     if (!guardada.ok || !guardada.direccion) return jsonResponse(500, { message: "No se pudo guardar la foto." });
-    const anterior = lista[i].imagen;
-    lista[i].imagen = guardada.direccion;
+    const anterior = agregar ? undefined : lista[i].imagen;
+    if (agregar) ponerFotos(lista[i], [...fotosDe(lista[i]), guardada.direccion]);
+    else lista[i].imagen = guardada.direccion;
     const r = await catalogo.guardar(ctx.env, lista);
     if (!r.ok) {
       await borrarFoto(ctx.env, guardada.direccion);
       return jsonResponse(500, { message: r.motivo || "No se pudo guardar la foto." });
     }
     if (anterior && anterior !== guardada.direccion) await borrarFoto(ctx.env, anterior);
-    return jsonResponse(200, { ok: true, imagen: guardada.direccion });
+    return jsonResponse(200, { ok: true, imagen: guardada.direccion, fotos: fotosDe(lista[i]) });
   }
 
   return { listar, post, foto, imagenValida };

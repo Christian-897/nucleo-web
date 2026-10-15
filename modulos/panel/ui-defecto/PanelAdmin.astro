@@ -605,12 +605,13 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <h2 id="pa-editor-titulo" data-editor-titulo>Producto</h2>
       <div class="pa-editor">
         <div class="pa-editor__foto">
-          <img data-editor-foto alt="" width="240" height="240" />
-          <label class="pa-boton pa-boton--suave pa-archivo">
-            Elegir foto
-            <input type="file" accept="image/jpeg,image/png,image/webp" data-editor-archivo />
+          <p class="pa-fotos__titulo">Fotos <span class="pa-tenue" data-editor-cuenta></span></p>
+          <ul class="pa-fotos" data-editor-fotos aria-label="Fotos del producto"></ul>
+          <label class="pa-boton pa-boton--suave pa-archivo" data-editor-agregar>
+            Agregar fotos
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple data-editor-archivo />
           </label>
-          <p class="pa-tenue pa-chico">Se recorta cuadrada al centro y se achica sola.</p>
+          <p class="pa-tenue pa-chico">La primera es la principal: la que se ve en la tienda y en el carrito. Puedes elegir varias a la vez; se recortan cuadradas y se achican solas.</p>
           <p class="pa-error" role="alert" data-error-foto></p>
         </div>
         <div class="pa-editor__campos">
@@ -929,6 +930,17 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-editor__foto img { width: 240px; height: 240px; object-fit: cover; border-radius: 12px; background: var(--pa-borde); }
   .pa-editor__campos { display: grid; gap: 8px; align-content: start; }
   .pa-archivo { position: relative; overflow: hidden; }
+  .pa-fotos__titulo { margin: 0; font-weight: 700; }
+  .pa-fotos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .pa-fotos:empty::before { content: "Todavía sin fotos."; grid-column: 1 / -1; color: var(--pa-suave); font-size: .9rem; padding: 18px 8px; text-align: center; border: 1.5px dashed var(--pa-borde); border-radius: 12px; }
+  .pa-fotos li { position: relative; display: grid; gap: 4px; }
+  .pa-editor__foto .pa-fotos img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: var(--pa-borde); }
+  .pa-fotos li:first-child img { outline: 3px solid var(--pa-acento); outline-offset: -3px; }
+  .pa-fotos__principal { position: absolute; top: 4px; left: 4px; background: var(--pa-acento); color: #fff; font-size: .7rem; font-weight: 700; border-radius: 999px; padding: 1px 7px; }
+  .pa-fotos__botones { display: flex; justify-content: space-between; gap: 2px; }
+  .pa-fotos__botones button { flex: 1; min-height: 32px; border: 1px solid var(--pa-borde); background: #fff; border-radius: 8px; cursor: pointer; font-size: .9rem; color: var(--pa-tinta); padding: 0; }
+  .pa-fotos__botones button:hover:not(:disabled) { border-color: var(--pa-acento); color: var(--pa-acento-oscuro); }
+  .pa-fotos__botones button:disabled { opacity: .35; cursor: default; }
   .pa-archivo input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
   .pa-pie-dialogo { display: flex; justify-content: end; gap: 8px; }
   .pa-editor--ancho { grid-template-columns: 320px 1fr; }

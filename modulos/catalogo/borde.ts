@@ -11,6 +11,8 @@
  *    `data-cat="campo"`.
  *  - FICHA: `/producto/<id>/` se arma desde UNA plantilla, llenando los
  *    `data-ficha="campo"`. Así un producto creado hoy ya tiene página.
+ *    `data-ficha="galeria"` (una <ul>) recibe las miniaturas de todas las
+ *    fotos; con una sola foto se oculta. Ver `galeria.ts` (navegador).
  *  - CATEGORÍAS: si se cambió el nombre o la foto de una categoría en el
  *    panel, todo elemento `data-categoria="<id>"` se pone al día según
  *    `data-categoria-campo` (uno o varios, separados por espacio):
@@ -91,6 +93,28 @@ export function imagenSegura(valor: unknown, porDefecto: string): string {
   return typeof valor === "string" && /^\/(media|img)\/[a-zA-Z0-9/_.-]{1,150}$/.test(valor) && !valor.includes("..")
     ? valor
     : porDefecto;
+}
+
+/** Todas las fotos válidas del producto, la principal primero (sin repetir). */
+export function fotosSeguras(p: Pick<ProductoCatalogo, "imagen" | "fotos">): string[] {
+  const todas = [p.imagen, ...(p.fotos ?? [])].map((f) => imagenSegura(f, "")).filter(Boolean);
+  return [...new Set(todas)];
+}
+
+/**
+ * Miniaturas de la galería. Las direcciones ya pasaron por `imagenSegura`
+ * (solo letras, números, / _ . -), así que no pueden cerrar el atributo ni
+ * meter marcado.
+ */
+export function htmlGaleria(fotos: string[]): string {
+  return fotos
+    .map(
+      (f, i) =>
+        `<li><button type="button" class="galeria__mini" data-galeria-foto="${f}" aria-label="Ver foto ${i + 1} de ${fotos.length}"${
+          i === 0 ? ' aria-current="true"' : ""
+        }><img src="${f}" alt="" width="72" height="72" loading="lazy" decoding="async"></button></li>`
+    )
+    .join("");
 }
 
 // ───────────────────────────── relleno de campos ─────────────────────────────
@@ -288,13 +312,14 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
       const canonica = new URL(`/producto/${p.id}/`, opciones.sitio.dominio).href;
       const imagen = imagenSegura(p.imagen, opciones.imagenPorDefecto);
       const imagenAbs = new URL(imagen, opciones.sitio.dominio).href;
+      const galeria = fotosSeguras(p);
       const descripcion = (p.descripcion || p.nombre).slice(0, 300);
       const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",
         name: p.nombre,
         description: descripcion,
-        image: imagenAbs,
+        image: galeria.length > 1 ? galeria.map((f) => new URL(f, opciones.sitio.dominio).href) : imagenAbs,
         sku: p.id,
         brand: { "@type": "Brand", name: opciones.sitio.nombre },
         offers: {
@@ -329,6 +354,12 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
                 el.setAttribute("href", `/tienda/${p.categoria}/`);
               } else if (campo === "categoria-nombre") {
                 el.setInnerContent(cat?.nombre ?? "", { html: false });
+              } else if (campo === "galeria") {
+                if (galeria.length < 2) el.setAttribute("hidden", "");
+                else {
+                  el.removeAttribute("hidden");
+                  el.setInnerContent(htmlGaleria(galeria), { html: true });
+                }
               } else if (campo === "cantidad") {
                 el.setAttribute("max", p.stock === undefined ? "99" : String(Math.max(1, p.stock)));
               } else {

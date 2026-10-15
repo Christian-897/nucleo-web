@@ -15,7 +15,10 @@ export interface ProductoCatalogo extends Producto {
   /** "digital" no requiere despacho (cursos, patrones en PDF). */
   tipo: "fisico" | "digital";
   descripcion?: string;
+  /** Foto principal (la de las listas y el carrito). */
   imagen?: string;
+  /** Fotos extra de la galería, en orden (sin la principal). Máximo MAXIMO_FOTOS - 1. */
+  fotos?: string[];
   destacado?: boolean;
 }
 

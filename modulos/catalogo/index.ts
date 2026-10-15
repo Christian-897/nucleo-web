@@ -4,7 +4,7 @@
  *   import { crearCatalogo, fuenteCarrito, registrarVenta } from "nucleo-web/catalogo";
  */
 export * from "./tipos";
-export { crearCatalogo, validarCatalogo, ErrorCatalogo, ID_VALIDO } from "./catalogo";
+export { crearCatalogo, validarCatalogo, ErrorCatalogo, ID_VALIDO, MAXIMO_FOTOS } from "./catalogo";
 export {
   fuenteCarrito,
   productoDisponible,

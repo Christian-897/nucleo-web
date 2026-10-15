@@ -360,6 +360,75 @@ async function run() {
     assert.equal((await catalogo.obtener(env)).buscar("gatito")!.imagen, r2.imagen);
   });
 
+  const agregar = (env: EnvPanel, cookie: string, id = "gatito") => {
+    const f = formFoto(id, png(800, 800));
+    f.set("modo", "agregar");
+    return panel.productoFoto.onRequestPost({ env, request: req("/x", { cookie, form: f }) });
+  };
+
+  await prueba("galería: agregar suma al final; la primera queda como principal", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const a = await json(await agregar(env, cookie));
+    const b = await json(await agregar(env, cookie));
+    const c = await json(await agregar(env, cookie));
+    const p = (await catalogo.obtener(env)).buscar("gatito")!;
+    // El gatito ya traía foto del sitio: esa sigue de principal.
+    assert.equal(p.imagen, "/img/productos/gatito.webp");
+    assert.deepEqual(p.fotos, [a.fotos[1], b.fotos[2], c.fotos[3]]);
+    assert.equal(c.fotos.length, 4);
+  });
+
+  await prueba("galería: máximo 20 fotos por producto", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    for (let i = 0; i < 19; i++) assert.equal((await agregar(env, cookie)).status, 200);
+    const extra = await agregar(env, cookie);
+    assert.equal(extra.status, 400);
+    assert.match((await json(extra)).message, /hasta 20 fotos/);
+    assert.equal((await catalogo.obtener(env)).buscar("gatito")!.fotos!.length, 19);
+  });
+
+  await prueba("galería: reordenar cambia la principal; quitar borra del almacén; no se aceptan fotos ajenas", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    await agregar(env, cookie);
+    const r = await json(await agregar(env, cookie));
+    const [principal, f1, f2] = r.fotos as string[];
+    const ordenar = (fotos: unknown, id = "gatito") =>
+      panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "fotos", id, fotos } }) });
+    assert.equal((await ordenar([f2, principal, f1])).status, 200);
+    let p = (await catalogo.obtener(env)).buscar("gatito")!;
+    assert.equal(p.imagen, f2);
+    assert.deepEqual(p.fotos, [principal, f1]);
+    // Una foto que no es del producto (de otro, o inventada) no entra.
+    assert.equal((await ordenar([f2, "/media/producto-otro-aaaaaaaaaaaa"])).status, 400);
+    assert.equal((await ordenar([f2, "https://malo.cl/x.png"])).status, 400);
+    assert.equal((await ordenar(new Array(21).fill(f2))).status, 400);
+    // Quitar f1: se borra del almacén.
+    assert.equal((await ordenar([f2, principal])).status, 200);
+    assert.equal(datos.has("foto:" + f1.slice(7)), false);
+    p = (await catalogo.obtener(env)).buscar("gatito")!;
+    assert.deepEqual([p.imagen, ...(p.fotos ?? [])], [f2, principal]);
+    // Quitar todas: queda sin foto (la tienda usa la de reemplazo).
+    assert.equal((await ordenar([])).status, 200);
+    p = (await catalogo.obtener(env)).buscar("gatito")!;
+    assert.equal(p.imagen, undefined);
+    assert.equal(p.fotos, undefined);
+    assert.equal(datos.has("foto:" + f2.slice(7)), false);
+    // Sin sesión, nada.
+    assert.equal((await panel.productos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "fotos", id: "gatito", fotos: [] } }) })).status, 401);
+  });
+
+  await prueba("galería: eliminar el producto borra todas sus fotos", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    await agregar(env, cookie);
+    const r = await json(await agregar(env, cookie));
+    await panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "eliminar", id: "gatito" } }) });
+    for (const f of (r.fotos as string[]).filter((x) => x.startsWith("/media/"))) assert.equal(datos.has("foto:" + f.slice(7)), false);
+  });
+
   await prueba("/media no sirve rutas raras ni archivos que no son fotos", async () => {
     const { env } = entorno();
     assert.equal((await panel.media.onRequestGet({ env, params: { id: "../admin:usuario" } })).status, 404);

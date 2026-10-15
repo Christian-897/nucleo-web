@@ -230,6 +230,18 @@ async function run() {
     assert.equal(idDeRuta("/producto/Gatito<script>/"), null);
   });
 
+  await prueba("galería en la ficha: solo fotos propias, sin repetir, y las miniaturas no pueden meter marcado", async () => {
+    const { fotosSeguras, htmlGaleria } = await import("../modulos/catalogo/borde");
+    const fotos = fotosSeguras({ imagen: "/media/a-1", fotos: ["/media/b-2", "javascript:alert(1)", "/img/x.webp", "/media/a-1", '/media/c"><script>'] });
+    assert.deepEqual(fotos, ["/media/a-1", "/media/b-2", "/img/x.webp"]);
+    const html = htmlGaleria(fotos);
+    assert.equal((html.match(/<li>/g) || []).length, 3);
+    assert.match(html, /aria-label="Ver foto 2 de 3"/);
+    assert.doesNotMatch(html, /script|javascript/);
+    assert.throws(() => crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", fotos: ["https://otro.cl/f.jpg"] }], [{ id: "x", nombre: "X" }]));
+    assert.throws(() => crearCatalogo([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico", fotos: new Array(20).fill("/media/a-1") }], [{ id: "x", nombre: "X" }]), "máximo 20 contando la principal");
+  });
+
   await prueba("sitemap con el catálogo editado (y escapado)", async () => {
     const { env } = entorno();
     const fuente = crearCatalogoEditable([{ id: "a", nombre: "A", precio: 1, categoria: "x", tipo: "fisico" }], [{ id: "x", nombre: "X" }]);

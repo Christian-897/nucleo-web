@@ -121,6 +121,15 @@ export async function subirFotoProducto(id: string, foto: File, base = "/api/adm
   return llamar<{ imagen: string }>(`${base}/producto-foto`, { method: "POST", body: form });
 }
 
+/** Agrega una foto a la galería del producto (ya reducida). Devuelve todas sus fotos, la principal primero. */
+export async function agregarFotoProducto(id: string, foto: File, base = "/api/admin") {
+  const form = new FormData();
+  form.set("id", id);
+  form.set("modo", "agregar");
+  form.set("archivo", foto);
+  return llamar<{ imagen: string; fotos: string[] }>(`${base}/producto-foto`, { method: "POST", body: form });
+}
+
 /** Sube la foto de un boletín (JPG, ya reducida). */
 export async function subirFotoBoletin(foto: File, base = "/api/admin") {
   const form = new FormData();

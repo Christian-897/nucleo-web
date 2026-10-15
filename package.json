@@ -1,6 +1,6 @@
 {
   "name": "nucleo-web",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter, cotización, aviso de construcción, contacto (WhatsApp y redes), carrusel de portada, diseño y textos editables (colores, tipografías, textos), métricas de ventas, visitas y panel de administración.",
   "type": "module",
   "exports": {
@@ -21,6 +21,7 @@
     "./newsletter/cliente": "./modulos/newsletter/cliente.ts",
     "./catalogo": "./modulos/catalogo/index.ts",
     "./catalogo/cliente": "./modulos/catalogo/cliente.ts",
+    "./catalogo/galeria": "./modulos/catalogo/galeria.ts",
     "./compra": "./modulos/compra/index.ts",
     "./compra/cliente": "./modulos/compra/cliente.ts",
     "./despacho": "./modulos/despacho/index.ts",

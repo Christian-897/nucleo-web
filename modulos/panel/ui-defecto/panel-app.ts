@@ -3,7 +3,7 @@
  * REGLA: lo que llega del servidor se escribe SIEMPRE con textContent o
  * atributos; nunca con innerHTML.
  */
-import { derivarClave, enviar, obtener, reducirFoto, subirFotoBoletin, subirFotoCarrusel, subirFotoCategoria, subirFotoProducto } from "../cliente";
+import { agregarFotoProducto, derivarClave, enviar, obtener, reducirFoto, subirFotoBoletin, subirFotoCarrusel, subirFotoCategoria } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
 import { ayudaVendidos, textoStock } from "../texto-stock";
 import {
@@ -39,6 +39,7 @@ interface Producto {
   descripcion?: string;
   destacado?: boolean;
   imagen?: string;
+  fotos?: string[];
   disponible: number | null;
   vendidos: number | null;
 }
@@ -428,12 +429,66 @@ async function eliminarProducto(p: Producto) {
 const editor = () => $("[data-editor]") as HTMLDialogElement;
 const formProducto = () => $<HTMLFormElement>('[data-form="producto"]');
 let editando: Producto | null = null;
-let fotoPendiente: File | null = null;
-let urlVistaPrevia = "";
+
+/** Fotos del editor: las ya guardadas (url) y las nuevas que se suben al Guardar (archivo). */
+interface FotoEditor {
+  url: string;
+  archivo?: File;
+}
+const MAXIMO_FOTOS = 20;
+let fotosEditor: FotoEditor[] = [];
+let fotosOriginales: string[] = [];
+
+function soltarVistasPrevias() {
+  for (const f of fotosEditor) if (f.archivo) URL.revokeObjectURL(f.url);
+}
+
+function pintarFotosEditor() {
+  const lista = $("[data-editor-fotos]");
+  const total = fotosEditor.length;
+  lista.replaceChildren(
+    ...fotosEditor.map((f, i) => {
+      const li = crear("li");
+      const img = crear("img");
+      img.src = f.url;
+      img.alt = i === 0 ? "Foto principal" : `Foto ${i + 1}`;
+      img.width = 96;
+      img.height = 96;
+      li.append(img);
+      if (i === 0) li.append(crear("span", "pa-fotos__principal", "Principal"));
+      const botones = crear("div", "pa-fotos__botones");
+      const boton = (texto: string, etiqueta: string, accion: () => void, desactivado = false) => {
+        const b = crear("button", "", texto);
+        b.type = "button";
+        b.title = etiqueta;
+        b.setAttribute("aria-label", etiqueta);
+        b.disabled = desactivado;
+        b.addEventListener("click", accion);
+        return b;
+      };
+      const mover = (a: number, b: number) => {
+        [fotosEditor[a], fotosEditor[b]] = [fotosEditor[b], fotosEditor[a]];
+        pintarFotosEditor();
+      };
+      botones.append(
+        boton("◀", `Mover la foto ${i + 1} a la izquierda`, () => mover(i, i - 1), i === 0),
+        boton("✕", `Quitar la foto ${i + 1}`, () => {
+          const [quitada] = fotosEditor.splice(i, 1);
+          if (quitada.archivo) URL.revokeObjectURL(quitada.url);
+          pintarFotosEditor();
+        }),
+        boton("▶", `Mover la foto ${i + 1} a la derecha`, () => mover(i, i + 1), i === total - 1)
+      );
+      li.append(botones);
+      return li;
+    })
+  );
+  $("[data-editor-cuenta]").textContent = `(${total} de ${MAXIMO_FOTOS})`;
+  $("[data-editor-agregar]").hidden = total >= MAXIMO_FOTOS;
+}
 
 function abrirEditor(p: Producto | null) {
   editando = p;
-  fotoPendiente = null;
   const f = formProducto();
   f.reset();
   errorDe(f);
@@ -450,35 +505,39 @@ function abrirEditor(p: Producto | null) {
   for (const r of $$<HTMLInputElement>('input[name="tipo"]', f)) r.checked = r.value === (p?.tipo ?? "fisico");
   (f.elements.namedItem("descripcion") as HTMLTextAreaElement).value = p?.descripcion ?? "";
   campo("destacado").checked = Boolean(p?.destacado);
-  const img = $<HTMLImageElement>("[data-editor-foto]");
-  if (urlVistaPrevia) URL.revokeObjectURL(urlVistaPrevia);
-  urlVistaPrevia = "";
-  img.src = p?.imagen || "";
-  img.alt = p ? `Foto de ${p.nombre}` : "";
+  soltarVistasPrevias();
+  fotosOriginales = p ? [...(p.imagen ? [p.imagen] : []), ...(p.fotos ?? [])] : [];
+  fotosEditor = fotosOriginales.map((url) => ({ url }));
+  pintarFotosEditor();
   editor().showModal();
   campo("nombre").focus();
 }
 $("[data-nuevo-producto]").addEventListener("click", () => abrirEditor(null));
 $("[data-cerrar-editor]").addEventListener("click", () => editor().close());
+editor().addEventListener("close", soltarVistasPrevias);
 
 $<HTMLInputElement>("[data-editor-archivo]").addEventListener("change", async (e) => {
   const input = e.currentTarget as HTMLInputElement;
-  const archivo = input.files?.[0];
+  const archivos = [...(input.files ?? [])];
   input.value = "";
   const error = $("[data-error-foto]");
   error.textContent = "";
-  if (!archivo) return;
-  try {
-    error.textContent = "Preparando la foto…";
-    fotoPendiente = await reducirFoto(archivo);
-    error.textContent = "";
-    if (urlVistaPrevia) URL.revokeObjectURL(urlVistaPrevia);
-    urlVistaPrevia = URL.createObjectURL(fotoPendiente);
-    $<HTMLImageElement>("[data-editor-foto]").src = urlVistaPrevia;
-  } catch (err) {
-    fotoPendiente = null;
-    error.textContent = err instanceof Error ? err.message : "No pudimos usar esa foto.";
+  if (!archivos.length) return;
+  const libres = MAXIMO_FOTOS - fotosEditor.length;
+  if (archivos.length > libres) error.textContent = `Solo caben ${libres} fotos más (máximo ${MAXIMO_FOTOS}). Se agregaron las primeras.`;
+  const malas: string[] = [];
+  for (const [n, archivo] of archivos.slice(0, libres).entries()) {
+    $("[data-editor-cuenta]").textContent = `(preparando ${n + 1} de ${Math.min(archivos.length, libres)}…)`;
+    try {
+      // Galería: 1200 px y hasta ~400 KB, para que quepan muchas fotos en el almacén gratis.
+      const lista = await reducirFoto(archivo, 1200, 400 * 1024);
+      fotosEditor.push({ url: URL.createObjectURL(lista), archivo: lista });
+    } catch {
+      malas.push(archivo.name);
+    }
   }
+  if (malas.length) error.textContent = `No pudimos usar: ${malas.join(", ")}. Usa fotos JPG, PNG o WebP.`;
+  pintarFotosEditor();
 });
 
 formProducto().addEventListener("submit", async (e) => {
@@ -512,15 +571,37 @@ formProducto().addEventListener("submit", async (e) => {
       }
       return errorDe(f, r.datos.message || "No se pudo guardar.");
     }
-    if (fotoPendiente) {
-      const subida = await subirFotoProducto(r.datos.producto.id, fotoPendiente);
+    const id = r.datos.producto.id;
+    const errorFoto = $("[data-error-foto]");
+    // 1) Sube las fotos nuevas, una por una (cada una se suma al final).
+    const nuevas = fotosEditor.filter((x) => x.archivo);
+    for (const [n, foto] of nuevas.entries()) {
+      errorFoto.textContent = `Subiendo foto ${n + 1} de ${nuevas.length}…`;
+      const subida = await agregarFotoProducto(id, foto.archivo!);
+      if (siSeCerro(subida.status)) return;
       if (!subida.ok) {
+        errorFoto.textContent = `${subida.datos.message || "Una foto no se pudo subir."} Las demás quedaron guardadas: revisa y vuelve a Guardar.`;
         await cargarProductos();
-        $("[data-error-foto]").textContent = subida.datos.message || "El producto se guardó, pero la foto no.";
-        editando = productos.find((p) => p.id === r.datos.producto.id) ?? null;
+        editando = productos.find((p) => p.id === id) ?? null;
+        return;
+      }
+      URL.revokeObjectURL(foto.url);
+      foto.url = subida.datos.fotos[subida.datos.fotos.length - 1];
+      delete foto.archivo;
+    }
+    errorFoto.textContent = "";
+    // 2) Orden final (y las quitadas): solo si algo cambió.
+    const final = fotosEditor.map((x) => x.url);
+    if (nuevas.length || final.join("|") !== fotosOriginales.join("|")) {
+      const o = await enviar(`${API}/productos`, { accion: "fotos", id, fotos: final });
+      if (siSeCerro(o.status)) return;
+      if (!o.ok) {
+        errorFoto.textContent = o.datos.message || "El producto se guardó, pero no el orden de las fotos.";
+        await cargarProductos();
         return;
       }
     }
+    fotosEditor = [];
     editor().close();
     avisar("Guardado. La tienda se actualiza en unos segundos.");
     await cargarProductos();
