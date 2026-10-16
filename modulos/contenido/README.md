@@ -9,6 +9,8 @@ textos**), sin reconstruir el sitio:
   combinaciones de un clic. Se sirven desde el propio sitio.
 - **Textos, enlaces de contacto y fotos**: los que el sitio declare en su
   esquema.
+- **Ubicación** (`tipo: "mapa"`): una dirección para el mapa de
+  `nucleo-web/mapa`; `data-c-href` con ese campo arma "Cómo llegar".
 
 Nada escrito en el panel se vuelve HTML o CSS: los textos se insertan
 como texto, los colores solo pasan con formato `#rrggbb`, las tipografías
@@ -51,6 +53,7 @@ export const temaCss = crearTemaCss(fuenteContenido);
 | `data-c-src` | foto (`src`) |
 | `data-c-href` | enlace según el tipo: url, correo, teléfono o WhatsApp |
 | `data-c-si` | vacío → se quita el elemento; con valor → se muestra (varias claves: si alguna tiene valor) |
+| `data-c-mapa` | en el mapa de `nucleo-web/mapa`: pone la dirección del mapa insertado (campo `tipo: "mapa"`) |
 | `data-c-faq="faq"` | en el `<script type="application/ld+json">` de preguntas frecuentes |
 
 Para párrafos con saltos de línea, el sitio pone `white-space: pre-line`.

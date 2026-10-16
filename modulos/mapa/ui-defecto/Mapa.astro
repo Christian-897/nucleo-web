@@ -1,0 +1,135 @@
+---
+/**
+ * Mapa de Google que se carga al tocarlo (gratis, sin clave):
+ *
+ *   ---
+ *   import Mapa from "nucleo-web/mapa/Mapa.astro";
+ *   ---
+ *   <Mapa ubicacion="Av. Providencia 1234, Providencia" clave="contacto.direccion" />
+ *
+ * - `clave`: campo del contenido editable (tipo "mapa"). Con ella, lo que
+ *   se cambie en el panel llega al mapa, a la dirección y a "Cómo llegar".
+ * - Sin ubicación válida no se dibuja nada.
+ * - La CSP del sitio debe permitir `frame-src https://www.google.com`.
+ *
+ * El diseño se ajusta con variables CSS desde el sitio:
+ *   --mapa-alto, --mapa-radio, --mapa-fondo, --mapa-linea, --mapa-tinta, --mapa-acento
+ * o pisando las clases .mapa__*.
+ */
+import { normalizarUbicacion, urlComoLlegar, urlInsercion, ZOOM_POR_DEFECTO } from "../index";
+
+interface Props {
+  /** Dirección, coordenadas o enlace largo de Google Maps. */
+  ubicacion: string;
+  /** Clave del campo editable (tipo "mapa") en el contenido del sitio. */
+  clave?: string;
+  zoom?: number;
+  /** Título accesible del mapa (lo lee el lector de pantalla). */
+  titulo?: string;
+  textoBoton?: string;
+  textoLlegar?: string;
+  aviso?: string;
+  class?: string;
+}
+const {
+  ubicacion,
+  clave,
+  zoom = ZOOM_POR_DEFECTO,
+  titulo = "Mapa de la ubicación",
+  textoBoton = "Ver mapa",
+  textoLlegar = "Cómo llegar",
+  aviso = "El mapa se carga desde Google Maps al tocarlo.",
+  class: clase,
+} = Astro.props;
+const r = normalizarUbicacion(ubicacion);
+const valor = r.ok ? r.valor : "";
+const src = valor ? urlInsercion(valor, { zoom }) : "";
+const llegar = valor ? urlComoLlegar(valor) : "";
+---
+{valor && (
+  <div
+    class:list={["mapa", clase]}
+    data-mapa
+    data-mapa-src={src}
+    data-mapa-zoom={String(zoom)}
+    data-mapa-titulo={titulo}
+    data-c-mapa={clave}
+  >
+    <button type="button" class="mapa__activar" data-mapa-activar>
+      <svg class="mapa__pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z" /><circle cx="12" cy="9.5" r="2.5" />
+      </svg>
+      <span class="mapa__direccion" data-c={clave}>{valor}</span>
+      <span class="mapa__boton">{textoBoton}</span>
+      <span class="mapa__aviso">{aviso}</span>
+    </button>
+    <a class="mapa__llegar" href={llegar} data-c-href={clave} target="_blank" rel="noopener noreferrer">
+      {textoLlegar} <span aria-hidden="true">↗</span>
+    </a>
+  </div>
+)}
+
+<style is:global>
+  .mapa {
+    --mapa-alto: 320px;
+    --mapa-radio: 14px;
+    --mapa-fondo: #f6eef1;
+    --mapa-linea: rgba(120, 30, 60, .09);
+    --mapa-tinta: #3a1424;
+    --mapa-acento: #8e1b45;
+    position: relative;
+    display: grid;
+    gap: .6rem;
+  }
+  .mapa__activar,
+  .mapa__marco {
+    width: 100%;
+    height: var(--mapa-alto);
+    border: 0;
+    border-radius: var(--mapa-radio);
+  }
+  .mapa__activar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: .55rem;
+    padding: 1.5rem;
+    cursor: pointer;
+    font: inherit;
+    color: var(--mapa-tinta);
+    text-align: center;
+    /* Cuadrícula suave que recuerda un plano, sin cargar nada externo. */
+    background:
+      linear-gradient(var(--mapa-linea) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, var(--mapa-linea) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(115deg, transparent 46%, rgba(255, 255, 255, .7) 46% 54%, transparent 54%),
+      var(--mapa-fondo);
+    transition: box-shadow .2s;
+  }
+  .mapa__activar:hover { box-shadow: inset 0 0 0 2px var(--mapa-acento); }
+  .mapa__activar:focus-visible { outline: 3px solid var(--mapa-acento); outline-offset: 3px; }
+  .mapa__pin { width: 2.6rem; height: 2.6rem; color: var(--mapa-acento); }
+  .mapa__direccion { font-weight: 600; max-width: 32ch; }
+  .mapa__boton {
+    display: inline-block;
+    padding: .55rem 1.3rem;
+    border-radius: 999px;
+    background: var(--mapa-acento);
+    color: #fff;
+    font-weight: 600;
+  }
+  .mapa__aviso { font-size: .8rem; opacity: .75; }
+  .mapa__llegar {
+    justify-self: start;
+    color: var(--mapa-acento);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .mapa__llegar:hover { text-decoration: underline; }
+</style>
+
+<script>
+  import { activarMapas } from "../cliente";
+  activarMapas();
+</script>

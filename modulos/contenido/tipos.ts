@@ -4,9 +4,10 @@ import type { RolFuente } from "./fuentes";
 /**
  * Tipos de campo editable. Cada tipo tiene su propia validación y nunca se
  * convierte en HTML: texto con `html: false`, colores con formato hex
- * cerrado, fuentes de una lista cerrada, imágenes solo /media/ o /img/.
+ * cerrado, fuentes de una lista cerrada, imágenes solo /media/ o /img/,
+ * ubicaciones (tipo "mapa") reducidas a una dirección o coordenadas.
  */
-export type TipoCampo = "texto" | "parrafo" | "color" | "fuente" | "imagen" | "url" | "email" | "telefono";
+export type TipoCampo = "texto" | "parrafo" | "color" | "fuente" | "imagen" | "url" | "email" | "telefono" | "mapa";
 
 export interface Campo {
   /** Identificador estable: "portada.saludo", "faq.3.pregunta". */
@@ -35,6 +36,8 @@ export interface Campo {
   enlace?: "whatsapp" | "tel";
   /** Para whatsapp: clave del campo con el mensaje inicial. */
   mensajeDe?: string;
+  /** Para mapa: acercamiento del mapa (3 a 20). Por defecto 16. */
+  zoom?: number;
 }
 
 export interface Grupo {

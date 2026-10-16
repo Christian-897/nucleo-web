@@ -23,6 +23,7 @@ Para formularios de presupuesto: **Muebles Crea**.
 | `carrusel` | Portada con diapositivas (hasta 8; texto hasta 220 caracteres) | `crearCarruselEditable` + `crearBordeCarrusel` + `<Carrusel>` |
 | `contenido` | Colores (con aviso de contraste), 17 tipografías servidas desde el sitio, textos, enlaces y fotos | `crearContenidoEditable` + `crearBordeContenido` + `crearTemaCss` (`/tema.css`) |
 | `contacto` | WhatsApp, teléfono, correo y redes, validados | `enlacesContacto({ ...contacto, redes })` |
+| `mapa` | Mapa de Google sin clave que carga al tocarlo, con "Cómo llegar". La dirección se edita en el panel (campo `tipo: "mapa"` del contenido) | `<Mapa ubicacion clave>` (`nucleo-web/mapa/Mapa.astro`) + `frame-src https://www.google.com` en `public/_headers` |
 
 ## Clientes y correo
 

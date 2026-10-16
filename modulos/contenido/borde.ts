@@ -10,6 +10,8 @@
  *   data-c-href="clave"     el enlace (url, correo, teléfono o WhatsApp según el campo)
  *   data-c-si="clave …"     vacío → se quita el elemento; con valor → se muestra (quita hidden).
  *                           Con varias claves, se muestra si alguna tiene valor.
+ *   data-c-mapa="clave"     en el contenedor del mapa (nucleo-web/mapa): pone la
+ *                           dirección del mapa insertado (data-mapa-src)
  *   data-c-faq="prefijo"    en <script type="application/ld+json">: rearma el FAQPage
  *                           con <prefijo>.N.pregunta / <prefijo>.N.respuesta
  *
@@ -25,6 +27,7 @@
  */
 import type { EnvBase } from "../../core/tipos";
 import { enlaceCorreo, enlaceTelefono, enlaceWhatsapp } from "../contacto/index";
+import { urlComoLlegar, urlInsercion } from "../mapa/index";
 import type { EstadoContenido, FuenteContenido } from "./almacen";
 import type { Campo, Valores } from "./tipos";
 
@@ -56,6 +59,8 @@ export function hrefDe(campo: Campo | undefined, valores: Valores): string {
       return campo.enlace === "whatsapp"
         ? enlaceWhatsapp(v, campo.mensajeDe ? valores[campo.mensajeDe] : undefined)
         : enlaceTelefono(v);
+    case "mapa":
+      return urlComoLlegar(v);
     default:
       return "";
   }
@@ -88,7 +93,7 @@ export function enlacesTema(estado: EstadoContenido): string {
 
 export function crearBordeContenido(fuente: FuenteContenido) {
   const campos = new Map(fuente.esquema.campos.map((c) => [c.clave, c]));
-  const TEXTO = new Set(["texto", "parrafo", "email", "telefono", "url"]);
+  const TEXTO = new Set(["texto", "parrafo", "email", "telefono", "url", "mapa"]);
 
   return {
     async onRequest(ctx: { request: Request; env: EnvBase; next: () => Promise<Response> }): Promise<Response> {
@@ -144,6 +149,14 @@ export function crearBordeContenido(fuente: FuenteContenido) {
             const { campo } = valor(el, "data-c-href");
             const href = hrefDe(campo, v);
             if (href) el.setAttribute("href", href);
+          },
+        })
+        .on("[data-c-mapa]", {
+          element(el) {
+            const { campo, dato } = valor(el, "data-c-mapa");
+            if (campo?.tipo !== "mapa" || !dato) return;
+            const src = urlInsercion(dato, { zoom: Number(el.getAttribute("data-mapa-zoom")) || campo.zoom });
+            if (src) el.setAttribute("data-mapa-src", src);
           },
         })
         .on("[data-c-si]", {

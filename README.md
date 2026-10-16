@@ -77,6 +77,7 @@ npm test            # corre las pruebas del módulo
 - **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
 - **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
 - **contacto** — enlaces de WhatsApp, teléfono, correo y redes, validados (número en cualquier formato, redes con enlace o @usuario). (listo)
+- **mapa** — mapa de Google gratis y sin clave, que se carga recién al tocarlo; la dirección se edita desde el panel (campo de tipo "mapa") y trae "Cómo llegar". (listo)
 - **carrusel** — portada con varias diapositivas (foto, textos y botón) que avanzan solas con transición suave, pausa, flechas, puntos y deslizar con el dedo; respeta "reducir movimiento" y se edita desde el panel (pestaña Portada). (listo)
 - **contenido** — diseño y textos editables desde el panel: paleta de colores (libre, con aviso de contraste), tipografías de una lista elegida (servidas desde el propio sitio), textos, enlaces de contacto y fotos. (listo)
 - **metricas** — resumen de ventas para el panel: hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, rango de fechas a elección (por día, semana o mes), gráficos de barras, línea o torta y comparación por años. (listo)
@@ -88,6 +89,6 @@ npm test            # corre las pruebas del módulo
 ## Entradas solo para el navegador
 
 `nucleo-web/compra/cliente`, `nucleo-web/newsletter/cliente`,
-`nucleo-web/catalogo/cliente`, `nucleo-web/carrusel/cliente` y `nucleo-web/core/turnstile` no arrastran código
+`nucleo-web/catalogo/cliente`, `nucleo-web/carrusel/cliente`, `nucleo-web/mapa/cliente` y `nucleo-web/core/turnstile` no arrastran código
 del servidor. Usarlas en los `<script>` de las páginas: el formulario del
 newsletter pesa 2 KB en vez de 58 KB.

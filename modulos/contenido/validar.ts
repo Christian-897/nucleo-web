@@ -3,6 +3,7 @@
  * por aquí antes de guardarse: nunca se confía en la pantalla.
  */
 import { enlaceCorreo, formatearTelefono, normalizarTelefono, urlRed } from "../contacto/index";
+import { normalizarUbicacion } from "../mapa/index";
 import { esColor } from "./color";
 import { fuentePorId } from "./fuentes";
 import type { Campo, Esquema, Valores } from "./tipos";
@@ -36,7 +37,7 @@ export function validarValor(campo: Campo, entrada: unknown): ResultadoValor {
   const crudo = entrada.trim();
   if (!crudo) {
     if (campo.opcional) return { ok: true, valor: "" };
-    if (["texto", "parrafo", "color", "fuente", "imagen"].includes(campo.tipo)) return { ok: false, error: "Este campo no puede quedar vacío." };
+    if (["texto", "parrafo", "color", "fuente", "imagen", "mapa"].includes(campo.tipo)) return { ok: false, error: "Este campo no puede quedar vacío." };
     return { ok: true, valor: "" };
   }
   switch (campo.tipo) {
@@ -79,6 +80,9 @@ export function validarValor(campo: Campo, entrada: unknown): ResultadoValor {
       // Se guarda ya formateado ("+56 9 1234 5678"): así se muestra en el sitio.
       return n ? { ok: true, valor: formatearTelefono(n) } : { ok: false, error: "Teléfono inválido. Ejemplo: +56 9 1234 5678" };
     }
+    case "mapa":
+      // Dirección, coordenadas o enlace largo de Google Maps → texto de búsqueda.
+      return normalizarUbicacion(crudo);
   }
 }
 

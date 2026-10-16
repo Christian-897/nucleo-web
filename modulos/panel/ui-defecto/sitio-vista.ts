@@ -280,6 +280,10 @@ export function crearVistaSitio(a: Ayudas) {
       i.type = c.tipo === "email" ? "email" : c.tipo === "telefono" ? "tel" : "text";
       if (c.tipo === "url") i.placeholder = c.red ? "Enlace de tu perfil o @usuario" : "https://…";
       if (c.tipo === "telefono") i.placeholder = "+56 9 1234 5678";
+      if (c.tipo === "mapa") {
+        i.placeholder = "Ej.: Av. Providencia 1234, Providencia";
+        i.maxLength = 300;
+      }
       control = i;
     }
     control.id = id;
