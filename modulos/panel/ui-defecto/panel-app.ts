@@ -26,8 +26,8 @@ import {
 import { crearVistaSitio } from "./sitio-vista";
 import { nombreZona, textosDespacho, type TarifasDespacho } from "../../despacho/calculo";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "suscriptores" | "seguridad";
-const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "suscriptores", "seguridad"];
+type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "mensajes" | "suscriptores" | "seguridad";
+const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "mensajes", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
 interface Producto {
@@ -285,12 +285,15 @@ async function abrirPestana(v: Vista) {
     if (!$("[data-despacho-caja]").hidden) void cargarDespacho();
     await cargarPedidos();
   }
+  if (v === "mensajes") await cargarMensajes();
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
 }
 
 async function entrarAlPanel(segundos: number) {
   iniciarInactividad(segundos);
+  // La burbuja de "Mensajes" se ve desde que entra, sin abrir la pestaña.
+  if (!$('[data-tab="mensajes"]').hidden) void cargarMensajes(true);
   await abrirPestana("resumen");
 }
 
@@ -1678,6 +1681,98 @@ for (const sel of ["[data-anio-a]", "[data-anio-b]"]) $(sel).addEventListener("c
 
 $("[data-resumen-recargar]").addEventListener("click", cargarResumen);
 $("[data-ir-pedidos]").addEventListener("click", () => abrirPestana("pedidos"));
+
+// ─────────────────────────── mensajes ───────────────────────────
+
+interface MensajePanel {
+  clave: string;
+  nombre: string;
+  email: string;
+  telefono: string;
+  motivo: string;
+  texto: string;
+  fecha: string;
+  atendido: string | null;
+  sinCorreo: boolean;
+}
+
+function pintarBurbujaMensajes(pendientes: number) {
+  const b = $("[data-mensajes-pendientes]");
+  b.textContent = pendientes > 99 ? "99+" : String(pendientes);
+  b.hidden = pendientes === 0;
+  b.title = `${pendientes} sin responder`;
+}
+
+/** solo = true: solo actualiza la burbuja de la pestaña (al entrar al panel). */
+async function cargarMensajes(solo = false) {
+  const r = await obtener<{ total: number; pendientes: number; hayMas: boolean; mensajes: MensajePanel[] }>(`${API}/mensajes`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    if (!solo) avisar(r.datos.message || "No se pudieron cargar los mensajes.");
+    return;
+  }
+  pintarBurbujaMensajes(r.datos.pendientes);
+  if (solo) return;
+  const todos = $<HTMLInputElement>("[data-mensajes-todos]").checked;
+  const lista = todos ? r.datos.mensajes : r.datos.mensajes.filter((m) => !m.atendido);
+  $("[data-resumen-mensajes]").textContent = r.datos.mensajes.length
+    ? `${r.datos.pendientes} sin responder · ${r.datos.mensajes.length} en total` +
+      (!todos && !lista.length ? ". Estás al día." : "") +
+      (r.datos.hayMas ? " (se muestran los más recientes)" : "")
+    : "Todavía no te han escrito desde la página.";
+  const fecha = (iso: string) => new Date(iso).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" });
+  $("[data-lista-mensajes]").replaceChildren(
+    ...lista.map((m) => {
+      const li = crear("li", m.atendido ? "pa-pedido pa-mensaje pa-mensaje--respondido" : "pa-pedido pa-mensaje");
+      const cabeza = crear("div", "pa-pedido__cabeza");
+      const izquierda = crear("div");
+      izquierda.append(crear("strong", "", m.nombre), document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--acento", m.motivo));
+      if (m.atendido) izquierda.append(document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--ok", "Respondido"));
+      if (m.sinCorreo) izquierda.append(document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--alerta", "No llegó por correo"));
+      cabeza.append(izquierda, crear("span", "pa-tenue pa-chico", fecha(m.fecha)));
+      const contacto = crear("p", "pa-pedido__dato");
+      const correo = crear("a", "", m.email);
+      correo.href = `mailto:${m.email}`;
+      contacto.append(correo);
+      if (m.telefono) contacto.append(document.createTextNode(` · ${m.telefono}`));
+      li.append(cabeza, contacto, crear("p", "pa-mensaje__texto", m.texto));
+
+      const botones = crear("div", "pa-mensaje__botones");
+      const responder = crear("a", "pa-boton pa-boton--chico", "Responder por correo");
+      responder.href = `mailto:${m.email}?subject=${encodeURIComponent("Re: tu mensaje")}`;
+      const marcar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", m.atendido ? "Volver a pendiente" : "Marcar como respondido");
+      marcar.type = "button";
+      marcar.addEventListener("click", async () => {
+        marcar.disabled = true;
+        const r2 = await enviar(`${API}/mensajes`, { accion: "marcar", clave: m.clave, atendido: !m.atendido });
+        if (siSeCerro(r2.status)) return;
+        if (!r2.ok) {
+          marcar.disabled = false;
+          return avisar(r2.datos.message || "No se pudo actualizar.");
+        }
+        await cargarMensajes();
+      });
+      const borrar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Borrar");
+      borrar.type = "button";
+      borrar.addEventListener("click", async () => {
+        if (!confirm(`¿Borrar el mensaje de ${m.nombre}? No se puede deshacer.`)) return;
+        borrar.disabled = true;
+        const r2 = await enviar(`${API}/mensajes`, { accion: "eliminar", clave: m.clave });
+        if (siSeCerro(r2.status)) return;
+        if (!r2.ok) {
+          borrar.disabled = false;
+          return avisar(r2.datos.message || "No se pudo borrar.");
+        }
+        avisar("Mensaje borrado.");
+        await cargarMensajes();
+      });
+      botones.append(responder, marcar, borrar);
+      li.append(botones);
+      return li;
+    })
+  );
+}
+$("[data-mensajes-todos]").addEventListener("change", () => cargarMensajes());
 
 // ─────────────────────────── suscriptores ───────────────────────────
 

@@ -28,11 +28,13 @@
  *   functions/api/admin/boletines.ts       export const { onRequestGet, onRequestPost } = panel.boletines;
  *   functions/api/admin/boletin-foto.ts    export const { onRequestPost } = panel.boletinFoto;
  *   functions/api/admin/despacho.ts        export const { onRequestGet, onRequestPost } = panel.despacho;
+ *   functions/api/admin/mensajes.ts        export const { onRequestGet, onRequestPost } = panel.mensajes;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
  *   functions/api/admin/_middleware.ts     export const { onRequest } = panel.cabeceras;
  */
 import type { FuenteCarrusel } from "../carrusel/almacen";
+import type { ConfigCotizacion } from "../cotizacion/config";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import type { FuenteContenido } from "../contenido/almacen";
 import type { FuenteDespacho } from "../despacho/almacen";
@@ -52,6 +54,7 @@ import { crearGestionPedidos } from "./pedidos";
 import { crearResumen } from "./resumen";
 import { visitasPanel } from "./visitas";
 import { crearGestionProductos } from "./productos";
+import { crearGestionMensajes } from "./mensajes";
 
 export interface OpcionesPanel extends ConfigPanel {
   /** Catálogo editable (crearCatalogoEditable). Sin él, no hay sección Productos. */
@@ -72,6 +75,12 @@ export interface OpcionesPanel extends ConfigPanel {
   revisionPagos?: boolean | ConfigRevisionPagos;
   /** Tarifas de despacho (crearDespachoEditable), la misma fuente que usa la tienda. Sin ella, no hay cuadro "Despacho". */
   despacho?: FuenteDespacho;
+  /**
+   * Mensajes del formulario de contacto: la MISMA config que usa el
+   * endpoint del formulario (crearEndpointCotizacion). Sin ella, no hay
+   * pestaña "Mensajes".
+   */
+  mensajes?: ConfigCotizacion;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
   /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
@@ -88,6 +97,7 @@ export function crearPanel(opciones: OpcionesPanel) {
   const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
   const contenido = opciones.contenido ? crearGestionContenido(opciones.contenido, opciones) : null;
   const boletines = opciones.boletines ? crearGestionBoletines(opciones.boletines, opciones) : null;
+  const mensajes = opciones.mensajes ? crearGestionMensajes(opciones.mensajes) : null;
   const revision = opciones.revisionPagos
     ? crearRevisionPagos({ zonaHoraria: opciones.zonaHoraria, ...(opciones.revisionPagos === true ? {} : opciones.revisionPagos) })
     : null;
@@ -189,6 +199,11 @@ export function crearPanel(opciones: OpcionesPanel) {
         if (!r.ok) return jsonResponse(400, { message: r.motivo, errores: r.errores });
         return jsonResponse(200, { ok: true, tarifas: r.tarifas, textos: fuente.textos(r.tarifas) });
       },
+    },
+    /** Mensajes del formulario de contacto (pestaña "Mensajes"). */
+    mensajes: {
+      onRequestGet: (c: Ctx) => (mensajes ? mensajes.get(c) : noDisponible()),
+      onRequestPost: (c: Ctx) => (mensajes ? mensajes.post(c) : noDisponible()),
     },
     /** Fotos públicas subidas desde el panel. */
     media: {

@@ -35,6 +35,32 @@ export const configCotizacion: ConfigCotizacion = {
 };
 ```
 
+## Modo contacto ("Escríbenos")
+
+El mismo motor sirve para el formulario de la página Contacto de una tienda:
+
+```ts
+export const configContacto: ConfigCotizacion = {
+  nombreSitio: "Sasha Anette Tejidos",
+  modo: "contacto", // el correo dice "Nuevo mensaje", no "presupuesto"
+  categorias: [
+    { id: "consulta", label: "Consulta por un producto" },
+    { id: "a-medida", label: "Pedido a medida" },
+    { id: "cursos", label: "Cursos" },
+    { id: "otro", label: "Otro" },
+  ],
+};
+```
+
+- Endpoint: `functions/api/contacto.ts` → `crearEndpointCotizacion(configContacto)`.
+  En el navegador: `enviarCotizacion(datos, { endpoint: "/api/contacto" })`.
+- El aviso va a `ADMIN_NOTIFY_EMAIL` con **Reply-To = quien escribió**: al
+  apretar Responder, la respuesta le llega directo a esa persona.
+- Panel: `crearPanel({ ..., mensajes: configContacto })` + `functions/api/admin/mensajes.ts`
+  (`panel.mensajes`) + `<PanelAdmin mensajes>` → pestaña **Mensajes**.
+- Cada mensaje gasta un correo del cupo diario de Resend. Si el aviso no
+  sale, el mensaje igual queda en el panel (marcado "No llegó por correo").
+
 ## Variables de entorno (Secrets en Cloudflare, nunca en el código)
 
 | Variable | Para qué |

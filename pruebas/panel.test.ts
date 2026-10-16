@@ -85,7 +85,15 @@ const sitio = crearContenidoEditable(
   { contraste: [{ texto: "#ffffff", fondo: "colores.acento", minimo: 4.5, descripcion: "Botones" }] }
 );
 const despachoFuente = crearDespachoEditable({ detallePorPagar: "Se paga al recibir." });
-const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" }, revisionPagos: true, despacho: despachoFuente });
+const configContacto = {
+  nombreSitio: "Tienda Prueba",
+  modo: "contacto" as const,
+  categorias: [
+    { id: "consulta", label: "Consulta por un producto" },
+    { id: "otro", label: "Otro" },
+  ],
+};
+const panel = crearPanel({ nombreSitio: "Tienda Prueba", catalogo, carrusel: portada, contenido: sitio, boletines: { nombreSitio: "Tienda Prueba", urlPublica: "https://tienda.cl" }, revisionPagos: true, despacho: despachoFuente, mensajes: configContacto });
 
 function entorno(): { env: EnvPanel; datos: ReturnType<typeof kvMemoria>["datos"] } {
   const { kv, datos } = kvMemoria();
@@ -946,6 +954,74 @@ async function run() {
     datos.set("pago:pedido:o9", { v: JSON.stringify({ orden: "o9", creado: new Date().toISOString(), estado: "pagada", monto: 25000, proveedor: "flow", email: "a@b.cl", metadata: { lineas: [], comprador: {}, requiereDespacho: true, tieneDigitales: false, despacho: { forma: "ahora", costo: 7000, zona: "extrema", gratisPorMonto: false } } }) });
     const r = await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie }) }));
     assert.equal(r.pedidos[0].despacho.costo, 7000);
+  });
+
+  console.log("Panel — mensajes de contacto:");
+
+  await prueba("mensajes: el formulario avisa a la dueña (responder le llega al visitante) y queda en el panel", async () => {
+    const { crearEndpointCotizacion } = await import("../modulos/cotizacion/index");
+    const { env } = entorno();
+    Object.assign(env, { TURNSTILE_SECRET_KEY: "secreto-turnstile", RESEND_API_KEY: "re_prueba", RESEND_FROM: "Tienda <hola@tienda.cl>", ADMIN_NOTIFY_EMAIL: "contacto@tienda.cl" });
+    const cookie = await instalarYEntrar(env);
+    const enviados: Record<string, any>[] = [];
+    const fetchOriginal = globalThis.fetch;
+    globalThis.fetch = (async (u: unknown, init?: RequestInit) => {
+      const url = String(u);
+      if (url.includes("turnstile")) return new Response(JSON.stringify({ success: true }), { status: 200 });
+      if (url.includes("resend.com")) {
+        enviados.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+      }
+      throw new Error("fetch inesperado: " + url);
+    }) as typeof fetch;
+    try {
+      const form = crearEndpointCotizacion(configContacto);
+      const datos = { nombre: "Ana <b>Pérez</b>", email: "ana@correo.cl", telefono: "", categoria: "consulta", descripcion: "Hola, ¿tienen el gatito en color lila?\n<script>alert(1)</script>", aceptaPolitica: true, turnstileToken: "tok", sitio_web: "" };
+      const r = await form.onRequestPost({ env, request: req("/api/contacto", { cuerpo: datos }) });
+      assert.equal(r.status, 200);
+      assert.equal(enviados.length, 1);
+      const correo = enviados[0];
+      assert.deepEqual([correo.to].flat(), ["contacto@tienda.cl"]);
+      assert.equal([correo.reply_to].flat()[0], "ana@correo.cl", "al responder le llega a quien escribió");
+      assert.match(correo.subject, /mensaje de Ana/);
+      assert.match(correo.html, /Nuevo mensaje desde la página/);
+      assert.doesNotMatch(correo.html, /<script>alert/);
+      assert.doesNotMatch(correo.html, /presupuesto/);
+      const malo = await form.onRequestPost({ env, request: req("/api/contacto", { cuerpo: { ...datos, categoria: "armas" } }) });
+      assert.equal(malo.status, 400);
+    } finally {
+      globalThis.fetch = fetchOriginal;
+    }
+    const lista = await json(await panel.mensajes.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(lista.pendientes, 1);
+    const m = lista.mensajes[0];
+    assert.equal(m.motivo, "Consulta por un producto");
+    assert.equal(m.nombre, "Ana <b>Pérez</b>", "se entrega como texto; la pantalla lo pone con textContent");
+    assert.equal(m.sinCorreo, false);
+    const marcar = await panel.mensajes.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "marcar", clave: m.clave, atendido: true } }) });
+    assert.equal(marcar.status, 200);
+    assert.equal((await json(await panel.mensajes.onRequestGet({ env, request: req("/x", { cookie }) }))).pendientes, 0);
+    const borrar = await panel.mensajes.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "eliminar", clave: m.clave } }) });
+    assert.equal(borrar.status, 200);
+    assert.equal((await json(await panel.mensajes.onRequestGet({ env, request: req("/x", { cookie }) }))).total, 0);
+  });
+
+  await prueba("mensajes: sin sesión nada; clave inventada no; desde otro sitio no; sin config no existe", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    datos.set("cotizacion:2026-10-15T12:00:00.000Z:abcdef12", { v: JSON.stringify({ nombre: "B", email: "b@c.cl", categoria: "otro", descripcion: "un mensaje largo", fecha: "2026-10-15T12:00:00.000Z", correoEnviado: false }) });
+    assert.equal((await panel.mensajes.onRequestGet({ env, request: req("/x") })).status, 401);
+    const lista = await json(await panel.mensajes.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(lista.mensajes[0].sinCorreo, true, "avisa que el correo no salió");
+    for (const clave of ["suscriptor:x", "admin:usuario", "cotizacion:../../x", 5]) {
+      const r = await panel.mensajes.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "eliminar", clave } }) });
+      assert.equal(r.status, 400, String(clave));
+    }
+    const csrf = await panel.mensajes.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.com", cuerpo: { accion: "eliminar", clave: "cotizacion:2026-10-15T12:00:00.000Z:abcdef12" } }) });
+    assert.equal(csrf.status, 403);
+    assert.ok(datos.has("cotizacion:2026-10-15T12:00:00.000Z:abcdef12"));
+    const sin = crearPanel({ nombreSitio: "X" });
+    assert.equal((await sin.mensajes.onRequestGet({ env, request: req("/x", { cookie }) })).status, 404);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

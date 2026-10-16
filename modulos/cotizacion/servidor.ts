@@ -154,6 +154,7 @@ export async function procesarCotizacion(
     urlPanel: `${origen}${rutaPanel}`,
     nombresCategoria: nombres,
     colores: config.coloresCorreo,
+    modo: config.modo,
   });
 
   // El correo puede fallar por causas ajenas (cuota, caída del proveedor):
@@ -164,6 +165,7 @@ export async function procesarCotizacion(
       subject: asuntoSolicitud(datos, {
         nombreSitio: config.nombreSitio,
         nombresCategoria: nombres,
+        modo: config.modo,
       }),
       html,
       // Al responder el correo, la respuesta le llega al visitante.

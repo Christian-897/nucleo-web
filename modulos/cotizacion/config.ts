@@ -34,9 +34,18 @@ export const COLORES_CORREO_POR_DEFECTO: ColoresCorreo = {
   whatsapp: "#25D366",
 };
 
+/**
+ * "presupuesto" (por defecto): formulario de cotización de un negocio a medida.
+ * "contacto": formulario "Escríbenos" de la página Contacto; mismo motor,
+ * pero el correo habla de "mensaje" en vez de "presupuesto".
+ */
+export type ModoCotizacion = "presupuesto" | "contacto";
+
 export interface ConfigCotizacion {
   /** Nombre del negocio, para el asunto y el cuerpo del correo. */
   nombreSitio: string;
+  /** Cómo se presenta el correo de aviso. Por defecto "presupuesto". */
+  modo?: ModoCotizacion;
   /** Categorías del rubro. De aquí salen las opciones válidas y sus nombres. */
   categorias: CategoriaCotizacion[];
   /** Ruta del panel donde se ven las solicitudes. Por defecto "/admin/". */

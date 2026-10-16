@@ -17,6 +17,7 @@ import { escapeHtml } from "../../core/validar";
 import {
   COLORES_CORREO_POR_DEFECTO,
   type ColoresCorreo,
+  type ModoCotizacion,
 } from "./config";
 
 export interface DatosSolicitud {
@@ -34,6 +35,8 @@ export interface OpcionesCorreo {
   nombresCategoria: Record<string, string>;
   /** Colores del sitio; lo que falte se completa con los por defecto. */
   colores?: Partial<ColoresCorreo>;
+  /** "presupuesto" (por defecto) o "contacto". */
+  modo?: ModoCotizacion;
 }
 
 /** Deja el teléfono como lo espera WhatsApp: solo dígitos, con código país. */
@@ -55,11 +58,12 @@ function nombreParaAsunto(nombre: string): string {
 
 export function asuntoSolicitud(
   datos: DatosSolicitud,
-  opciones: Pick<OpcionesCorreo, "nombreSitio" | "nombresCategoria">
+  opciones: Pick<OpcionesCorreo, "nombreSitio" | "nombresCategoria" | "modo">
 ): string {
   const categoria =
     opciones.nombresCategoria[datos.categoria] || datos.categoria;
-  return `${opciones.nombreSitio}: nueva solicitud de ${nombreParaAsunto(
+  const que = opciones.modo === "contacto" ? "mensaje" : "nueva solicitud";
+  return `${opciones.nombreSitio}: ${que} de ${nombreParaAsunto(
     datos.nombre
   )} — ${categoria}`;
 }
@@ -79,8 +83,26 @@ export function cuerpoSolicitud(
   const descripcion = escapeHtml(datos.descripcion).replace(/\n/g, "<br>");
   const sitio = escapeHtml(opciones.nombreSitio);
 
+  const contacto = opciones.modo === "contacto";
   const numero = telefonoWhatsApp(datos.telefono);
-  const saludo = `Hola ${datos.nombre.split(" ")[0]}, recibimos tu solicitud de presupuesto en ${opciones.nombreSitio}.`;
+  const saludo = contacto
+    ? `Hola ${datos.nombre.split(" ")[0]}, te escribo por el mensaje que dejaste en ${opciones.nombreSitio}.`
+    : `Hola ${datos.nombre.split(" ")[0]}, recibimos tu solicitud de presupuesto en ${opciones.nombreSitio}.`;
+  const t = contacto
+    ? {
+        titulo: "Nuevo mensaje desde la página",
+        frase: `<strong>${nombre}</strong> te escribió: ${categoria.toLowerCase()}.`,
+        etiqueta: "Motivo",
+        cuerpo: "Su mensaje",
+        cierre: "verlo en la pestaña Mensajes del",
+      }
+    : {
+        titulo: "Nueva solicitud de presupuesto",
+        frase: `<strong>${nombre}</strong> pidió un presupuesto de ${categoria.toLowerCase()}.`,
+        etiqueta: "Categoría",
+        cuerpo: "Lo que necesita",
+        cierre: "verla en el",
+      };
   const enlaceWhatsApp = numero
     ? `https://wa.me/${numero}?text=${encodeURIComponent(saludo)}`
     : "";
@@ -126,11 +148,11 @@ export function cuerpoSolicitud(
                     text-transform:uppercase;">${sitio}</p>
           <h1 style="margin:0;font-size:21px;line-height:1.3;color:${C.tinta};
                      font-family:Helvetica,Arial,sans-serif;">
-            Nueva solicitud de presupuesto
+            ${t.titulo}
           </h1>
           <p style="margin:8px 0 0 0;font-size:15px;line-height:1.55;color:${C.tintaSuave};
                     font-family:Helvetica,Arial,sans-serif;">
-            <strong>${nombre}</strong> pidió un presupuesto de ${categoria.toLowerCase()}.
+            ${t.frase}
           </p>
         </td></tr>
 
@@ -162,13 +184,13 @@ export function cuerpoSolicitud(
               "Correo",
               `<a href="mailto:${datos.email}" style="color:${C.acento};">${email}</a>`
             )}
-            ${fila("Categoría", categoria)}
+            ${fila(t.etiqueta, categoria)}
           </table>
         </td></tr>
 
         <tr><td style="padding:18px 26px 0 26px;">
           <p style="margin:0 0 6px 0;font-size:13px;color:${C.tintaTenue};
-                    font-family:Helvetica,Arial,sans-serif;">Lo que necesita</p>
+                    font-family:Helvetica,Arial,sans-serif;">${t.cuerpo}</p>
           <div style="background:${C.fondo};border-radius:10px;padding:14px 16px;
                       font-size:15px;line-height:1.6;color:${C.tinta};
                       font-family:Helvetica,Arial,sans-serif;">${descripcion}</div>
@@ -178,9 +200,9 @@ export function cuerpoSolicitud(
           <p style="margin:0;font-size:13px;line-height:1.6;color:${C.tintaTenue};
                     font-family:Helvetica,Arial,sans-serif;">
             Al responder este correo le llegará directamente a ${nombre}.
-            También puedes verla en el
+            También puedes ${t.cierre}
             <a href="${opciones.urlPanel}" style="color:${C.acento};">panel del sitio</a>
-            y marcarla como atendida.
+            y ${contacto ? "marcarlo como respondido" : "marcarla como atendida"}.
           </p>
         </td></tr>
       </table>

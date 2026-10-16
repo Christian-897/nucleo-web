@@ -116,4 +116,14 @@ prueba("el asunto incluye sitio, nombre y categoría", () => {
   assert.ok(asunto.includes("Cocinas"));
 });
 
+prueba("modo contacto: el correo habla de mensaje, no de presupuesto", () => {
+  const datos = { nombre: "Ana", email: "ana@correo.cl", categoria: "cocinas", descripcion: "Hola, quería consultar algo." };
+  const html = cuerpoSolicitud(datos, { nombreSitio: "Sasha", urlPanel: "https://x.cl/admin/", nombresCategoria, modo: "contacto" });
+  assert.match(html, /Nuevo mensaje desde la página/);
+  assert.match(html, /Motivo/);
+  assert.doesNotMatch(html, /presupuesto/);
+  assert.match(asuntoSolicitud(datos, { nombreSitio: "Sasha", nombresCategoria, modo: "contacto" }), /^Sasha: mensaje de Ana/);
+  assert.match(cuerpoSolicitud(datos, { nombreSitio: "Sasha", urlPanel: "https://x.cl/admin/", nombresCategoria }), /Nueva solicitud de presupuesto/);
+});
+
 console.log(`\n${pasaron} pruebas pasaron.`);

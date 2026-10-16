@@ -30,7 +30,7 @@ Para formularios de presupuesto: **Muebles Crea**.
 |---|---|---|
 | `newsletter` | Suscripción con doble confirmación, baja firmada (y RFC 8058), **pedir baja** por correo, exportación | `crearEndpointsNewsletter` → `/api/newsletter/{suscribir,confirmar,baja,pedir-baja,exportar}` + páginas `/newsletter/confirmar` y `/newsletter/baja` |
 | `newsletter` (boletines) | Escribir y enviar boletines desde el panel; Resend por lotes; tope diario editable; List-Unsubscribe | `crearPanel({ boletines: {…} })` |
-| `cotizacion` | Formulario de presupuesto con anti-bots y correo | `crearEndpointCotizacion` + `QuoteForm.astro` |
+| `cotizacion` | Formulario de presupuesto **o de contacto** (`modo: "contacto"`) con anti-bots, aviso por correo (responder le llega al visitante) y respaldo; en el panel, pestaña **Mensajes** | `crearEndpointCotizacion` + `QuoteForm.astro`; panel: `crearPanel({ mensajes })` |
 | `core/correo` | Envío por Resend (limpia variables pegadas a mano) | lo usan los demás |
 | `core/turnstile` | Turnstile oculto (`interaction-only`) y `widget.esperar()` | en cada formulario público |
 
