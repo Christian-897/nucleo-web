@@ -625,10 +625,11 @@ interface CategoriaPanel {
   id: string;
   nombre: string;
   corto: string;
+  bajada: string;
   imagen: string;
   productos: number;
   editada: boolean;
-  original: { nombre: string; corto: string };
+  original: { nombre: string; corto: string; bajada: string };
 }
 let listaCategoriasPanel: CategoriaPanel[] = [];
 
@@ -652,6 +653,7 @@ async function cargarCategorias() {
       const datos = crear("div", "pa-fila__datos");
       datos.append(crear("span", "", c.productos === 1 ? "1 producto" : `${c.productos} productos`));
       if (c.corto && c.corto !== c.nombre) datos.append(crear("span", "", `Corto: ${c.corto}`));
+      if (c.bajada) datos.append(crear("span", "", `Bajada: ${c.bajada}`));
       if (c.editada) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Editada"));
       info.append(datos);
       const botones = crear("div", "pa-fila__botones");
@@ -697,6 +699,7 @@ function abrirEditorCategoria(c: CategoriaPanel) {
   $("[data-categoria-titulo]").textContent = `Categoría: ${c.nombre}`;
   (f.elements.namedItem("nombre") as HTMLInputElement).value = c.nombre;
   (f.elements.namedItem("corto") as HTMLInputElement).value = c.corto === c.nombre ? "" : c.corto;
+  (f.elements.namedItem("bajada") as HTMLInputElement).value = c.bajada;
   $("[data-categoria-original]").textContent = c.editada ? `Nombre original del sitio: ${c.original.nombre}` : "";
   if (vistaPreviaCategoria) URL.revokeObjectURL(vistaPreviaCategoria);
   vistaPreviaCategoria = "";
@@ -741,7 +744,7 @@ formCategoria().addEventListener("submit", async (e) => {
     const r = await enviar<{ errores?: Record<string, string> }>(`${API}/categorias`, {
       accion: "guardar",
       id: c.id,
-      categoria: { nombre: String(d.get("nombre") || ""), corto: String(d.get("corto") || "") },
+      categoria: { nombre: String(d.get("nombre") || ""), corto: String(d.get("corto") || ""), bajada: String(d.get("bajada") || "") },
     });
     if (siSeCerro(r.status)) return;
     if (!r.ok) {
@@ -828,7 +831,7 @@ function pintarPortada(editado: boolean) {
       img.height = 70;
       img.loading = "lazy";
       const info = crear("div");
-      info.append(crear("div", "pa-fila__nombre", [d.titulo, d.subtitulo].filter(Boolean).join(" · ") || "Sin título"));
+      info.append(crear("div", "pa-fila__nombre", [d.titulo, d.subtitulo].filter(Boolean).join(" · ").replace(/\*/g, "") || "Sin título"));
       const datos = crear("div", "pa-fila__datos");
       datos.append(crear("span", "pa-etiqueta", `${i + 1} de ${total}`));
       if (d.boton) datos.append(crear("span", "", `Botón "${d.boton.texto}" → ${d.boton.enlace}`));

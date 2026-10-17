@@ -1,5 +1,5 @@
 /**
- * Prueba de las categorías editables (nombre, nombre corto y foto).
+ * Prueba de las categorías editables (nombre, nombre corto, bajada y foto).
  * Se corre con `npm test`.
  */
 import assert from "node:assert/strict";
@@ -70,6 +70,18 @@ async function run() {
     assert.equal(r[0].corto, "Peluches clásicos y anime");
     assert.equal(r[0].imagen, "/img/categorias/peluches.webp", "la foto del sitio se mantiene si no se cambió");
     assert.equal(r[1], BASE[1]);
+  });
+
+  await prueba("bajada: hasta 40, se limpia, puede quedar vacía a propósito y la del sitio se respeta", () => {
+    assert.ok(!validarCambioCategoria({ nombre: "Bien", bajada: "x".repeat(41) }).ok);
+    const v = validarCambioCategoria({ nombre: "Scrunchies", bajada: "  Colección\u0000 satín " });
+    assert.ok(v.ok && v.datos.bajada === "Colección satín");
+    const base = [{ id: "a", nombre: "Scrunchies", bajada: "Colección satín" }, { id: "b", nombre: "Gorros" }];
+    assert.equal(aplicarCambios(base, { a: { nombre: "Scrunchies" } })[0].bajada, "Colección satín", "sin tocarla, queda la del sitio");
+    assert.equal(aplicarCambios(base, { a: { nombre: "Scrunchies", bajada: "" } })[0].bajada, "", "vaciarla la quita");
+    assert.equal(aplicarCambios(base, { b: { nombre: "Gorros", bajada: "de satín" } })[1].bajada, "de satín");
+    const limpios = limpiarCambios({ a: { bajada: "x".repeat(80) } }, base);
+    assert.equal(limpios.a.bajada?.length, 40);
   });
 
   await prueba("plantillas de título y descripción: {nombre} y {corto}", () => {

@@ -5,8 +5,6 @@ cliente. Todos van primero en el núcleo.
 
 | Idea | Para qué | Notas |
 |---|---|---|
-| **Rutina en pasos** | Pasos numerados con fotos y flechas, editables | Del diseño de Isatin. |
-| **Mosaico con frase** | Fotos en grilla con una frase destacada | Del diseño de Isatin. |
 | **Videos cortos en la portada** | Tutoriales verticales (YouTube Shorts o reels de Instagram) | Portada con ▶ y el reproductor se carga al tocar; editable desde el panel (enlace, título, orden). Instagram se ve con su marco blanco y pesa más. El video **por producto** ya existe (v0.22.0, YouTube): reutilizar `catalogo/video`. |
 | **Antes y después** | Dos fotos con barra deslizable | Mouse, dedo y teclado; editable desde el panel. Las fotos deben tener el mismo encuadre. |
 | **Redirigir `.pages.dev`** | No duplicar el sitio en Google | 301 hacia el dominio propio. |

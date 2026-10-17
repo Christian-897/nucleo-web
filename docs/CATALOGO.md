@@ -10,7 +10,7 @@ Para formularios de presupuesto: **Muebles Crea**.
 
 | Módulo | Para qué | Se importa de | Monta en el sitio |
 |---|---|---|---|
-| `catalogo` | Productos (JSON inicial + lo editado en el panel), stock real en KV, categorías editables, ficha `/producto/<id>/` con **galería de hasta 20 fotos y un video de YouTube** (`catalogo/galeria` en el navegador), sitemap | `nucleo-web/catalogo` | `crearCatalogoEditable`, `crearBordeCatalogo`, `crearFichaProducto`, `crearSitemap` |
+| `catalogo` | Productos (JSON inicial + lo editado en el panel), stock real en KV, categorías editables (nombre, corto, **bajada** y foto), ficha `/producto/<id>/` con **galería de hasta 20 fotos y un video de YouTube** (`catalogo/galeria` en el navegador), sitemap | `nucleo-web/catalogo` | `crearCatalogoEditable`, `crearBordeCatalogo`, `crearFichaProducto`, `crearSitemap` |
 | `carrito` | Carrito en el navegador y validación de precio y stock en el servidor | `nucleo-web/carrito` (+ `Carrito.astro`, `BotonAgregar.astro`) | lo arma `compra` |
 | `pago` | Flow y Mercado Pago bajo una interfaz; webhooks verificados contra el proveedor | `nucleo-web/pago` | lo arma `compra` |
 | `despacho` | Cobro del despacho por comunas de la RM (centro/alejada) y regiones (cercana/extrema) con casillas; el comprador paga ahora o al recibir; "gratis desde $X"; avisos sin sorpresas | `nucleo-web/despacho` (+ `despacho/cliente`) | `crearDespachoEditable` → `crearEndpointsCompra({ despacho })`, `crearPanel({ despacho })`, `tienda.despacho`, `panel.despacho` |
@@ -20,9 +20,10 @@ Para formularios de presupuesto: **Muebles Crea**.
 
 | Módulo | Para qué | Monta en el sitio |
 |---|---|---|
-| `carrusel` | Portada con diapositivas (hasta 8; texto hasta 220 caracteres) | `crearCarruselEditable` + `crearBordeCarrusel` + `<Carrusel>` |
+| `carrusel` | Portada con diapositivas (hasta 8; texto hasta 220 caracteres; `*cursiva*` en título y subtítulo) | `crearCarruselEditable` + `crearBordeCarrusel` + `<Carrusel>` |
 | `contenido` | Colores (con aviso de contraste), 34 tipografías servidas desde el sitio (sin serif, serif de lectura, serif de lujo y de firma), textos, enlaces y fotos | `crearContenidoEditable` + `crearBordeContenido` + `crearTemaCss` (`/tema.css`) |
 | `contacto` | WhatsApp, teléfono, correo y redes, validados | `enlacesContacto({ ...contacto, redes })` |
+| `secciones` | Rutina en pasos (fotos numeradas con flechas, botón y frase a mano) y mosaico de fotos con frase, editables en "Diseño y textos" | `camposRutina` / `camposMosaico` en el esquema del contenido + `<Rutina>` / `<Mosaico>` (`nucleo-web/secciones/…astro`) |
 | `mapa` | Mapa de Google sin clave que carga al tocarlo, con "Cómo llegar". La dirección se edita en el panel (campo `tipo: "mapa"` del contenido) | `<Mapa ubicacion clave>` (`nucleo-web/mapa/Mapa.astro`) + `frame-src https://www.google.com` en `public/_headers` |
 
 ## Clientes y correo

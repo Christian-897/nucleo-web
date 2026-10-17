@@ -13,6 +13,7 @@ import {
   imagenValida,
   validarCarrusel,
   atributosCarrusel,
+  sinEnfasis,
   type EstadoCarrusel,
 } from "../modulos/carrusel/index";
 
@@ -215,6 +216,16 @@ async function run() {
     assert.match(segunda, /<h2 class="carrusel__titulo">/);
     assert.ok(!segunda.includes("data-activa"));
     assert.ok(!htmlCarrusel(copia(), { tituloPrincipal: false }).includes("<h1"));
+  });
+
+  await prueba("énfasis: *texto* sale en cursiva y nada del panel se vuelve otra etiqueta", () => {
+    const d = (titulo: string) => htmlCarrusel({ ...copia(), diapositivas: [{ id: "a", imagen: "/img/a.webp", imagenAlt: "x", titulo }] });
+    assert.ok(d("Tu cabello, *más sano,*").includes('<span class="carrusel__nombre">Tu cabello, <em>más sano,</em></span>'));
+    const malo = d("*<img src=x onerror=alert(1)>*");
+    assert.ok(malo.includes("<em>&lt;img src=x onerror=alert(1)&gt;</em>"), "se escapa antes de poner la cursiva");
+    assert.ok(!/<img src=x/.test(malo));
+    assert.ok(d("precio 2*3").includes("precio 2*3"), "un asterisco suelto queda tal cual");
+    assert.equal(sinEnfasis("Tu cabello, *más sano,*"), "Tu cabello, más sano,");
   });
 
   await prueba("título en dos líneas: lleva un espacio entre ellas (Google no lee 'sano,bonito')", () => {

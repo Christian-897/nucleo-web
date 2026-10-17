@@ -43,6 +43,10 @@ export const fuenteCarrusel = crearCarruselEditable({
   ],
 });
 
+// Título y subtítulo: lo que va entre asteriscos sale en cursiva (<em>).
+// "Tu cabello, *más sano,*" → Tu cabello, <em>más sano,</em>
+// Se escapa antes: el panel no puede colar otras etiquetas.
+
 export const opcionesCarrusel: OpcionesCarrusel = {
   etiqueta: "Novedades",
   claseContenedor: "contenedor", // el ancho máximo del sitio

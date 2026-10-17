@@ -1,7 +1,7 @@
 {
   "name": "nucleo-web",
-  "version": "0.25.0",
-  "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter, cotización, aviso de construcción, contacto (WhatsApp y redes), mapa de Google, carrusel de portada, diseño y textos editables (colores, tipografías, textos), métricas de ventas, visitas y panel de administración.",
+  "version": "0.26.0",
+  "description": "Núcleo reutilizable de módulos para sitios Astro + Cloudflare Pages: catálogo, carrito, pago (Flow + Mercado Pago), compra, newsletter, cotización, aviso de construcción, contacto (WhatsApp y redes), mapa de Google, secciones de portada (rutina en pasos, mosaico con frase), carrusel de portada, diseño y textos editables (colores, tipografías, textos), métricas de ventas, visitas y panel de administración.",
   "type": "module",
   "exports": {
     ".": "./index.ts",
@@ -33,6 +33,9 @@
     "./mapa": "./modulos/mapa/index.ts",
     "./mapa/cliente": "./modulos/mapa/cliente.ts",
     "./mapa/Mapa.astro": "./modulos/mapa/ui-defecto/Mapa.astro",
+    "./secciones": "./modulos/secciones/index.ts",
+    "./secciones/Rutina.astro": "./modulos/secciones/ui-defecto/Rutina.astro",
+    "./secciones/Mosaico.astro": "./modulos/secciones/ui-defecto/Mosaico.astro",
     "./carrusel": "./modulos/carrusel/index.ts",
     "./contenido": "./modulos/contenido/index.ts",
     "./carrusel/cliente": "./modulos/carrusel/cliente.ts",
@@ -52,6 +55,6 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "tsx pruebas/exports.test.ts && tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts && tsx pruebas/newsletter.test.ts && tsx pruebas/boletin.test.ts && tsx pruebas/revision.test.ts && tsx pruebas/compra.test.ts && tsx pruebas/construccion.test.ts && tsx pruebas/contacto.test.ts && tsx pruebas/mapa.test.ts && tsx pruebas/metricas.test.ts && tsx pruebas/visitas.test.ts && tsx pruebas/carrusel.test.ts && tsx pruebas/categorias.test.ts && tsx pruebas/contenido.test.ts && tsx pruebas/panel.test.ts"
+    "test": "tsx pruebas/exports.test.ts && tsx pruebas/cotizacion.test.ts && tsx pruebas/carrito.test.ts && tsx pruebas/pago.test.ts && tsx pruebas/newsletter.test.ts && tsx pruebas/boletin.test.ts && tsx pruebas/revision.test.ts && tsx pruebas/compra.test.ts && tsx pruebas/construccion.test.ts && tsx pruebas/contacto.test.ts && tsx pruebas/mapa.test.ts && tsx pruebas/secciones.test.ts && tsx pruebas/metricas.test.ts && tsx pruebas/visitas.test.ts && tsx pruebas/carrusel.test.ts && tsx pruebas/categorias.test.ts && tsx pruebas/contenido.test.ts && tsx pruebas/panel.test.ts"
   }
 }

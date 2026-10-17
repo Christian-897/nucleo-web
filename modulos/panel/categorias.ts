@@ -1,8 +1,8 @@
 /**
- * CATEGORÍAS DESDE EL PANEL: cambiar nombre, nombre corto y foto.
+ * CATEGORÍAS DESDE EL PANEL: cambiar nombre, nombre corto, bajada y foto.
  *
  *   GET  /api/admin/categorias        lista con lo vigente y lo original del sitio
- *   POST /api/admin/categorias        { accion: "guardar", id, categoria: { nombre, corto } }
+ *   POST /api/admin/categorias        { accion: "guardar", id, categoria: { nombre, corto, bajada } }
  *                                     { accion: "restablecer" }  (todas vuelven a las del sitio)
  *   POST /api/admin/categoria-foto    multipart: id + archivo
  *
@@ -29,10 +29,11 @@ export function crearGestionCategorias(catalogo: FuenteCatalogo, config: ConfigP
         id: c.id,
         nombre: c.nombre,
         corto: c.corto ?? "",
+        bajada: typeof c.bajada === "string" ? c.bajada : "",
         imagen: typeof c.imagen === "string" ? c.imagen : "",
         productos: vigente.deCategoria(c.id).length,
         editada: Boolean(cambios[c.id]),
-        original: { nombre: original.nombre, corto: original.corto ?? "" },
+        original: { nombre: original.nombre, corto: original.corto ?? "", bajada: typeof original.bajada === "string" ? original.bajada : "" },
       };
     });
     return jsonResponse(200, { editadas: Object.keys(cambios).length > 0, categorias, limites: LIMITES_CATEGORIA });

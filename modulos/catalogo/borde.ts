@@ -17,7 +17,7 @@
  *  - CATEGORÍAS: si se cambió el nombre o la foto de una categoría en el
  *    panel, todo elemento `data-categoria="<id>"` se pone al día según
  *    `data-categoria-campo` (uno o varios, separados por espacio):
- *      nombre · corto · imagen (src) · alt · texto · content
+ *      nombre · corto · bajada · imagen (src) · alt · texto · content
  *    "texto" y "content" (atributo de <meta>) usan la plantilla de
  *    `data-categoria-plantilla`, con {nombre} y {corto}.
  *
@@ -235,6 +235,10 @@ function conCategorias(r: Reescritor, catalogo: Catalogo): Reescritor {
             break;
           case "corto":
             el.setInnerContent(c.corto || c.nombre, { html: false });
+            break;
+          case "bajada":
+            // Vacía = el elemento queda vacío (el sitio lo esconde con :empty).
+            el.setInnerContent(typeof c.bajada === "string" ? c.bajada : "", { html: false });
             break;
           case "imagen":
             if (typeof c.imagen === "string" && imagenSegura(c.imagen, "") === c.imagen) el.setAttribute("src", c.imagen);

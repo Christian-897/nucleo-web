@@ -29,6 +29,8 @@ export interface CategoriaCatalogo {
   nombre: string;
   /** Nombre corto para tarjetas y menú. */
   corto?: string;
+  /** Línea chica bajo el nombre en las tarjetas del sitio. Opcional. */
+  bajada?: string;
   imagen?: string;
   [extra: string]: unknown;
 }

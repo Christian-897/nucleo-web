@@ -1,5 +1,5 @@
 /**
- * CATEGORÍAS EDITABLES: nombre, nombre corto y foto de cada categoría se
+ * CATEGORÍAS EDITABLES: nombre, nombre corto, bajada y foto de cada categoría se
  * cambian desde el panel. Las categorías en sí (cuáles existen y su
  * dirección /tienda/<id>/) las define el sitio: crear una nueva necesita
  * su página, y eso se hace en el código.
@@ -11,12 +11,14 @@ import { normalizeInput } from "../../core/validar";
 import type { CategoriaCatalogo } from "./tipos";
 
 export const CLAVE_CATEGORIAS = "catalogo:categorias";
-export const LIMITES_CATEGORIA = { nombre: 60, corto: 40 } as const;
+export const LIMITES_CATEGORIA = { nombre: 60, corto: 40, bajada: 40 } as const;
 
 export interface CambioCategoria {
   nombre?: string;
   /** Vacío = igual al nombre. */
   corto?: string;
+  /** Línea chica bajo el nombre en las tarjetas ("Colección satín"). Vacío = sin bajada. */
+  bajada?: string;
   imagen?: string;
 }
 export type CambiosCategorias = Record<string, CambioCategoria>;
@@ -35,11 +37,13 @@ export function validarCambioCategoria(
   const e: Record<string, string> = {};
   const nombre = texto(o.nombre);
   const corto = texto(o.corto);
+  const bajada = texto(o.bajada);
   if (nombre.length < 2) e.nombre = "Escribe al menos 2 caracteres.";
   else if (nombre.length > LIMITES_CATEGORIA.nombre) e.nombre = `Máximo ${LIMITES_CATEGORIA.nombre} caracteres.`;
   if (corto.length > LIMITES_CATEGORIA.corto) e.corto = `Máximo ${LIMITES_CATEGORIA.corto} caracteres.`;
+  if (bajada.length > LIMITES_CATEGORIA.bajada) e.bajada = `Máximo ${LIMITES_CATEGORIA.bajada} caracteres.`;
   if (Object.keys(e).length) return { ok: false, errores: e };
-  return { ok: true, datos: { nombre, corto } };
+  return { ok: true, datos: { nombre, corto, bajada } };
 }
 
 /** Limpia lo guardado en KV: ids que no existen o campos malos se descartan. */
@@ -53,6 +57,7 @@ export function limpiarCambios(crudo: unknown, base: CategoriaCatalogo[]): Cambi
     const c: CambioCategoria = {};
     if (typeof v.nombre === "string" && v.nombre.trim().length >= 2) c.nombre = normalizeInput(v.nombre).trim().slice(0, LIMITES_CATEGORIA.nombre);
     if (typeof v.corto === "string") c.corto = normalizeInput(v.corto).trim().slice(0, LIMITES_CATEGORIA.corto);
+    if (typeof v.bajada === "string") c.bajada = normalizeInput(v.bajada).trim().slice(0, LIMITES_CATEGORIA.bajada);
     if (imagenCategoriaValida(v.imagen)) c.imagen = v.imagen;
     if (Object.keys(c).length) salida[id] = c;
   }
@@ -70,6 +75,8 @@ export function aplicarCambios(base: CategoriaCatalogo[], cambios: CambiosCatego
       nombre,
       // Si se cambió el nombre y el corto quedó vacío, el corto es el nombre.
       corto: k.corto !== undefined ? k.corto || nombre : c.corto,
+      // La bajada sí puede quedar vacía a propósito (= sin bajada).
+      bajada: k.bajada !== undefined ? k.bajada : c.bajada,
       ...(k.imagen ? { imagen: k.imagen } : {}),
     };
   });

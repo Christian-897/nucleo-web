@@ -8,6 +8,6 @@
  */
 export * from "./tipos";
 export { validarCarrusel, imagenValida, enlaceValido, nuevoIdDiapositiva } from "./validar";
-export { htmlCarrusel, atributosCarrusel, escapar } from "./marcado";
+export { htmlCarrusel, atributosCarrusel, escapar, conEnfasis, sinEnfasis } from "./marcado";
 export { crearCarruselEditable, CLAVE_CARRUSEL, ErrorCarrusel, type FuenteCarrusel } from "./almacen";
 export { crearBordeCarrusel, type OpcionesBordeCarrusel } from "./borde";

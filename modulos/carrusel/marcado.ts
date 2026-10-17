@@ -7,12 +7,26 @@
  * direcciones se revisan otra vez (imagen y enlace) aunque ya vengan
  * validadas. Lo único que entra sin escapar es `iconoBoton`, que es
  * código del sitio, nunca del panel.
+ *
+ * Énfasis: en título y subtítulo, lo que va entre asteriscos (*más sano,*)
+ * sale en cursiva (<em>). Se escapa PRIMERO y recién después se cambian los
+ * asteriscos: ningún texto del panel puede colar otras etiquetas.
  */
 import { enlaceValido, imagenValida } from "./validar";
 import type { Diapositiva, EstadoCarrusel, OpcionesCarrusel } from "./tipos";
 
 export function escapar(v: string): string {
   return v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/** Escapa y convierte *texto* en <em>texto</em> (sin anidar, una línea). */
+export function conEnfasis(v: string): string {
+  return escapar(v).replace(/\*([^*\n]{1,120})\*/g, "<em>$1</em>");
+}
+
+/** El texto sin los asteriscos de énfasis (para alt, títulos de pestaña, etc.). */
+export function sinEnfasis(v: string): string {
+  return v.replace(/\*([^*\n]{1,120})\*/g, "$1");
 }
 
 const ICONO = {
@@ -36,11 +50,11 @@ function diapositiva(d: Diapositiva, i: number, total: number, op: OpcionesCarru
     const h = primera && op.tituloPrincipal !== false ? "h1" : "h2";
     partes.push(
       `<${h} class="carrusel__titulo">` +
-        (d.titulo ? `<span class="carrusel__nombre">${escapar(d.titulo)}</span>` : "") +
+        (d.titulo ? `<span class="carrusel__nombre">${conEnfasis(d.titulo)}</span>` : "") +
         // Espacio entre las dos líneas: en pantalla no se nota (son celdas de grilla),
         // pero sin él Google y los lectores de pantalla leen "sano,bonito".
         (d.titulo && d.subtitulo ? " " : "") +
-        (d.subtitulo ? `<span class="carrusel__subtitulo">${escapar(d.subtitulo)}</span>` : "") +
+        (d.subtitulo ? `<span class="carrusel__subtitulo">${conEnfasis(d.subtitulo)}</span>` : "") +
         `</${h}>`
     );
   }

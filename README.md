@@ -78,6 +78,7 @@ npm test            # corre las pruebas del módulo
 - **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
 - **contacto** — enlaces de WhatsApp, teléfono, correo y redes, validados (número en cualquier formato, redes con enlace o @usuario). (listo)
 - **mapa** — mapa de Google gratis y sin clave, que se carga recién al tocarlo; la dirección se edita desde el panel (campo de tipo "mapa") y trae "Cómo llegar". (listo)
+- **secciones** — bloques de portada editables desde el panel: rutina en pasos (fotos numeradas con flechas) y mosaico de fotos con frase. (listo)
 - **carrusel** — portada con varias diapositivas (foto, textos y botón) que avanzan solas con transición suave, pausa, flechas, puntos y deslizar con el dedo; respeta "reducir movimiento" y se edita desde el panel (pestaña Portada). (listo)
 - **contenido** — diseño y textos editables desde el panel: paleta de colores (libre, con aviso de contraste), tipografías de una lista elegida (servidas desde el propio sitio), textos, enlaces de contacto y fotos. (listo)
 - **metricas** — resumen de ventas para el panel: hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, rango de fechas a elección (por día, semana o mes), gráficos de barras, línea o torta y comparación por años. (listo)

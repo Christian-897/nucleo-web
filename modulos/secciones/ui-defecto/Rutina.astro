@@ -1,0 +1,144 @@
+---
+/**
+ * Rutina en pasos (editable con el contenido del sitio):
+ *
+ *   ---
+ *   import Rutina from "nucleo-web/secciones/Rutina.astro";
+ *   import { valoresIniciales } from "../contenido";
+ *   ---
+ *   <Rutina valores={valoresIniciales} enlace="/tienda/kit-ondas/" />
+ *
+ * Los campos salen de camposRutina() con el mismo prefijo y número de pasos.
+ * Se dibuja con los valores iniciales; el borde del contenido pone lo
+ * editado en el panel (data-c, data-c-src, data-c-alt, data-c-si).
+ *
+ * Diseño ajustable con variables CSS desde el sitio:
+ *   --rutina-fondo, --rutina-tinta, --rutina-texto, --rutina-acento,
+ *   --rutina-numero-fondo, --rutina-fuente-titulo, --rutina-fuente-nota
+ * o pisando las clases .rutina__*.
+ */
+import { clavesRutina } from "../index";
+
+interface Props {
+  valores: Record<string, string>;
+  prefijo?: string;
+  pasos?: number;
+  /** Adónde lleva el botón (página del sitio). */
+  enlace?: string;
+  class?: string;
+}
+const { valores: v, prefijo = "rutina", pasos = 3, enlace = "/tienda/", class: clase } = Astro.props;
+const k = clavesRutina(prefijo, pasos);
+const idTitulo = `${prefijo}-titulo`;
+---
+<section class:list={["rutina", clase]} aria-labelledby={idTitulo}>
+  <div class="rutina__texto">
+    <p class="rutina__ante" data-c={k.antetitulo} data-c-si={k.antetitulo} hidden={!v[k.antetitulo]}>{v[k.antetitulo]}</p>
+    <h2 class="rutina__titulo" id={idTitulo} data-c={k.titulo}>{v[k.titulo]}</h2>
+    <p class="rutina__bajada" data-c={k.texto} data-c-si={k.texto} hidden={!v[k.texto]}>{v[k.texto]}</p>
+    <a class="rutina__boton" href={enlace} data-c-si={k.boton} hidden={!v[k.boton]}>
+      <span data-c={k.boton}>{v[k.boton]}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+    </a>
+    <p class="rutina__nota" data-c-si={k.nota} hidden={!v[k.nota]}>
+      <svg class="rutina__flecha" viewBox="0 0 60 24" aria-hidden="true"><path d="M2 18c14-1 30-4 50-10M44 4l9 4-6 8" /></svg>
+      <span data-c={k.nota}>{v[k.nota]}</span>
+    </p>
+  </div>
+  <ol class="rutina__pasos" style={`--rutina-pasos: ${k.pasos.length}`}>
+    {k.pasos.map((p, i) => (
+      <li class="rutina__paso">
+        <div class="rutina__rotulo">
+          <span class="rutina__numero" aria-hidden="true">{i + 1}</span>
+          <span class="rutina__paso-titulo" data-c={p.titulo}>{v[p.titulo]}</span>
+        </div>
+        <img
+          class="rutina__foto"
+          src={v[p.imagen]}
+          alt={v[p.imagenAlt]}
+          data-c-src={p.imagen}
+          data-c-alt={p.imagenAlt}
+          width="400"
+          height="600"
+          loading="lazy"
+          decoding="async"
+        />
+        {i < k.pasos.length - 1 && (
+          <span class="rutina__siguiente" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </span>
+        )}
+      </li>
+    ))}
+  </ol>
+</section>
+
+<style is:global>
+  .rutina {
+    --rutina-fondo: var(--c-fondo-claro, #f8e9ee);
+    --rutina-tinta: var(--c-tinta, #7a1838);
+    --rutina-texto: var(--c-acento, #8e1b45);
+    --rutina-acento: var(--c-acento, #8e1b45);
+    --rutina-numero-fondo: #f6dde6;
+    --rutina-fuente-titulo: var(--fuente-titulo, Georgia, serif);
+    --rutina-fuente-nota: var(--fuente-firma, cursive);
+    display: grid;
+    grid-template-columns: minmax(260px, .9fr) 2fr;
+    gap: clamp(16px, 2.5vw, 28px);
+    align-items: center;
+    background: var(--rutina-fondo);
+    padding: clamp(20px, 3vw, 36px);
+  }
+  .rutina__texto { padding-inline: clamp(0px, 2vw, 24px); }
+  .rutina__ante { margin: 0 0 10px; font-size: .8rem; letter-spacing: .22em; text-transform: uppercase; color: var(--rutina-texto); }
+  .rutina__titulo {
+    margin: 0 0 14px; font-family: var(--rutina-fuente-titulo); font-weight: 600;
+    font-size: clamp(2rem, 3.6vw, 2.8rem); line-height: 1.08; color: var(--rutina-tinta);
+  }
+  .rutina__bajada { margin: 0 0 20px; color: var(--rutina-texto); font-size: 1.05rem; line-height: 1.5; max-width: 30ch; white-space: pre-line; }
+  .rutina__boton {
+    display: inline-flex; align-items: center; gap: 10px; padding: 10px 22px; border-radius: 999px;
+    background: var(--rutina-tinta); color: #fff; text-decoration: none; font-weight: 600;
+  }
+  .rutina__boton:hover { background: var(--rutina-acento); }
+  .rutina__boton svg, .rutina__siguiente svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .rutina__nota {
+    display: flex; align-items: flex-end; gap: 6px; margin: 26px 0 0; font-family: var(--rutina-fuente-nota);
+    font-size: 1.35rem; line-height: 1.15; color: var(--rutina-texto); transform: rotate(-8deg); transform-origin: left bottom; max-width: 17ch;
+  }
+  .rutina__flecha { width: 56px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  .rutina__pasos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(var(--rutina-pasos), 1fr); gap: 8px; }
+  .rutina__paso { position: relative; min-width: 0; border-radius: 6px; overflow: visible; background: #fff; }
+  .rutina__foto { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 6px; }
+  .rutina__rotulo {
+    position: absolute; top: 10px; left: 8px; right: 8px; z-index: 1;
+    display: flex; align-items: center; gap: 0;
+  }
+  .rutina__numero {
+    flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%;
+    background: var(--rutina-numero-fondo); color: var(--rutina-tinta); font-family: var(--rutina-fuente-titulo);
+    font-size: 1.9rem; font-weight: 500; position: relative; z-index: 1; box-shadow: 0 2px 8px rgba(80, 15, 36, .12);
+  }
+  .rutina__paso-titulo {
+    flex: 1; min-width: 0; margin-left: -10px; padding: 7px 14px 7px 20px; border-radius: 999px;
+    background: rgba(255, 245, 248, .94); color: var(--rutina-tinta); font-family: var(--rutina-fuente-titulo);
+    font-weight: 600; font-size: .92rem; line-height: 1.15;
+  }
+  .rutina__siguiente {
+    position: absolute; top: 50%; right: -26px; z-index: 2; transform: translateY(-50%);
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255, 255, 255, .95); color: var(--rutina-tinta); box-shadow: 0 3px 10px rgba(80, 15, 36, .18);
+  }
+
+  @media (max-width: 900px) {
+    .rutina { grid-template-columns: 1fr; }
+    .rutina__nota { transform: rotate(-4deg); }
+  }
+  @media (max-width: 640px) {
+    /* Teléfono: los pasos se deslizan con el dedo, uno y medio a la vista. */
+    .rutina__pasos { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 68%; overflow-x: auto; scroll-snap-type: x mandatory; gap: 14px; padding-bottom: 6px; }
+    .rutina__paso { scroll-snap-align: start; }
+    .rutina__siguiente { right: -24px; width: 36px; height: 36px; }
+  }
+</style>

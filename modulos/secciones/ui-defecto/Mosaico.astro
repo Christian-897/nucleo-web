@@ -1,0 +1,86 @@
+---
+/**
+ * Mosaico de fotos con una frase destacada (editable con el contenido):
+ *
+ *   ---
+ *   import Mosaico from "nucleo-web/secciones/Mosaico.astro";
+ *   import { valoresIniciales } from "../contenido";
+ *   ---
+ *   <Mosaico valores={valoresIniciales} />
+ *
+ * Los campos salen de camposMosaico() con el mismo prefijo y número de fotos.
+ * Diseño ajustable con variables CSS:
+ *   --mosaico-alto, --mosaico-fondo-frase, --mosaico-tinta-frase,
+ *   --mosaico-fuente-frase, --mosaico-espacio
+ * o pisando las clases .mosaico__*.
+ */
+import { clavesMosaico } from "../index";
+
+interface Props {
+  valores: Record<string, string>;
+  prefijo?: string;
+  fotos?: number;
+  class?: string;
+}
+const { valores: v, prefijo = "mosaico", fotos = 4, class: clase } = Astro.props;
+const k = clavesMosaico(prefijo, fotos);
+---
+<section class:list={["mosaico", clase]} style={`--mosaico-fotos: ${k.fotos.length}`} aria-label={v[k.frase]}>
+  {k.fotos.map((f) => (
+    <img
+      class="mosaico__foto"
+      src={v[f.imagen]}
+      alt={v[f.imagenAlt]}
+      data-c-src={f.imagen}
+      data-c-alt={f.imagenAlt}
+      width="500"
+      height="500"
+      loading="lazy"
+      decoding="async"
+    />
+  ))}
+  <div class="mosaico__frase">
+    <p class="mosaico__ante" data-c={k.antetitulo} data-c-si={k.antetitulo} hidden={!v[k.antetitulo]}>{v[k.antetitulo]}</p>
+    <p class="mosaico__texto"><span data-c={k.frase}>{v[k.frase]}</span></p>
+    <svg class="mosaico__corazon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 20s-7.5-4.6-7.5-10.1A4.2 4.2 0 0 1 12 7.4a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z" />
+    </svg>
+  </div>
+</section>
+
+<style is:global>
+  .mosaico {
+    --mosaico-alto: clamp(150px, 17vw, 230px);
+    --mosaico-espacio: 3px;
+    --mosaico-fondo-frase: var(--c-pie, #6e1430);
+    --mosaico-tinta-frase: #fff;
+    --mosaico-fuente-frase: var(--fuente-titulo, Georgia, serif);
+    display: grid;
+    grid-template-columns: repeat(var(--mosaico-fotos), 1fr) 1.45fr;
+    gap: var(--mosaico-espacio);
+    background: #fff;
+  }
+  .mosaico__foto { display: block; width: 100%; height: var(--mosaico-alto); object-fit: cover; min-width: 0; }
+  .mosaico__frase {
+    position: relative; display: flex; flex-direction: column; justify-content: center;
+    padding: 18px clamp(18px, 2.4vw, 32px); color: var(--mosaico-tinta-frase);
+    background:
+      radial-gradient(90% 70% at 85% 10%, rgba(255, 255, 255, .14), transparent 60%),
+      radial-gradient(70% 90% at 0% 100%, rgba(0, 0, 0, .25), transparent 65%),
+      var(--mosaico-fondo-frase);
+  }
+  .mosaico__ante { margin: 0 0 8px; font-family: var(--mosaico-fuente-frase); font-style: italic; font-size: .95rem; opacity: .92; }
+  .mosaico__texto {
+    margin: 0; font-family: var(--mosaico-fuente-frase); font-size: clamp(1.25rem, 2.1vw, 1.75rem);
+    line-height: 1.18; white-space: pre-line;
+  }
+  .mosaico__corazon {
+    position: absolute; right: 18px; bottom: 16px; width: 24px; height: 24px;
+    fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; opacity: .9;
+  }
+  @media (max-width: 760px) {
+    .mosaico { grid-template-columns: repeat(2, 1fr); }
+    .mosaico__foto { height: auto; aspect-ratio: 1; }
+    .mosaico__frase { grid-column: 1 / -1; min-height: 150px; }
+  }
+</style>

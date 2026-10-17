@@ -20,7 +20,8 @@ compran la última unidad en el mismo segundo, pasan ambas.
 ## Categorías editables
 
 Desde el panel (pestaña **Categorías**) se cambia el **nombre**, el **nombre
-corto** y la **foto** de cada categoría. Crear o borrar categorías no: cada una
+corto**, la **bajada** (línea chica bajo el nombre en las tarjetas, opcional) y la
+**foto** de cada categoría. Crear o borrar categorías no: cada una
 tiene su página `/tienda/<id>/`, que se arma en el código del sitio.
 
 Lo editado se guarda en KV (`catalogo:categorias`) como cambios encima de las
@@ -30,12 +31,13 @@ elemento marcado así:
 ```astro
 <a href={`/tienda/${c.id}/`} data-categoria={c.id}>{c.nombre}</a>
 <span data-categoria={c.id} data-categoria-campo="corto">{c.corto}</span>
+<span class="bajada" data-categoria={c.id} data-categoria-campo="bajada">{c.bajada}</span>  <!-- vacía: esconder con .bajada:empty -->
 <img src={c.imagen} alt="" data-categoria={c.id} data-categoria-campo="imagen" />
 <title data-categoria={c.id} data-categoria-campo="texto" data-categoria-plantilla="{nombre} | Mi Tienda">…</title>
 <meta name="description" content="…" data-categoria={c.id} data-categoria-campo="content" data-categoria-plantilla="{nombre} hechos a mano." />
 ```
 
-Campos: `nombre` (por defecto), `corto`, `imagen` (src), `alt`, `texto` y
+Campos: `nombre` (por defecto), `corto`, `bajada`, `imagen` (src), `alt`, `texto` y
 `content` (estos dos con la plantilla, `{nombre}` y `{corto}`). Todo texto va
 escapado. Panel: `functions/api/admin/categorias.ts` (`panel.categorias`) y
 `functions/api/admin/categoria-foto.ts` (`panel.categoriaFoto`).
