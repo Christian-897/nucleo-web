@@ -37,6 +37,9 @@ function diapositiva(d: Diapositiva, i: number, total: number, op: OpcionesCarru
     partes.push(
       `<${h} class="carrusel__titulo">` +
         (d.titulo ? `<span class="carrusel__nombre">${escapar(d.titulo)}</span>` : "") +
+        // Espacio entre las dos líneas: en pantalla no se nota (son celdas de grilla),
+        // pero sin él Google y los lectores de pantalla leen "sano,bonito".
+        (d.titulo && d.subtitulo ? " " : "") +
         (d.subtitulo ? `<span class="carrusel__subtitulo">${escapar(d.subtitulo)}</span>` : "") +
         `</${h}>`
     );

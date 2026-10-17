@@ -217,6 +217,15 @@ async function run() {
     assert.ok(!htmlCarrusel(copia(), { tituloPrincipal: false }).includes("<h1"));
   });
 
+  await prueba("título en dos líneas: lleva un espacio entre ellas (Google no lee 'sano,bonito')", () => {
+    const dos = htmlCarrusel({ ...copia(), diapositivas: [{ id: "a", imagen: "/img/a.webp", imagenAlt: "x", titulo: "Tu cabello, más sano,", subtitulo: "bonito y sin frizz." }] });
+    assert.ok(dos.includes('más sano,</span> <span class="carrusel__subtitulo">bonito'));
+    const sinTexto = dos.replace(/<[^>]+>/g, "");
+    assert.ok(sinTexto.includes("más sano, bonito"), "el texto leído tiene el espacio");
+    const una = htmlCarrusel({ ...copia(), diapositivas: [{ id: "a", imagen: "/img/a.webp", imagenAlt: "x", titulo: "Solo título" }] });
+    assert.ok(una.includes('<span class="carrusel__nombre">Solo título</span></h1>'), "con una sola línea no se agrega nada");
+  });
+
   await prueba("controles accesibles: pausa, flechas y un punto por diapositiva", () => {
     const html = htmlCarrusel(copia());
     assert.match(html, /data-carrusel-pausa aria-label="Pausar el carrusel"/);

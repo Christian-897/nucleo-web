@@ -322,7 +322,7 @@ export function crearVistaSitio(a: Ayudas) {
     }
     caja.append(etiqueta);
     if (c.tipo === "fuente") {
-      const muestra = crear("p", "pa-muestra-fuente", "Tejidos hechos a mano · Aa Ññ 123");
+      const muestra = crear("p", "pa-muestra-fuente", "Así se verán tus textos · Aa Ññ 123");
       muestra.dataset.muestraDe = c.clave;
       caja.append(muestra);
     }

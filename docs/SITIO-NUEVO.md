@@ -32,6 +32,10 @@ de trabajo acordadas. Pensada para leerla al comienzo de cada chat nuevo.
    YouTube, Google).
 10. **Lo más simple para el cliente final:** todo editable desde el panel; nada
     que lo obligue a entrar a Cloudflare.
+11. **Tipografías: se suman por proyecto.** Si el diseño usa letras que no están
+    en `modulos/contenido/fuentes.ts`, se agregan al núcleo las del diseño **y
+    algunas alternativas del mismo estilo**, con prueba y muestrario para que el
+    usuario las apruebe antes. No se agregan "por si acaso".
 
 ### Verificar una subida del núcleo
 

@@ -6,8 +6,11 @@
 import assert from "node:assert/strict";
 import type { AlmacenKV } from "../core/tipos";
 import {
+  COMBINACIONES,
   contraste,
   crearContenidoEditable,
+  FUENTES,
+  fuentePorId,
   enlacesTema,
   hrefDe,
   jsonLdFaq,
@@ -101,6 +104,26 @@ async function run() {
     assert.ok(validarValor(campo("fuentes.titulo"), "pacifico").ok);
     assert.ok(!validarValor(campo("fuentes.titulo"), "Comic Sans").ok);
     assert.ok(!validarValor(campo("fuentes.texto"), "pacifico").ok, "Pacifico no sirve para texto largo");
+    assert.ok(validarValor(campo("fuentes.texto"), "lora").ok, "Lora: serif de lectura para textos");
+    assert.ok(!validarValor(campo("fuentes.texto"), "cinzel").ok, "Cinzel (mayúsculas decorativas) solo para títulos");
+    assert.ok(!validarValor(campo("fuentes.texto"), "cormorant-garamond").ok, "Cormorant es muy fina para párrafos");
+  });
+
+  await prueba("lista de tipografías: ids únicos y en formato de carpeta; combinaciones válidas", () => {
+    const ids = FUENTES.map((f) => f.id);
+    assert.equal(new Set(ids).size, ids.length, "sin ids repetidos");
+    assert.equal(FUENTES.length, 34);
+    for (const f of FUENTES) {
+      assert.match(f.id, /^[a-z0-9-]+$/, `id de carpeta: ${f.id}`);
+      assert.ok(f.roles.length > 0 && f.archivos.length > 0, f.id);
+      assert.match(f.paquete, /^@fontsource(-variable)?\//, f.id);
+      assert.ok(!/[<>;{}]/.test(f.familia), `familia sin caracteres de CSS: ${f.id}`);
+    }
+    for (const c of COMBINACIONES) {
+      assert.ok(fuentePorId(c.titulo)?.roles.includes("titulo"), `${c.id}: título`);
+      assert.ok(fuentePorId(c.texto)?.roles.includes("texto"), `${c.id}: texto`);
+      assert.ok(fuentePorId(c.firma)?.roles.includes("firma"), `${c.id}: firma`);
+    }
   });
 
   await prueba("foto: solo /img/ o /media/; enlaces y teléfonos se normalizan", () => {

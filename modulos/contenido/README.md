@@ -61,7 +61,7 @@ Para párrafos con saltos de línea, el sitio pone `white-space: pre-line`.
 ### Tipografías
 
 Una vez por sitio se copian a `public/fuentes/` (solo letras latinas,
-unos 760 KB en total; cada visitante descarga solo las elegidas):
+unos 1,6 MB en total; cada visitante descarga solo las elegidas):
 
 ```sh
 # en una carpeta temporal
@@ -69,6 +69,10 @@ npm i @fontsource/caveat-brush @fontsource/pacifico … (los paquetes de fuentes
 # desde el núcleo
 npx tsx scripts/copiar-fuentes.ts <carpeta>/node_modules <sitio>/public/fuentes
 ```
+
+**Al subir de versión el núcleo**, si la lista creció (ver el release), hay
+que volver a copiar las tipografías al sitio con el mismo comando: el panel
+ofrece toda la lista y una letra sin sus archivos se vería con la de respaldo.
 
 Las tipografías iniciales del sitio siguen viniendo en su CSS; si se elige
 otra, el borde agrega su hoja (`/fuentes/<id>/fuente.css`) y `/tema.css`.
