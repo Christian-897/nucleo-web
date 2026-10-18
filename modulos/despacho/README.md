@@ -11,6 +11,12 @@ para que la dueña solo marque casillas:
 - **Regiones:** valor de **zona cercana** y de **zona extrema**, y las 15
   regiones con casillas (marcadas = cercana; el resto = extrema).
 - Opcional: **gratis desde $X** en productos. `0` = gratis en esa zona.
+- **Mostrar los valores del despacho en la tienda** (casilla, marcada de
+  fábrica). Desmarcada: la ficha, Términos y la nota del carrito no publican
+  montos por zona ("el valor se calcula en el carrito según tu comuna"); el
+  comprador ve SU valor recién en el carrito al elegir región y comuna,
+  sumado al total antes de pagar (Ley 19.496). La promo "gratis desde $X" se
+  sigue mostrando. Lo guardado antes de esta opción sigue mostrando valores.
 
 De fábrica: Gran Santiago + Puente Alto + San Bernardo = centro; Arica y
 Parinacota, Aysén y Magallanes = extremas; modo "por pagar".

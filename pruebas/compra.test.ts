@@ -414,6 +414,21 @@ async function run() {
     assert.equal(calcularDespacho({ ...base, centro: 0 }, { region: RM, comuna: "Providencia" }, 5000, "al-recibir").forma, "ahora", "si es gratis no hay nada que pagar al recibir");
   });
 
+  await prueba("sin mostrar valores: ningún aviso publica montos por zona, pero el carrito igual cobra lo correcto", () => {
+    const base = { ...despacho.inicial, gratisDesde: null, mostrarValores: false };
+    const t = textosDespacho(base, "Por pagar.");
+    for (const texto of [t.corto, t.ficha, t.detalle]) assert.doesNotMatch(texto, /\$|zona/i, texto);
+    assert.match(t.ficha, /se calcula en el carrito/);
+    assert.match(t.detalle, /lo verás en el carrito, antes de pagar/);
+    assert.match(textosDespacho({ ...base, gratisDesde: 30000 }, "x").ficha, /Gratis en compras desde \$30\.000/, "la promo de gratis se mantiene");
+    assert.equal(calcularDespacho(base, { region: RM, comuna: "Providencia" }, 5000, "ahora").costo, 3500);
+    const guardadoAntes = validarTarifas({ ...despacho.inicial, mostrarValores: undefined });
+    assert.ok(guardadoAntes.ok && guardadoAntes.datos.mostrarValores === true, "lo guardado antes de esta opción sigue mostrando valores");
+    assert.equal(validarTarifas({ ...despacho.inicial, mostrarValores: "no" }).ok, false);
+    const apagado = validarTarifas({ ...despacho.inicial, mostrarValores: false });
+    assert.ok(apagado.ok && apagado.datos.mostrarValores === false);
+  });
+
   await prueba("correos: despacho cobrado o por pagar, con la zona", () => {
     const base = { orden: "o1", monto: 23500, lineas: [{ productoId: "gatito", nombre: "Gatito", cantidad: 1, precioUnitario: 18000, subtotal: 18000 }], comprador: { ...comprador, notas: "", aceptaPolitica: true as const }, requiereDespacho: true, tieneDigitales: false };
     const c = correoComprador(configDespacho, { ...base, despacho: { forma: "ahora", costo: 5500, zona: "cercana", gratisPorMonto: false } });

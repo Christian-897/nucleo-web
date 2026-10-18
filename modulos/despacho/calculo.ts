@@ -33,6 +33,13 @@ export interface TarifasDespacho {
   regionesCercanas: string[];
   /** Compras de este monto o más (en productos) no pagan despacho. null = sin esa regla. */
   gratisDesde: number | null;
+  /**
+   * true (por defecto): los avisos de la tienda (ficha, términos, nota del
+   * carrito) muestran la tabla de valores por zona. false: no muestran
+   * montos; el valor aparece solo en el carrito, al elegir región y comuna,
+   * sumado al total antes de pagar (lo exige la Ley 19.496).
+   */
+  mostrarValores: boolean;
 }
 
 export const ZONAS: { id: ZonaDespacho; nombre: string }[] = [
@@ -85,6 +92,7 @@ export const TARIFAS_POR_DEFECTO: TarifasDespacho = {
   comunasCentro: COMUNAS_CENTRO_POR_DEFECTO,
   regionesCercanas: REGIONES_CERCANAS_POR_DEFECTO,
   gratisDesde: null,
+  mostrarValores: true,
 };
 
 export const MAXIMO_TARIFA = 200_000;
@@ -162,6 +170,15 @@ export function textosDespacho(t: TarifasDespacho, detallePorPagar: string): Tex
       filaSinRegion: "Gratis",
     };
   }
+  const gratis0 = t.gratisDesde !== null ? ` Gratis en compras desde ${formatearPrecio(t.gratisDesde)}.` : "";
+  if (!t.mostrarValores) {
+    return {
+      corto: t.gratisDesde !== null ? `Despacho gratis desde ${formatearPrecio(t.gratisDesde)}` : "Envíos a todo Chile",
+      ficha: `Despacho a todo Chile: el valor se calcula en el carrito según tu comuna.${gratis0}`,
+      detalle: `El valor del despacho depende de tu comuna o región y lo verás en el carrito, antes de pagar.${gratis0}${alRecibir} Los cursos y patrones llegan a tu correo.`,
+      filaSinRegion: "Elige tu región",
+    };
+  }
   const iguales = valores.every((v) => v === valores[0]);
   const tabla = iguales
     ? `${formatearPrecio(valores[0])} a todo Chile`
@@ -233,6 +250,11 @@ export function validarTarifas(entrada: unknown): ResultadoTarifas {
       errores.gratisDesde = "El monto para despacho gratis va desde $1.000, sin decimales. Déjalo vacío si no lo usas.";
     } else gratisDesde = v;
   }
+  // Lo guardado antes de esta opción no la trae: sigue mostrando valores, como antes.
+  if (e.mostrarValores !== undefined && typeof e.mostrarValores !== "boolean") {
+    errores.mostrarValores = "Indica si se muestran los valores del despacho en la tienda.";
+  }
+  const mostrarValores = e.mostrarValores !== false;
   if (Object.keys(errores).length) return { ok: false, mensaje: "Revisa los campos marcados.", errores };
-  return { ok: true, datos: { pagarAhora, pagarAlRecibir, centro, alejada, cercana, extrema, comunasCentro, regionesCercanas, gratisDesde } };
+  return { ok: true, datos: { pagarAhora, pagarAlRecibir, centro, alejada, cercana, extrema, comunasCentro, regionesCercanas, gratisDesde, mostrarValores } };
 }

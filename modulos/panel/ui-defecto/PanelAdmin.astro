@@ -449,6 +449,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
 
             <label class="pa-campo">Despacho gratis en compras desde (opcional)<input name="gratisDesde" inputmode="numeric" autocomplete="off" placeholder="Ej: 30.000 — vacío si no lo usas" /></label>
             <p class="pa-tenue pa-chico">Pon 0 en una zona para que ahí sea gratis.</p>
+            <label class="pa-casilla"><input type="checkbox" name="mostrarValores" /> Mostrar los valores del despacho en la tienda (producto, carrito y Términos)</label>
+            <p class="pa-tenue pa-chico">Desmarcado, no se publican los valores por zona: el comprador ve el valor de su despacho recién en el carrito, al elegir su región y comuna, sumado al total antes de pagar.</p>
           </div>
 
           <div class="pa-aviso">
@@ -456,6 +458,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
             <p class="pa-chico">La ficha de cada producto y el carrito se actualizan solos.</p>
             <p class="pa-chico" data-despacho-vista-corto></p>
             <p class="pa-chico" data-despacho-vista-ficha></p>
+            <p class="pa-chico" data-despacho-vista-detalle></p>
           </div>
           <p class="pa-error" role="alert" data-error></p>
           <button class="pa-boton" type="submit">Guardar despacho</button>

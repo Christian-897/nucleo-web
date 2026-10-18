@@ -1182,6 +1182,7 @@ function tarifasDelFormulario(): Record<string, unknown> {
     comunasCentro: marcadas("comunas"),
     regionesCercanas: marcadas("regiones"),
     gratisDesde: leerPesos(d.get("gratisDesde")),
+    mostrarValores: d.get("mostrarValores") === "on",
   };
 }
 
@@ -1208,11 +1209,13 @@ function vistaDespacho() {
       centro: num(t.centro), alejada: num(t.alejada), cercana: num(t.cercana), extrema: num(t.extrema),
       comunasCentro: t.comunasCentro as string[], regionesCercanas: t.regionesCercanas as string[],
       gratisDesde: (t.gratisDesde as number | null) ?? null,
+      mostrarValores: t.mostrarValores === true,
     },
     despachoBase.detallePorPagar
   );
   $("[data-despacho-vista-corto]").textContent = `Texto sugerido para la franja de arriba (se cambia en Diseño y textos): “${tx.corto}”`;
   $("[data-despacho-vista-ficha]").textContent = `Ficha del producto: “${tx.ficha}”`;
+  $("[data-despacho-vista-detalle]").textContent = `Carrito y Términos: “${tx.detalle}”`;
 }
 
 function casillas(tipo: "comunas" | "regiones", nombres: string[], marcadasAhora: string[]) {
@@ -1233,6 +1236,7 @@ function llenarDespacho(t: TarifasDespacho) {
   $<HTMLInputElement>('input[name="pagarAhora"]', formDespacho).checked = t.pagarAhora;
   for (const z of ["centro", "alejada", "cercana", "extrema"] as const) $<HTMLInputElement>(`input[name="${z}"]`, formDespacho).value = mostrarPesos(t[z]);
   $<HTMLInputElement>('input[name="gratisDesde"]', formDespacho).value = mostrarPesos(t.gratisDesde);
+  $<HTMLInputElement>('input[name="mostrarValores"]', formDespacho).checked = t.mostrarValores !== false;
   casillas("comunas", despachoBase.comunasRM, t.comunasCentro);
   casillas("regiones", despachoBase.regiones, t.regionesCercanas);
   const tx = textosDespacho(t, despachoBase.detallePorPagar);
