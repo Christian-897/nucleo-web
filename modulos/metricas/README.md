@@ -30,6 +30,9 @@ Los días se cuentan en hora de Chile (`America/Santiago`), configurable con
   orden). Si falla, la venta igual queda pagada.
 - El panel (pestaña **Resumen**, `GET /api/admin/resumen`) primero "se pone al
   día" con los pedidos pagados que aún no estén contados, y luego calcula.
+- Pedido **anulado** desde el panel: `quitarPedido` resta lo que se sumó y
+  deja la marca como `anulado:<día>`, así el "ponerse al día" nunca lo vuelve
+  a sumar (aunque después se borre el pedido).
 - Totales por **día** (`metricas:dia:AAAA-MM-DD`): duran 400 días. Sirven
   para el gráfico de 30 días y para cortar el año anterior en el mismo día.
 - Totales por **mes** (`metricas:mes:AAAA-MM`): **no vencen nunca**. Son 12

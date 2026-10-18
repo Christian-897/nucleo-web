@@ -65,6 +65,31 @@ export async function registrarVenta(
   }
 }
 
+/**
+ * Devuelve al stock lo de un pedido anulado (devolución o prueba): resta
+ * esas unidades del contador de vendidos, sin bajar de 0. Si el stock se
+ * editó en el panel después de la venta (contador en 0), no hay nada que
+ * devolver: el número que se escribió ya es el disponible.
+ */
+export async function devolverUnidades(
+  catalogo: CatalogoODinamico,
+  env: EnvBase,
+  lineas: { productoId: string; cantidad: number }[]
+): Promise<void> {
+  if (!env.REVIEWS_KV) return;
+  const vigente = await resolverCatalogo(catalogo, env);
+  for (const l of lineas) {
+    const p = vigente.buscar(l.productoId);
+    if (!p || p.stock === undefined) continue;
+    const cantidad = Math.max(0, Math.floor(l.cantidad));
+    if (!cantidad) continue;
+    const actual = await vendidos(env, p.id);
+    const nuevo = Math.max(0, actual - cantidad);
+    if (nuevo === 0) await env.REVIEWS_KV.delete(PREFIJO_VENDIDOS + p.id);
+    else await env.REVIEWS_KV.put(PREFIJO_VENDIDOS + p.id, String(nuevo));
+  }
+}
+
 /** Stock disponible de varios productos (para mostrar "agotado"). */
 export async function stockDisponible(
   catalogo: CatalogoODinamico,

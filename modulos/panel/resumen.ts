@@ -43,7 +43,7 @@ export function crearResumen(zona?: string) {
     // Una sola operación de listado para saber qué pedidos ya están contados.
     const contadas = await ordenesContadas(kv);
     for (const p of pedidos) {
-      if (p.estado !== "pagada" || contadas.has(p.orden)) continue;
+      if (p.estado !== "pagada" || p.anulado || contadas.has(p.orden)) continue;
       try {
         await registrarPedido(kv, p, zona);
       } catch (e) {
@@ -51,7 +51,7 @@ export function crearResumen(zona?: string) {
       }
     }
     const datos = await obtenerResumen(kv, { zona });
-    const porDespachar = pedidos.filter((p) => p.estado === "pagada" && p.requiereDespacho && !p.enviado).length;
+    const porDespachar = pedidos.filter((p) => p.estado === "pagada" && p.requiereDespacho && !p.enviado && !p.anulado).length;
     return jsonResponse(200, { ...datos, porDespachar });
   };
 }

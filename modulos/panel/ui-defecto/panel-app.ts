@@ -56,6 +56,7 @@ interface Pedido {
   tieneDigitales?: boolean;
   despacho?: { forma: string; costo: number; zona?: string; gratisPorMonto?: boolean };
   enviado: string | null;
+  anulado: { fecha: string; por: string; stockDevuelto: boolean } | null;
 }
 
 const raiz = document.querySelector<HTMLElement>("[data-panel]")!;
@@ -1044,23 +1045,26 @@ const ESTADOS: Record<string, [string, string]> = {
 
 async function cargarPedidos() {
   const todos = $<HTMLInputElement>("[data-pedidos-todos]").checked;
-  const r = await obtener<{ pedidos: Pedido[] }>(`${API}/pedidos${todos ? "?todos=1" : ""}`);
+  const r = await obtener<{ pedidos: Pedido[]; puedeAnular?: boolean }>(`${API}/pedidos${todos ? "?todos=1" : ""}`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar los pedidos.");
   const lista = r.datos.pedidos;
-  const porEnviar = lista.filter((p) => p.estado === "pagada" && !p.enviado && p.requiereDespacho).length;
+  const puedeAnular = r.datos.puedeAnular === true;
+  const porEnviar = lista.filter((p) => p.estado === "pagada" && !p.enviado && p.requiereDespacho && !p.anulado).length;
   $("[data-resumen-pedidos]").textContent = lista.length
     ? `${lista.length} pedidos · ${porEnviar} por despachar`
     : "Todavía no hay pedidos pagados.";
   const fecha = (iso: string) => new Date(iso).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" });
   $("[data-lista-pedidos]").replaceChildren(
     ...lista.map((p) => {
-      const li = crear("li", "pa-pedido");
+      const li = crear("li", p.anulado ? "pa-pedido pa-pedido--anulado" : "pa-pedido");
       const cabeza = crear("div", "pa-pedido__cabeza");
       const [txt, clase] = ESTADOS[p.estado] ?? [p.estado, "pa-etiqueta"];
       const izquierda = crear("div");
-      izquierda.append(crear("strong", "", fecha(p.creado)), document.createTextNode(" "), crear("span", clase, txt));
-      if (p.enviado) izquierda.append(document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--ok", "Enviado"));
+      izquierda.append(crear("strong", "", fecha(p.creado)), document.createTextNode(" "));
+      if (p.anulado) izquierda.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Anulado"));
+      else izquierda.append(crear("span", clase, txt));
+      if (p.enviado && !p.anulado) izquierda.append(document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--ok", "Enviado"));
       cabeza.append(izquierda, crear("span", "pa-pedido__total", formatearPrecio(p.monto)));
       li.append(cabeza);
       const c = p.comprador ?? {};
@@ -1082,7 +1086,15 @@ async function cargarPedidos() {
       }
       if (p.tieneDigitales) dato("Incluye cursos o patrones: envía el material al correo del comprador.");
       dato(`Pedido ${p.orden}`);
-      if (p.estado === "pagada") {
+      if (p.anulado) {
+        dato(
+          `Anulado el ${fecha(p.anulado.fecha)} por ${p.anulado.por}. ` +
+            (p.anulado.stockDevuelto ? "Los productos volvieron al stock. " : "") +
+            "Ya no cuenta en las ventas. Si cobraste, la devolución del dinero se hace en Flow o Mercado Pago."
+        );
+      }
+      const botones = crear("div", "pa-mensaje__botones");
+      if (p.estado === "pagada" && !p.anulado) {
         const b = crear("button", p.enviado ? "pa-boton pa-boton--suave pa-boton--chico" : "pa-boton pa-boton--chico", p.enviado ? "Desmarcar enviado" : "Marcar como enviado");
         b.type = "button";
         b.addEventListener("click", async () => {
@@ -1095,8 +1107,50 @@ async function cargarPedidos() {
           }
           await cargarPedidos();
         });
-        li.append(b);
+        botones.append(b);
       }
+      if (puedeAnular && !p.anulado) {
+        const anular = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Anular pedido");
+        anular.type = "button";
+        anular.addEventListener("click", async () => {
+          const ok = confirm(
+            `¿Anular el pedido ${p.orden} por ${formatearPrecio(p.monto)}?\n\n` +
+              "• Deja de contar en las ventas del Resumen.\n" +
+              "• Sus productos vuelven al stock.\n" +
+              "• NO devuelve el dinero: eso se hace en Flow o Mercado Pago.\n\n" +
+              "Úsalo para devoluciones o pedidos de prueba."
+          );
+          if (!ok) return;
+          anular.disabled = true;
+          const r2 = await enviar(`${API}/pedidos`, { accion: "anular", orden: p.orden });
+          if (siSeCerro(r2.status)) return;
+          if (!r2.ok) {
+            anular.disabled = false;
+            return avisar(r2.datos.message || "No se pudo anular.");
+          }
+          avisar("Pedido anulado.");
+          await cargarPedidos();
+        });
+        botones.append(anular);
+      }
+      if (puedeAnular && p.anulado) {
+        const borrar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Borrar");
+        borrar.type = "button";
+        borrar.addEventListener("click", async () => {
+          if (!confirm(`¿Borrar para siempre el pedido ${p.orden}? Desaparece de la lista y no se puede deshacer.`)) return;
+          borrar.disabled = true;
+          const r2 = await enviar(`${API}/pedidos`, { accion: "borrar", orden: p.orden });
+          if (siSeCerro(r2.status)) return;
+          if (!r2.ok) {
+            borrar.disabled = false;
+            return avisar(r2.datos.message || "No se pudo borrar.");
+          }
+          avisar("Pedido borrado.");
+          await cargarPedidos();
+        });
+        botones.append(borrar);
+      }
+      if (botones.childElementCount) li.append(botones);
       return li;
     })
   );

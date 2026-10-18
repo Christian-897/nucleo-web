@@ -956,6 +956,81 @@ async function run() {
     assert.equal(r.pedidos[0].despacho.costo, 7000);
   });
 
+  console.log("Panel — anular pedidos:");
+
+  async function pedidoPagado(env: EnvPanel, orden: string, cantidad = 2) {
+    const kv = env.REVIEWS_KV!;
+    const lineas = [{ productoId: "gatito", nombre: "Gatito", precioUnitario: 18000, cantidad, subtotal: 18000 * cantidad }];
+    await kv.put(`pago:pedido:${orden}`, JSON.stringify({ orden, descripcion: "Compra", moneda: "CLP", email: "ana@correo.cl", proveedor: "flow", monto: 18000 * cantidad, estado: "pagada", creado: new Date().toISOString(), actualizado: "", metadata: { comprador: { nombre: "Ana" }, lineas, requiereDespacho: true, tieneDigitales: false } }));
+    // Lo mismo que hace `compra` al confirmar el pago: descuenta stock y marca.
+    await registrarVenta(catalogo, env, lineas);
+    await kv.put(`compra:procesado:${orden}`, "1");
+  }
+  const resumenDe = async (env: EnvPanel, cookie: string) => json(await panel.resumen.onRequestGet({ env, request: req("/api/admin/resumen", { cookie }) }));
+
+  await prueba("anular: sale de las ventas (y no vuelve), repone el stock y queda marcado; después se puede borrar", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    await pedidoPagado(env, "PRUEBA1", 2);
+    await pedidoPagado(env, "REAL1", 1);
+    assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 0);
+    const antes = await resumenDe(env, cookie);
+    assert.equal(antes.periodos.d30.ventas, 54000);
+    assert.equal(antes.porDespachar, 2);
+
+    const lista = await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(lista.puedeAnular, true, "el dueño puede anular");
+    const borrarAntes = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "borrar", orden: "PRUEBA1" } }) });
+    assert.equal(borrarAntes.status, 409, "no se borra un pedido sin anular");
+
+    const r = await json(await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "anular", orden: "PRUEBA1" } }) }));
+    assert.equal(r.anulado.stockDevuelto, true);
+    assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 2, "las 2 unidades vuelven al stock");
+    const dos = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "anular", orden: "PRUEBA1" } }) });
+    assert.equal(dos.status, 409, "anular dos veces no devuelve stock dos veces");
+    assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 2);
+
+    for (let i = 0; i < 2; i++) {
+      const despues = await resumenDe(env, cookie);
+      assert.equal(despues.periodos.d30.ventas, 18000, "el anulado ya no suma (ni al ponerse al día)");
+      assert.equal(despues.periodos.d30.pedidos, 1);
+      assert.deepEqual(despues.topProductos[0], { nombre: "Gatito", unidades: 1, ventas: 18000 });
+      assert.equal(despues.porDespachar, 1);
+    }
+    const marcado = (await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie }) }))).pedidos.find((p: any) => p.orden === "PRUEBA1");
+    assert.equal(marcado.anulado.por, "sasha");
+
+    const borrado = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "borrar", orden: "PRUEBA1" } }) });
+    assert.equal(borrado.status, 200);
+    assert.ok(!datos.has("pago:pedido:PRUEBA1") && !datos.has("compra:anulado:PRUEBA1"));
+    assert.equal((await resumenDe(env, cookie)).periodos.d30.ventas, 18000, "borrar no cambia las ventas");
+    assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 2, "borrar no toca el stock");
+  });
+
+  await prueba("anular/borrar: solo el dueño, con sesión y mismo origen; acción u orden inválida no", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    await pedidoPagado(env, "ORD9", 1);
+    assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "anular", orden: "ORD9" } }) })).status, 401);
+    const csrf = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.com", cuerpo: { accion: "anular", orden: "ORD9" } }) });
+    assert.equal(csrf.status, 403);
+    for (const cuerpo of [{ accion: "anular", orden: "../x" }, { accion: "destruir", orden: "ORD9" }, { accion: "anular" }]) {
+      assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo }) })).status, 400, JSON.stringify(cuerpo));
+    }
+    assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "anular", orden: "NOEXISTE" } }) })).status, 404);
+    // Una invitada: ve los pedidos, pero no puede anular ni borrar.
+    const inv = await json(await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas: 24, derivado: D1 } }) }));
+    await panel.instalar.onRequestPost({ env, request: req("/api/admin/instalar", { cuerpo: { invitacion: inv.token, usuario: "ayudante", derivado: "d".repeat(64) } }) });
+    const entra = await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "ayudante", derivado: "d".repeat(64) } }) });
+    const cookieInv = cookieDe(entra, "mc_sesion");
+    const vista = await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie: cookieInv }) }));
+    assert.equal(vista.puedeAnular, false);
+    assert.equal(vista.pedidos.length, 1);
+    const intento = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD9" } }) });
+    assert.equal(intento.status, 403);
+    assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 2, "nada cambió");
+  });
+
   console.log("Panel — mensajes de contacto:");
 
   await prueba("mensajes: el formulario avisa a la dueña (responder le llega al visitante) y queda en el panel", async () => {

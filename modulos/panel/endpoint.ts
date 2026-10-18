@@ -92,7 +92,7 @@ const noDisponible = async () => jsonResponse(404, { message: "Esta sección no 
 export function crearPanel(opciones: OpcionesPanel) {
   const productos = opciones.catalogo ? crearGestionProductos(opciones.catalogo, opciones) : null;
   const categorias = opciones.catalogo ? crearGestionCategorias(opciones.catalogo, opciones) : null;
-  const pedidos = crearGestionPedidos(opciones.retencionPedidosDias);
+  const pedidos = crearGestionPedidos(opciones.retencionPedidosDias, opciones.catalogo);
   const resumen = crearResumen(opciones.zonaHoraria);
   const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
   const contenido = opciones.contenido ? crearGestionContenido(opciones.contenido, opciones) : null;

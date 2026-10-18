@@ -16,7 +16,7 @@ import type { Resumen } from "./tipos";
 import { calcularRango, normalizarConsulta, type ConsultaRango, type ReporteRango } from "./rango";
 
 export * from "./tipos";
-export { registrarPedido, leerTotales, leerDias, leerMeses, leerRangoDias, ordenesContadas, PREFIJO_DIA, PREFIJO_CONTADO, PREFIJO_MES } from "./almacen";
+export { registrarPedido, quitarPedido, leerTotales, leerDias, leerMeses, leerRangoDias, ordenesContadas, PREFIJO_DIA, PREFIJO_CONTADO, PREFIJO_MES } from "./almacen";
 export * from "./rango";
 export { calcularResumen, calcularAnual, diasDelMesHasta } from "./calculo";
 export { diaLocal, restarDias, ultimosDias, ZONA_POR_DEFECTO } from "./fechas";

@@ -9,6 +9,7 @@ export {
   fuenteCarrito,
   productoDisponible,
   registrarVenta,
+  devolverUnidades,
   stockDisponible,
   PREFIJO_VENDIDOS,
   reponerStock,

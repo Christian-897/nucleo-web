@@ -75,6 +75,47 @@ export async function registrarPedido(
 }
 
 /** Lee días puntuales (por ejemplo, el mismo mes del año pasado). */
+/**
+ * Saca de las métricas un pedido ANULADO desde el panel (devolución o
+ * prueba). Resta lo que se sumó y deja la marca como "anulado:<día>", así
+ * el "ponerse al día" del Resumen nunca lo vuelve a sumar. Si nunca se
+ * contó, solo deja la marca. Devuelve true si restó algo.
+ */
+export async function quitarPedido(kv: AlmacenKV | undefined, pedido: PedidoParaMetricas): Promise<boolean> {
+  if (!kv || !ORDEN_VALIDA.test(pedido.orden)) return false;
+  const marca = await kv.get(PREFIJO_CONTADO + pedido.orden);
+  if (marca?.startsWith("anulado")) return false;
+  const dia = marca && /^\d{4}-\d{2}-\d{2}$/.test(marca) ? marca : null;
+  // La marca va primero: si algo falla después, el total queda alto, pero nunca se resta dos veces.
+  await kv.put(PREFIJO_CONTADO + pedido.orden, dia ? `anulado:${dia}` : "anulado", { expirationTtl: DURACION });
+  if (!dia) return false;
+
+  const restar = (t: DiaMetricas) => {
+    const monto = entero(pedido.monto);
+    t.v = Math.max(0, t.v - monto);
+    t.n = Math.max(0, t.n - 1);
+    const prov = String(pedido.proveedor || "otro").slice(0, 30);
+    if (t.m[prov]) {
+      const [mn, mv] = t.m[prov];
+      if (mn - 1 <= 0) delete t.m[prov];
+      else t.m[prov] = [mn - 1, Math.max(0, mv - monto)];
+    }
+    for (const l of pedido.lineas ?? []) {
+      const nombre = String(l.nombre ?? "").trim().slice(0, 120);
+      if (!nombre || !t.p[nombre]) continue;
+      const [u, v] = t.p[nombre];
+      const nu = u - entero(l.cantidad);
+      if (nu <= 0) delete t.p[nombre];
+      else t.p[nombre] = [nu, Math.max(0, v - entero(l.subtotal))];
+    }
+    return JSON.stringify(t);
+  };
+  await kv.put(PREFIJO_DIA + dia, restar(leerDia(await kv.get(PREFIJO_DIA + dia))), { expirationTtl: DURACION });
+  const mes = dia.slice(0, 7);
+  await kv.put(PREFIJO_MES + mes, restar(leerDia(await kv.get(PREFIJO_MES + mes))));
+  return true;
+}
+
 export async function leerDias(kv: AlmacenKV | undefined, dias: string[]): Promise<Record<string, DiaMetricas>> {
   const salida: Record<string, DiaMetricas> = {};
   if (!kv || !dias.length) return salida;
