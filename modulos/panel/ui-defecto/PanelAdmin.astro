@@ -187,10 +187,13 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
 
     <!-- ───────────── categorías ───────────── -->
     <section class="pa-vista" data-vista="categorias" hidden>
-      <div class="pa-titulo"><h1>Categorías</h1></div>
-      <p class="pa-tenue">Cambia el nombre y la foto de cada categoría. Se actualiza en el menú, el inicio y la tienda en unos segundos.</p>
+      <div class="pa-titulo">
+        <h1>Categorías</h1>
+        <button class="pa-boton" type="button" data-nueva-categoria>Nueva categoría</button>
+      </div>
+      <p class="pa-tenue">Crea, edita o borra categorías. Los cambios se ven en el menú, el inicio y la tienda en unos segundos. Solo se puede borrar una categoría sin productos.</p>
+      <p class="pa-tenue pa-chico" data-cupo-categorias></p>
       <ul class="pa-lista" data-lista-categorias aria-live="polite"></ul>
-      <p class="pa-tenue pa-chico">¿Necesitas una categoría nueva? Lleva su propia página en la tienda: pídesela a quien mantiene el sitio.</p>
       <button class="pa-enlace" type="button" data-restablecer-categorias hidden>Volver a los nombres y fotos originales</button>
     </section>
 
@@ -200,7 +203,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <h1>Diseño y textos</h1>
         <a class="pa-boton pa-boton--suave" href={tienda} target="_blank" rel="noopener">Ver tienda ↗</a>
       </div>
-      <p class="pa-tenue">Elige una sección, cambia lo que quieras y pulsa <strong>Guardar</strong>. El sitio se actualiza en unos segundos.</p>
+      <p class="pa-tenue">Elige una sección, cambia lo que quieras y pulsa <strong>Guardar cambios</strong>. El sitio se actualiza en unos segundos.</p>
       <div class="pa-secciones" role="group" aria-label="Secciones" data-sitio-grupos></div>
       <form class="pa-panel pa-sitio" data-form="sitio" novalidate>
         <h2 data-sitio-titulo></h2>
@@ -210,7 +213,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <p class="pa-error" role="alert" data-error></p>
         <div class="pa-sitio__pie">
           <button class="pa-enlace" type="button" data-sitio-restablecer>Volver a lo original en esta sección</button>
-          <button class="pa-boton" type="submit">Guardar</button>
+          <button class="pa-boton" type="submit">Guardar cambios</button>
         </div>
       </form>
     </section>
@@ -461,7 +464,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
             <p class="pa-chico" data-despacho-vista-detalle></p>
           </div>
           <p class="pa-error" role="alert" data-error></p>
-          <button class="pa-boton" type="submit">Guardar despacho</button>
+          <button class="pa-boton" type="submit">Guardar cambios</button>
         </form>
       </details>
       <p class="pa-tenue" data-resumen-pedidos></p>
@@ -498,7 +501,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <div class="pa-barra" aria-hidden="true"><span data-cupo-barra></span></div>
           <form class="pa-cupo__form" data-form="cupo" novalidate>
             <label class="pa-campo pa-campo--fila">Correos de boletín por día<input type="number" name="porDia" min="1" max="1000" step="1" inputmode="numeric" required /></label>
-            <button class="pa-boton pa-boton--suave pa-boton--chico" type="submit">Guardar</button>
+            <button class="pa-boton pa-boton--suave pa-boton--chico" type="submit">Guardar cambios</button>
           </form>
           <p class="pa-error" role="alert" data-error></p>
           <p class="pa-tenue pa-chico" data-cupo-ayuda></p>
@@ -658,7 +661,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <p class="pa-error" role="alert" data-error></p>
       <div class="pa-pie-dialogo">
         <button class="pa-boton pa-boton--suave" type="button" data-cerrar-editor>Cancelar</button>
-        <button class="pa-boton" type="submit">Guardar</button>
+        <button class="pa-boton" type="submit">Guardar cambios</button>
       </div>
     </form>
   </dialog>
@@ -692,7 +695,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <p class="pa-error" role="alert" data-error></p>
       <div class="pa-pie-dialogo">
         <button class="pa-boton pa-boton--suave" type="button" data-cerrar-categoria>Cancelar</button>
-        <button class="pa-boton" type="submit">Guardar</button>
+        <button class="pa-boton" type="submit">Guardar cambios</button>
       </div>
     </form>
   </dialog>
@@ -741,7 +744,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <p class="pa-error" role="alert" data-error></p>
       <div class="pa-pie-dialogo">
         <button class="pa-boton pa-boton--suave" type="button" data-cerrar-diapo>Cancelar</button>
-        <button class="pa-boton" type="submit">Guardar</button>
+        <button class="pa-boton" type="submit">Guardar cambios</button>
       </div>
     </form>
   </dialog>

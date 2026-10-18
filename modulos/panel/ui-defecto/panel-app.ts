@@ -588,7 +588,7 @@ formProducto().addEventListener("submit", async (e) => {
       const subida = await agregarFotoProducto(id, foto.archivo!);
       if (siSeCerro(subida.status)) return;
       if (!subida.ok) {
-        errorFoto.textContent = `${subida.datos.message || "Una foto no se pudo subir."} Las demás quedaron guardadas: revisa y vuelve a Guardar.`;
+        errorFoto.textContent = `${subida.datos.message || "Una foto no se pudo subir."} Las demás quedaron guardadas: revisa y vuelve a Guardar cambios.`;
         await cargarProductos();
         editando = productos.find((p) => p.id === id) ?? null;
         return;
@@ -630,21 +630,31 @@ interface CategoriaPanel {
   imagen: string;
   productos: number;
   editada: boolean;
+  nueva?: boolean;
   original: { nombre: string; corto: string; bajada: string };
 }
 let listaCategoriasPanel: CategoriaPanel[] = [];
 
 async function cargarCategorias() {
-  const r = await obtener<{ categorias: CategoriaPanel[]; editadas: boolean }>(`${API}/categorias`);
+  const r = await obtener<{ categorias: CategoriaPanel[]; editadas: boolean; nuevas?: number; maximoNuevas?: number }>(`${API}/categorias`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar las categorías.");
   listaCategoriasPanel = r.datos.categorias;
   $("[data-restablecer-categorias]").hidden = !r.datos.editadas;
+  const usadas = r.datos.nuevas ?? 0;
+  const tope = r.datos.maximoNuevas ?? 0;
+  const lleno = tope > 0 && usadas >= tope;
+  $<HTMLButtonElement>("[data-nueva-categoria]").disabled = lleno;
+  $("[data-cupo-categorias]").textContent = lleno
+    ? `Llegaste al máximo de ${tope} categorías nuevas. Para crear otra, borra una que no uses.`
+    : usadas > 0
+      ? `Categorías nuevas: ${usadas} de ${tope}.`
+      : "";
   $("[data-lista-categorias]").replaceChildren(
     ...listaCategoriasPanel.map((c) => {
       const li = crear("li", "pa-fila");
       const img = crear("img");
-      img.src = c.imagen;
+      if (c.imagen) img.src = c.imagen;
       img.alt = "";
       img.width = 64;
       img.height = 64;
@@ -655,7 +665,8 @@ async function cargarCategorias() {
       datos.append(crear("span", "", c.productos === 1 ? "1 producto" : `${c.productos} productos`));
       if (c.corto && c.corto !== c.nombre) datos.append(crear("span", "", `Corto: ${c.corto}`));
       if (c.bajada) datos.append(crear("span", "", `Bajada: ${c.bajada}`));
-      if (c.editada) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Editada"));
+      if (c.nueva) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Nueva"));
+      else if (c.editada) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Editada"));
       info.append(datos);
       const botones = crear("div", "pa-fila__botones");
       const editar = crear("button", "pa-boton pa-boton--chico", "Editar");
@@ -666,12 +677,35 @@ async function cargarCategorias() {
       ver.href = `/tienda/${encodeURIComponent(c.id)}/`;
       ver.target = "_blank";
       ver.rel = "noopener";
-      botones.append(editar, ver);
+      const borrar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Borrar");
+      borrar.type = "button";
+      borrar.setAttribute("aria-label", `Borrar la categoría ${c.nombre}`);
+      if (c.productos > 0) borrar.title = "Primero mueve sus productos a otra categoría.";
+      borrar.addEventListener("click", () => borrarCategoria(c, borrar));
+      botones.append(editar, ver, borrar);
       li.append(img, info, botones);
       return li;
     })
   );
 }
+
+async function borrarCategoria(c: CategoriaPanel, boton: HTMLButtonElement) {
+  if (c.productos > 0) {
+    return avisar(`“${c.nombre}” tiene ${c.productos === 1 ? "1 producto" : `${c.productos} productos`}. Muévelos a otra categoría (en Productos → Editar) y vuelve a intentar.`);
+  }
+  if (!confirm(`¿Borrar la categoría “${c.nombre}”? Desaparece del menú, del inicio y de la tienda.`)) return;
+  boton.disabled = true;
+  const r = await enviar(`${API}/categorias`, { accion: "borrar", id: c.id });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    boton.disabled = false;
+    return avisar(r.datos.message || "No se pudo borrar.");
+  }
+  avisar("Categoría borrada. La tienda se actualiza en unos segundos.");
+  await cargarCategorias();
+}
+
+$("[data-nueva-categoria]").addEventListener("click", () => abrirEditorCategoria(null));
 
 $("[data-restablecer-categorias]").addEventListener("click", async () => {
   if (!confirm("¿Volver a los nombres y fotos originales de todas las categorías?")) return;
@@ -688,7 +722,8 @@ let categoriaEditando: CategoriaPanel | null = null;
 let fotoPendienteCategoria: File | null = null;
 let vistaPreviaCategoria = "";
 
-function abrirEditorCategoria(c: CategoriaPanel) {
+/** c = null: crear una categoría nueva. */
+function abrirEditorCategoria(c: CategoriaPanel | null) {
   categoriaEditando = c;
   fotoPendienteCategoria = null;
   const f = formCategoria();
@@ -697,16 +732,17 @@ function abrirEditorCategoria(c: CategoriaPanel) {
   $$("[data-error-categoria]", f).forEach((e) => (e.textContent = ""));
   $$("[aria-invalid]", f).forEach((e) => e.removeAttribute("aria-invalid"));
   $("[data-error-foto-categoria]").textContent = "";
-  $("[data-categoria-titulo]").textContent = `Categoría: ${c.nombre}`;
-  (f.elements.namedItem("nombre") as HTMLInputElement).value = c.nombre;
-  (f.elements.namedItem("corto") as HTMLInputElement).value = c.corto === c.nombre ? "" : c.corto;
-  (f.elements.namedItem("bajada") as HTMLInputElement).value = c.bajada;
-  $("[data-categoria-original]").textContent = c.editada ? `Nombre original del sitio: ${c.original.nombre}` : "";
+  $("[data-categoria-titulo]").textContent = c ? `Categoría: ${c.nombre}` : "Nueva categoría";
+  (f.elements.namedItem("nombre") as HTMLInputElement).value = c?.nombre ?? "";
+  (f.elements.namedItem("corto") as HTMLInputElement).value = !c || c.corto === c.nombre ? "" : c.corto;
+  (f.elements.namedItem("bajada") as HTMLInputElement).value = c?.bajada ?? "";
+  $("[data-categoria-original]").textContent = c?.editada && !c.nueva ? `Nombre original del sitio: ${c.original.nombre}` : "";
   if (vistaPreviaCategoria) URL.revokeObjectURL(vistaPreviaCategoria);
   vistaPreviaCategoria = "";
   const img = $<HTMLImageElement>("[data-categoria-foto]");
-  img.src = c.imagen;
-  img.alt = `Foto de ${c.nombre}`;
+  if (c?.imagen) img.src = c.imagen;
+  else img.removeAttribute("src");
+  img.alt = c ? `Foto de ${c.nombre}` : "Foto de la categoría nueva";
   editorCategoria().showModal();
   (f.elements.namedItem("nombre") as HTMLInputElement).focus();
 }
@@ -734,7 +770,6 @@ $<HTMLInputElement>("[data-categoria-archivo]").addEventListener("change", async
 
 formCategoria().addEventListener("submit", async (e) => {
   e.preventDefault();
-  if (!categoriaEditando) return;
   const c = categoriaEditando;
   const f = e.currentTarget as HTMLFormElement;
   const d = new FormData(f);
@@ -742,11 +777,11 @@ formCategoria().addEventListener("submit", async (e) => {
   $$("[data-error-categoria]", f).forEach((x) => (x.textContent = ""));
   $$("[aria-invalid]", f).forEach((x) => x.removeAttribute("aria-invalid"));
   await conBoton(f, async () => {
-    const r = await enviar<{ errores?: Record<string, string> }>(`${API}/categorias`, {
-      accion: "guardar",
-      id: c.id,
-      categoria: { nombre: String(d.get("nombre") || ""), corto: String(d.get("corto") || ""), bajada: String(d.get("bajada") || "") },
-    });
+    const categoria = { nombre: String(d.get("nombre") || ""), corto: String(d.get("corto") || ""), bajada: String(d.get("bajada") || "") };
+    const r = await enviar<{ errores?: Record<string, string>; id?: string }>(
+      `${API}/categorias`,
+      c ? { accion: "guardar", id: c.id, categoria } : { accion: "crear", categoria }
+    );
     if (siSeCerro(r.status)) return;
     if (!r.ok) {
       for (const [campo, texto] of Object.entries(r.datos.errores ?? {})) {
@@ -756,8 +791,10 @@ formCategoria().addEventListener("submit", async (e) => {
       }
       return errorDe(f, r.datos.message || "No se pudo guardar.");
     }
-    if (fotoPendienteCategoria) {
-      const subida = await subirFotoCategoria(c.id, fotoPendienteCategoria);
+    const id = c?.id ?? r.datos.id ?? "";
+    if (!c) categoriaEditando = { id, nombre: categoria.nombre, corto: categoria.corto, bajada: categoria.bajada, imagen: "", productos: 0, editada: false, nueva: true, original: { ...categoria } };
+    if (fotoPendienteCategoria && id) {
+      const subida = await subirFotoCategoria(id, fotoPendienteCategoria);
       if (siSeCerro(subida.status)) return;
       if (!subida.ok) {
         await cargarCategorias();
@@ -767,7 +804,7 @@ formCategoria().addEventListener("submit", async (e) => {
       fotoPendienteCategoria = null;
     }
     editorCategoria().close();
-    avisar("Guardado. La tienda se actualiza en unos segundos.");
+    avisar(c ? "Guardado. La tienda se actualiza en unos segundos." : "Categoría creada. Ya puedes asignarle productos en Productos → Editar.");
     await cargarCategorias();
   });
 });

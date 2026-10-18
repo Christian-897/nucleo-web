@@ -19,10 +19,10 @@ compran la última unidad en el mismo segundo, pasan ambas.
 
 ## Categorías editables
 
-Desde el panel (pestaña **Categorías**) se cambia el **nombre**, el **nombre
-corto**, la **bajada** (línea chica bajo el nombre en las tarjetas, opcional) y la
-**foto** de cada categoría. Crear o borrar categorías no: cada una
-tiene su página `/tienda/<id>/`, que se arma en el código del sitio.
+Desde el panel (pestaña **Categorías**) se **crean** y **borran** categorías
+(solo vacías; hasta `MAXIMO_NUEVAS` = 12 nuevas) y se cambia el **nombre**, el
+**nombre corto**, la **bajada** (línea chica bajo el nombre en las tarjetas,
+opcional) y la **foto** de cada una.
 
 Lo editado se guarda en KV (`catalogo:categorias`) como cambios encima de las
 categorías del sitio. El borde (`crearBordeCatalogo`) pone al día todo
@@ -41,6 +41,32 @@ Campos: `nombre` (por defecto), `corto`, `bajada`, `imagen` (src), `alt`, `texto
 `content` (estos dos con la plantilla, `{nombre}` y `{corto}`). Todo texto va
 escapado. Panel: `functions/api/admin/categorias.ts` (`panel.categorias`) y
 `functions/api/admin/categoria-foto.ts` (`panel.categoriaFoto`).
+
+### Categorías nuevas y borradas: qué pone el sitio
+
+Lo creado/borrado va en KV (`catalogo:categorias-estructura`). Para que una
+categoría nueva aparezca sin reconstruir:
+
+1. **Cada lista de categorías** (menú, pie, filtros, tarjetas de portada) se
+   marca así; los espacios (`data-cats-slot`, `MAXIMO_NUEVAS`) van ocultos:
+
+   ```astro
+   <ul data-cats-lista>
+     {categorias.map((c) => <li data-cats-item={c.id}><a href={`/tienda/${c.id}/`} data-categoria={c.id}>{c.nombre}</a></li>)}
+     {Array.from({ length: MAXIMO_NUEVAS }, () => <li data-cats-slot hidden><a href="/tienda/" data-cats="enlace nombre"></a></li>)}
+   </ul>
+   ```
+
+   Campos de `data-cats`: `enlace` (href, y `aria-current="page"` en su
+   página), `nombre`, `corto`, `bajada`, `imagen` (src), `alt`. Un
+   `data-cats-item` de una categoría borrada se quita.
+2. **Plantilla de página**: construir `/tienda/plantilla/` como una categoría
+   más con id `plantilla` (nombre único, p. ej. "Plantilla de categoría"),
+   con `<meta name="robots" content="noindex" data-plantilla>`.
+3. **Función** `functions/tienda/[categoria].ts`:
+   `export const { onRequestGet } = crearPaginaCategoria(fuenteCatalogo, opciones)`.
+   Sirve la página estática de las categorías del sitio, arma la de las
+   nuevas desde la plantilla y da 404 a las borradas.
 
 ## Galería de fotos (hasta 20 por producto)
 

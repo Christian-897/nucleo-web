@@ -25,6 +25,12 @@ export {
 } from "./almacen";
 export {
   CLAVE_CATEGORIAS,
+  CLAVE_ESTRUCTURA,
+  MAXIMO_NUEVAS,
+  limpiarEstructura,
+  categoriasVigentes,
+  type CategoriaNueva,
+  type EstructuraCategorias,
   LIMITES_CATEGORIA,
   validarCambioCategoria,
   limpiarCambios,
@@ -39,6 +45,8 @@ export { consultarStock } from "./cliente";
 export {
   crearBordeCatalogo,
   crearFichaProducto,
+  crearPaginaCategoria,
+  categoriaDeRuta,
   productosDeLista,
   imagenSegura,
   rellenarPlantilla,

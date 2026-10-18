@@ -1,14 +1,63 @@
 /**
- * CATEGORÍAS EDITABLES: nombre, nombre corto, bajada y foto de cada categoría se
- * cambian desde el panel. Las categorías en sí (cuáles existen y su
- * dirección /tienda/<id>/) las define el sitio: crear una nueva necesita
- * su página, y eso se hace en el código.
- *
- * Lo editado se guarda aparte del catálogo (KV "catalogo:categorias") como
- * cambios por id, encima de las categorías del sitio.
+ * CATEGORÍAS EDITABLES desde el panel:
+ *  - nombre, nombre corto, bajada y foto de cada una (KV "catalogo:categorias",
+ *    cambios por id encima de las del sitio);
+ *  - categorías NUEVAS y categorías del sitio BORRADAS (KV
+ *    "catalogo:categorias-estructura"). Las nuevas no tienen página
+ *    estática: el borde arma /tienda/<id>/ desde una plantilla y las agrega
+ *    a los menús en los espacios que el sitio deja (ver borde.ts). Solo se
+ *    borra una categoría sin productos.
  */
 import { normalizeInput } from "../../core/validar";
+import { ID_VALIDO } from "./catalogo";
 import type { CategoriaCatalogo } from "./tipos";
+
+export const CLAVE_ESTRUCTURA = "catalogo:categorias-estructura";
+/** Tope de categorías nuevas: el sitio deja este número de espacios en sus menús. */
+export const MAXIMO_NUEVAS = 12;
+
+export interface CategoriaNueva {
+  id: string;
+  /** Nombre con que se creó (lo editado después va en los cambios). */
+  nombre: string;
+  creada: string;
+}
+export interface EstructuraCategorias {
+  nuevas: CategoriaNueva[];
+  /** Ids de categorías DEL SITIO que se borraron desde el panel. */
+  ocultas: string[];
+}
+export const ESTRUCTURA_VACIA: EstructuraCategorias = { nuevas: [], ocultas: [] };
+
+/** Limpia lo guardado: ids válidos, sin chocar con las del sitio, sin repetir y con tope. */
+export function limpiarEstructura(crudo: unknown, base: CategoriaCatalogo[]): EstructuraCategorias {
+  const delSitio = new Set(base.map((c) => c.id));
+  const o = (crudo && typeof crudo === "object" && !Array.isArray(crudo) ? crudo : {}) as Record<string, unknown>;
+  const vistas = new Set<string>();
+  const nuevas: CategoriaNueva[] = [];
+  for (const n of Array.isArray(o.nuevas) ? o.nuevas : []) {
+    if (!n || typeof n !== "object") continue;
+    const v = n as Record<string, unknown>;
+    const id = typeof v.id === "string" ? v.id : "";
+    const nombre = typeof v.nombre === "string" ? normalizeInput(v.nombre).trim().slice(0, LIMITES_CATEGORIA.nombre) : "";
+    if (!ID_VALIDO.test(id) || delSitio.has(id) || vistas.has(id) || nombre.length < 2) continue;
+    vistas.add(id);
+    nuevas.push({ id, nombre, creada: typeof v.creada === "string" ? v.creada : "" });
+    if (nuevas.length >= MAXIMO_NUEVAS) break;
+  }
+  const ocultas = [...new Set((Array.isArray(o.ocultas) ? o.ocultas : []).filter((x): x is string => typeof x === "string" && delSitio.has(x)))];
+  return { nuevas, ocultas };
+}
+
+/** Las categorías que rigen: las del sitio (sin las borradas) + las nuevas, con los cambios encima. */
+export function categoriasVigentes(base: CategoriaCatalogo[], estructura: EstructuraCategorias, cambios: CambiosCategorias): CategoriaCatalogo[] {
+  const ocultas = new Set(estructura.ocultas);
+  const lista: CategoriaCatalogo[] = [
+    ...base.filter((c) => !ocultas.has(c.id)),
+    ...estructura.nuevas.map((n) => ({ id: n.id, nombre: n.nombre, corto: n.nombre, nueva: true })),
+  ];
+  return aplicarCambios(lista, cambios);
+}
 
 export const CLAVE_CATEGORIAS = "catalogo:categorias";
 export const LIMITES_CATEGORIA = { nombre: 60, corto: 40, bajada: 40 } as const;

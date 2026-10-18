@@ -6,7 +6,10 @@ import assert from "node:assert/strict";
 import type { AlmacenKV } from "../core/tipos";
 import {
   aplicarCambios,
+  categoriasVigentes,
   crearCatalogoEditable,
+  limpiarEstructura,
+  MAXIMO_NUEVAS,
   limpiarCambios,
   rellenarPlantilla,
   validarCambioCategoria,
@@ -128,6 +131,54 @@ async function run() {
     } finally {
       console.error = original;
     }
+  });
+
+  console.log("Categorías nuevas y borradas:");
+
+  await prueba("estructura: ids válidos, sin chocar con el sitio, sin repetir, con tope; ocultas solo del sitio", () => {
+    const e = limpiarEstructura(
+      {
+        nuevas: [
+          { id: "accesorios", nombre: "Accesorios", creada: "x" },
+          { id: "peluches", nombre: "Choca con el sitio" },
+          { id: "accesorios", nombre: "Repetida" },
+          { id: "Mal Id", nombre: "Mal" },
+          { id: "corto", nombre: "x" },
+          ...Array.from({ length: 20 }, (_, i) => ({ id: `extra-${i}`, nombre: `Extra ${i}` })),
+        ],
+        ocultas: ["flores", "inventada", "flores", 5],
+      },
+      BASE
+    );
+    assert.equal(e.nuevas[0].id, "accesorios");
+    assert.ok(!e.nuevas.some((n) => n.id === "peluches" || n.id === "corto" || n.id === "Mal Id"));
+    assert.equal(e.nuevas.length, MAXIMO_NUEVAS);
+    assert.deepEqual(e.ocultas, ["flores"]);
+    assert.deepEqual(limpiarEstructura("basura", BASE), { nuevas: [], ocultas: [] });
+  });
+
+  await prueba("vigentes: las del sitio sin las borradas, después las nuevas (marcadas), con los cambios encima", () => {
+    const v = categoriasVigentes(BASE, { nuevas: [{ id: "accesorios", nombre: "Accesorios", creada: "" }], ocultas: ["flores"] }, { accesorios: { corto: "Acces." } });
+    assert.deepEqual(v.map((c) => c.id), ["peluches", "accesorios"]);
+    assert.equal(v[1].nueva, true);
+    assert.equal(v[1].corto, "Acces.");
+  });
+
+  await prueba("un producto puede ir a una categoría nueva; a una borrada no", async () => {
+    const { kv } = kvMemoria();
+    const env = { REVIEWS_KV: kv };
+    const fuente = crearCatalogoEditable(PRODUCTOS, BASE);
+    assert.ok(!(await fuente.guardar(env, [...PRODUCTOS, { id: "aros", nombre: "Aros", precio: 1, categoria: "accesorios", tipo: "fisico" }])).ok);
+    assert.ok((await fuente.guardarEstructuraCategorias(env, { nuevas: [{ id: "accesorios", nombre: "Accesorios", creada: "" }], ocultas: ["flores"] })).ok);
+    assert.equal(await fuente.categoriasEditadas(env), true);
+    assert.ok((await fuente.guardar(env, [...PRODUCTOS, { id: "aros", nombre: "Aros", precio: 1, categoria: "accesorios", tipo: "fisico" }])).ok);
+    assert.ok(!(await fuente.guardar(env, [...PRODUCTOS, { id: "rosa", nombre: "Rosa", precio: 1, categoria: "flores", tipo: "fisico" }])).ok);
+    const c = await fuente.obtener(env);
+    assert.deepEqual(c.categorias.map((x) => x.id), ["peluches", "accesorios"]);
+    assert.equal(c.deCategoria("accesorios").length, 1);
+    // Cambios (nombre corto, foto) también sirven para las nuevas.
+    assert.ok((await fuente.guardarCambiosCategorias(env, { accesorios: { nombre: "Accesorios tejidos", imagen: "/media/categoria-accesorios-a1" } })).ok);
+    assert.equal((await fuente.obtener(env)).categoria("accesorios")!.nombre, "Accesorios tejidos");
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

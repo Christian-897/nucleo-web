@@ -225,7 +225,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     if (cuerpo.accion === "eliminar") return eliminar(ctx, cuerpo.id);
     if (cuerpo.accion === "fotos") return ordenarFotos(ctx, cuerpo.id, cuerpo.fotos);
     if (cuerpo.accion === "guardar") {
-      const v = validarEntrada(cuerpo.producto, catalogo.categorias);
+      const v = validarEntrada(cuerpo.producto, (await catalogo.obtener(ctx.env)).categorias);
       if (!v.ok) return jsonResponse(400, { message: "Revisa los campos marcados.", errores: v.errores });
       return guardar(ctx, v.datos);
     }

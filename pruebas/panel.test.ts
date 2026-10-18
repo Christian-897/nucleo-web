@@ -8,7 +8,7 @@ import { crearPanel } from "../modulos/panel/index";
 import type { EnvPanel } from "../modulos/panel/config";
 import { obtenerUsuario } from "../modulos/panel/auth";
 import { codigoPara, descifrarSecreto, PERIODO } from "../modulos/panel/totp";
-import { crearCatalogoEditable, productoDisponible, registrarVenta } from "../modulos/catalogo/index";
+import { crearCatalogoEditable, MAXIMO_NUEVAS, productoDisponible, registrarVenta } from "../modulos/catalogo/index";
 import { validarCarrito } from "../modulos/carrito/servidor";
 import { fuenteCarrito } from "../modulos/catalogo/stock";
 import { tipoRealDeImagen } from "../modulos/panel/imagenes";
@@ -954,6 +954,59 @@ async function run() {
     datos.set("pago:pedido:o9", { v: JSON.stringify({ orden: "o9", creado: new Date().toISOString(), estado: "pagada", monto: 25000, proveedor: "flow", email: "a@b.cl", metadata: { lineas: [], comprador: {}, requiereDespacho: true, tieneDigitales: false, despacho: { forma: "ahora", costo: 7000, zona: "extrema", gratisPorMonto: false } } }) });
     const r = await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie }) }));
     assert.equal(r.pedidos[0].despacho.costo, 7000);
+  });
+
+  console.log("Panel — crear y borrar categorías:");
+
+  const cat = (env: EnvPanel, cookie: string, cuerpo: unknown, origen?: string) =>
+    panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo, ...(origen ? { origen } : {}) }) });
+
+  await prueba("crear categoría: id desde el nombre, recibe productos; nombre repetido o vacío no", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const r = await json(await cat(env, cookie, { accion: "crear", categoria: { nombre: "Accesorios Ñandú", corto: "Accesorios", bajada: "" } }));
+    assert.equal(r.id, "accesorios-nandu");
+    const lista = await json(await panel.categorias.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const nueva = lista.categorias.find((c: any) => c.id === "accesorios-nandu");
+    assert.ok(nueva.nueva && nueva.corto === "Accesorios" && nueva.productos === 0);
+    assert.equal(lista.nuevas, 1);
+    assert.equal((await cat(env, cookie, { accion: "crear", categoria: { nombre: "accesorios ñandú" } })).status, 400, "nombre repetido");
+    assert.equal((await cat(env, cookie, { accion: "crear", categoria: { nombre: "x" } })).status, 400);
+    // Un producto se puede mover a la categoría nueva desde el panel.
+    const g = await panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", producto: { id: "gatito", nombre: "Gatito", precio: 18000, disponible: 3, categoria: "accesorios-nandu", tipo: "fisico" } } }) });
+    assert.equal(g.status, 200);
+    assert.equal((await catalogo.obtener(env)).deCategoria("accesorios-nandu").length, 1);
+  });
+
+  await prueba("borrar: solo vacías (avisa cuántos productos tiene); del sitio u otra nueva; sin sesión ni desde otro sitio no", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const lleno = await cat(env, cookie, { accion: "borrar", id: "peluches" });
+    assert.equal(lleno.status, 409);
+    assert.match((await json(lleno)).message, /1 producto/);
+    const nueva = (await json(await cat(env, cookie, { accion: "crear", categoria: { nombre: "Temporal" } }))).id;
+    assert.equal((await panel.categorias.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "borrar", id: nueva } }) })).status, 401);
+    assert.equal((await cat(env, cookie, { accion: "borrar", id: nueva }, "https://malo.com")).status, 403);
+    assert.equal((await cat(env, cookie, { accion: "borrar", id: nueva })).status, 200);
+    // Categoría del sitio, vacía: se oculta (y su id no se puede volver a usar para una nueva).
+    await panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "eliminar", id: "curso" } }) });
+    assert.equal((await cat(env, cookie, { accion: "borrar", id: "cursos" })).status, 200);
+    const vigente = await catalogo.obtener(env);
+    assert.deepEqual(vigente.categorias.map((c) => c.id), ["peluches"]);
+    const otra = await json(await cat(env, cookie, { accion: "crear", categoria: { nombre: "Cursos" } }));
+    assert.equal(otra.id, "cursos-2", "no reutiliza la dirección de una categoría del sitio borrada");
+    assert.equal((await cat(env, cookie, { accion: "borrar", id: "no-existe" })).status, 404);
+    assert.equal((await cat(env, cookie, { accion: "borrar", id: otra.id })).status, 200);
+    assert.equal((await cat(env, cookie, { accion: "borrar", id: "peluches" })).status, 409, "la última nunca se borra (y tiene productos)");
+  });
+
+  await prueba("crear: tope de categorías nuevas", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    for (let i = 0; i < MAXIMO_NUEVAS; i++) assert.equal((await cat(env, cookie, { accion: "crear", categoria: { nombre: `Nueva ${i}` } })).status, 200);
+    const pasada = await cat(env, cookie, { accion: "crear", categoria: { nombre: "Una más" } });
+    assert.equal(pasada.status, 400);
+    assert.match((await json(pasada)).message, /hasta/);
   });
 
   console.log("Panel — anular pedidos:");

@@ -20,6 +20,16 @@
  *      nombre · corto · bajada · imagen (src) · alt · texto · content
  *    "texto" y "content" (atributo de <meta>) usan la plantilla de
  *    `data-categoria-plantilla`, con {nombre} y {corto}.
+ *  - CATEGORÍAS CREADAS O BORRADAS en el panel: en cada lista de categorías
+ *    del sitio (menú, pie, filtros, tarjetas de portada), un contenedor
+ *    `data-cats-lista` trae un elemento `data-cats-item="<id>"` por cada
+ *    categoría del sitio (se quita si se borró) y N espacios ocultos
+ *    `data-cats-slot` que se llenan, en orden, con las categorías nuevas.
+ *    Dentro del espacio, `data-cats="campo"`: enlace (href) · nombre ·
+ *    corto · bajada · imagen (src) · alt. En /tienda/<id>/, el enlace de esa
+ *    categoría recibe aria-current="page".
+ *  - PÁGINA DE CATEGORÍA NUEVA: `crearPaginaCategoria` arma /tienda/<id>/
+ *    desde la plantilla estática (por defecto /tienda/plantilla/).
  *
  * Seguridad: TODO texto se inserta con `html: false` (las etiquetas se ven
  * escritas, no se ejecutan) o con setAttribute (escapa en atributo). Las
@@ -33,7 +43,7 @@ import type { EnvBase } from "../../core/tipos";
 import { formatearPrecio } from "../carrito/formato";
 import { type CatalogoODinamico, esDinamico, resolverCatalogo } from "./almacen";
 import { ID_VALIDO } from "./catalogo";
-import type { Catalogo, ProductoCatalogo } from "./tipos";
+import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 import { ID_VIDEO, miniaturaVideo } from "./video";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
@@ -60,6 +70,10 @@ export interface OpcionesBorde {
   imagenPorDefecto: string;
   /** Plantilla estática de la ficha. Por defecto "/producto/plantilla/". */
   plantillaFicha?: string;
+  /** Plantilla estática de la página de una categoría nueva. Por defecto "/tienda/plantilla/". */
+  plantillaCategoria?: string;
+  /** Id de categoría con que se construyó esa plantilla. Por defecto "plantilla". */
+  idPlantillaCategoria?: string;
   /** Página 404 estática. Por defecto "/404.html". */
   pagina404?: string;
   /** Datos para el título, el JSON-LD y las direcciones absolutas. */
@@ -222,6 +236,78 @@ export function rellenarPlantilla(plantilla: string, c: { nombre: string; corto?
   return plantilla.split("{nombre}").join(c.nombre).split("{corto}").join(c.corto || c.nombre);
 }
 
+/** Categorías creadas en el panel (no son del sitio), en orden. */
+function nuevasDe(catalogo: Catalogo): CategoriaCatalogo[] {
+  return catalogo.categorias.filter((c) => c.nueva === true);
+}
+
+/** `/tienda/lanas/` → "lanas" (o null). */
+export function categoriaDeRuta(ruta: string): string | null {
+  const m = ruta.match(/^\/tienda\/([^/]+)\/?$/);
+  return m && ID_VALIDO.test(m[1]) ? m[1] : null;
+}
+
+function conListasCategorias(r: Reescritor, catalogo: Catalogo, rutaActual: string): Reescritor {
+  const vigentes = new Set(catalogo.categorias.map((c) => c.id));
+  const nuevas = nuevasDe(catalogo);
+  const actualId = categoriaDeRuta(rutaActual);
+  let indice = -1;
+  let actual: CategoriaCatalogo | null = null;
+  return r
+    .on("[data-cats-lista]", {
+      element() {
+        indice = -1;
+        actual = null;
+      },
+    })
+    .on("[data-cats-item]", {
+      element(el) {
+        if (!vigentes.has(el.getAttribute("data-cats-item") ?? "")) el.remove();
+      },
+    })
+    .on("[data-cats-slot]", {
+      element(el) {
+        indice++;
+        actual = nuevas[indice] ?? null;
+        if (!actual) {
+          el.remove();
+          return;
+        }
+        el.removeAttribute("hidden");
+        el.setAttribute("data-cats-slot", actual.id);
+      },
+    })
+    .on("[data-cats-slot] [data-cats]", {
+      element(el) {
+        const c = actual;
+        if (!c) return;
+        for (const campo of (el.getAttribute("data-cats") ?? "").split(/\s+/)) {
+          switch (campo) {
+            case "enlace":
+              el.setAttribute("href", `/tienda/${c.id}/`);
+              if (c.id === actualId) el.setAttribute("aria-current", "page");
+              break;
+            case "nombre":
+              el.setInnerContent(c.nombre, { html: false });
+              break;
+            case "corto":
+              el.setInnerContent(c.corto || c.nombre, { html: false });
+              break;
+            case "bajada":
+              el.setInnerContent(typeof c.bajada === "string" ? c.bajada : "", { html: false });
+              break;
+            case "imagen":
+              if (typeof c.imagen === "string" && imagenSegura(c.imagen, "") === c.imagen) el.setAttribute("src", c.imagen);
+              break;
+            case "alt":
+              el.setAttribute("alt", c.nombre);
+              break;
+          }
+        }
+      },
+    });
+}
+
 function conCategorias(r: Reescritor, catalogo: Catalogo): Reescritor {
   return r.on("[data-categoria]", {
     element(el) {
@@ -280,7 +366,7 @@ export function crearBordeCatalogo(fuente: CatalogoODinamico, opciones: Opciones
       }
       let r = new HTMLRewriter();
       if (productos) r = conListas(r, catalogo, opciones);
-      if (categorias) r = conCategorias(r, catalogo);
+      if (categorias) r = conListasCategorias(conCategorias(r, catalogo), catalogo, ruta);
       return r.transform(respuesta);
     },
   };
@@ -386,6 +472,69 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
         });
       // Relacionados: misma categoría, sin el propio producto.
       r = conListas(r, catalogo, opciones, (f) => (f === "relacionados" ? `relacionados:${p.categoria}:${p.id}` : f));
+      return r.transform(respuesta);
+    },
+  };
+}
+
+// ───────────────────────────── página de categoría ─────────────────────────────
+
+/**
+ * /tienda/<id>/ para TODAS las categorías:
+ *  - del sitio (no borrada): su página estática, tal cual;
+ *  - creada en el panel: la plantilla estática con sus datos;
+ *  - borrada o inexistente: 404.
+ *
+ * La plantilla se construye como una categoría más con el id
+ * `idPlantillaCategoria` ("plantilla") y `<meta name="robots" data-plantilla>`.
+ */
+export function crearPaginaCategoria(fuente: CatalogoODinamico, opciones: OpcionesBorde) {
+  const plantilla = opciones.plantillaCategoria ?? "/tienda/plantilla/";
+  const idPlantilla = opciones.idPlantillaCategoria ?? "plantilla";
+
+  async function noEncontrado(request: Request, env: EnvBorde): Promise<Response> {
+    const pagina = env.ASSETS ? await env.ASSETS.fetch(new URL(opciones.pagina404 ?? "/404.html", request.url).toString()) : null;
+    return new Response(pagina?.ok ? pagina.body : "No encontrado", {
+      status: 404,
+      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+    });
+  }
+
+  return {
+    onRequestGet: async ({ request, env }: { request: Request; env: EnvBorde }) => {
+      const url = new URL(request.url);
+      const id = categoriaDeRuta(url.pathname);
+      if (id && !url.pathname.endsWith("/")) {
+        return Response.redirect(`${url.origin}/tienda/${id}/${url.search}`, 301);
+      }
+      if (!id || !env.ASSETS) return noEncontrado(request, env);
+      const catalogo = await resolverCatalogo(fuente, env);
+      const c = catalogo.categoria(id);
+      if (!c) return noEncontrado(request, env);
+      if (c.nueva !== true) return env.ASSETS.fetch(request);
+
+      const base = await env.ASSETS.fetch(new URL(plantilla, request.url).toString());
+      if (!base.ok) return noEncontrado(request, env);
+      const respuesta = new Response(base.body, base);
+      respuesta.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
+      const canonica = new URL(`/tienda/${c.id}/`, opciones.sitio.dominio).href;
+      const titulo = `${c.nombre} | ${opciones.sitio.nombre}`;
+      let r = new HTMLRewriter()
+        .on("title", { element: (el) => el.setInnerContent(titulo, { html: false }) })
+        .on('meta[property="og:title"]', { element: (el) => el.setAttribute("content", titulo) })
+        .on('meta[property="og:url"]', { element: (el) => el.setAttribute("content", canonica) })
+        .on('link[rel="canonical"]', { element: (el) => el.setAttribute("href", canonica) })
+        .on('meta[name="robots"][data-plantilla]', { element: (el) => el.remove() })
+        // Los textos con el nombre los llena el borde de categorías (data-categoria + campo).
+        .on(`[data-categoria="${idPlantilla}"]`, { element: (el) => el.setAttribute("data-categoria", c.id) })
+        .on("[data-cat-lista]", {
+          element(el) {
+            const f = el.getAttribute("data-cat-lista") ?? "";
+            if (f === `categoria:${idPlantilla}`) el.setAttribute("data-cat-lista", `categoria:${c.id}`);
+          },
+        });
+      r = conListas(r, catalogo, opciones, (f) => (f === `categoria:${idPlantilla}` ? `categoria:${c.id}` : f));
+      r = conListasCategorias(conCategorias(r, catalogo), catalogo, url.pathname);
       return r.transform(respuesta);
     },
   };
