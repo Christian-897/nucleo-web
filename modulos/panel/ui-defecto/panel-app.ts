@@ -24,7 +24,7 @@ import {
   type TipoTiempo,
 } from "./resumen-vista";
 import { crearVistaSitio } from "./sitio-vista";
-import { nombreZona, textosDespacho, type TarifasDespacho } from "../../despacho/calculo";
+import { IDS_ZONAS, NOMBRES_RETIRO, nombreZona, textoRetiro, textosDespacho, type TarifasDespacho, type ZonaDespacho } from "../../despacho/calculo";
 
 type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "mensajes" | "suscriptores" | "seguridad";
 const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "mensajes", "suscriptores", "seguridad"];
@@ -54,7 +54,7 @@ interface Pedido {
   lineas?: { nombre: string; cantidad: number; subtotal: number }[];
   requiereDespacho?: boolean;
   tieneDigitales?: boolean;
-  despacho?: { forma: string; costo: number; zona?: string; gratisPorMonto?: boolean };
+  despacho?: { forma: string; costo: number; zona?: string; gratisPorMonto?: boolean; retiro?: { nombre: string; comuna: string } };
   enviado: string | null;
   anulado: { fecha: string; por: string; stockDevuelto: boolean } | null;
 }
@@ -1101,14 +1101,19 @@ async function cargarPedidos() {
       izquierda.append(crear("strong", "", fecha(p.creado)), document.createTextNode(" "));
       if (p.anulado) izquierda.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Anulado"));
       else izquierda.append(crear("span", clase, txt));
-      if (p.enviado && !p.anulado) izquierda.append(document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--ok", "Enviado"));
+      const esRetiroP = p.despacho?.forma === "retiro";
+      if (p.enviado && !p.anulado) izquierda.append(document.createTextNode(" "), crear("span", "pa-etiqueta pa-etiqueta--ok", esRetiroP ? "Entregado" : "Enviado"));
       cabeza.append(izquierda, crear("span", "pa-pedido__total", formatearPrecio(p.monto)));
       li.append(cabeza);
       const c = p.comprador ?? {};
       const dato = (t: string) => li.append(crear("p", "pa-pedido__dato", t));
       dato(`${String(c.nombre ?? "")} · ${p.email}${c.telefono ? " · " + String(c.telefono) : ""}`);
-      if (p.requiereDespacho) dato(`Despacho: ${String(c.direccion ?? "")}, ${String(c.comuna ?? "")}, ${String(c.region ?? "")}`);
-      if (p.despacho) {
+      const retiro = esRetiroP;
+      if (retiro) {
+        const r = p.despacho!.retiro;
+        dato(`Entrega: ${r ? textoRetiro(r) : "retiro"} — el comprador retira (sin despacho). Coordina el día y la hora con él.`);
+      } else if (p.requiereDespacho) dato(`Despacho: ${String(c.direccion ?? "")}, ${String(c.comuna ?? "")}, ${String(c.region ?? "")}`);
+      if (p.despacho && !retiro) {
         const zona = nombreZona(p.despacho.zona);
         const enZona = zona ? ` · ${zona}` : "";
         if (p.despacho.forma === "al-recibir") dato(`Despacho por pagar: lo paga el comprador al recibir${enZona}.`);
@@ -1132,7 +1137,7 @@ async function cargarPedidos() {
       }
       const botones = crear("div", "pa-mensaje__botones");
       if (p.estado === "pagada" && !p.anulado) {
-        const b = crear("button", p.enviado ? "pa-boton pa-boton--suave pa-boton--chico" : "pa-boton pa-boton--chico", p.enviado ? "Desmarcar enviado" : "Marcar como enviado");
+        const b = crear("button", p.enviado ? "pa-boton pa-boton--suave pa-boton--chico" : "pa-boton pa-boton--chico", p.enviado ? (esRetiroP ? "Desmarcar entregado" : "Desmarcar enviado") : esRetiroP ? "Marcar como entregado" : "Marcar como enviado");
         b.type = "button";
         b.addEventListener("click", async () => {
           b.disabled = true;
@@ -1207,11 +1212,23 @@ const mostrarPesos = (n: number | null) => (n === null ? "" : n.toLocaleString("
 const marcadas = (tipo: "comunas" | "regiones") =>
   $$<HTMLInputElement>(`[data-casillas-${tipo}] input:checked`, formDespacho).map((c) => c.value);
 
+const zonasAlRecibir = () => $$<HTMLInputElement>("[data-casillas-alrecibir] input:checked", formDespacho).map((c) => c.value as ZonaDespacho);
+
 function tarifasDelFormulario(): Record<string, unknown> {
   const d = new FormData(formDespacho);
+  const alRecibirZonas = zonasAlRecibir();
   return {
     pagarAhora: d.get("pagarAhora") === "on",
-    pagarAlRecibir: true,
+    pagarAlRecibir: d.get("pagarAhora") !== "on" || alRecibirZonas.length > 0,
+    alRecibirZonas,
+    retiro: {
+      activo: d.get("retiroActivo") === "on",
+      nombre: String(d.get("retiroNombre") ?? ""),
+      comuna: String(d.get("retiroComuna") ?? ""),
+      direccion: String(d.get("retiroDireccion") ?? ""),
+      instrucciones: String(d.get("retiroInstrucciones") ?? ""),
+      direccionSoloEnCorreo: d.get("retiroSoloCorreo") === "on",
+    },
     centro: leerPesos(d.get("centro")) ?? "",
     alejada: leerPesos(d.get("alejada")) ?? "",
     cercana: leerPesos(d.get("cercana")) ?? "",
@@ -1239,10 +1256,13 @@ function vistaDespacho() {
   $("[data-despacho-tarifas]").hidden = t.pagarAhora !== true;
   contarCasillas();
   const num = (x: unknown) => (typeof x === "number" ? x : 0);
+  $("[data-retiro-campos]").hidden = !(t.retiro as { activo: boolean }).activo;
   const tx = textosDespacho(
     {
       pagarAhora: t.pagarAhora === true,
       pagarAlRecibir: t.pagarAlRecibir === true,
+      alRecibirZonas: t.alRecibirZonas as ZonaDespacho[],
+      retiro: t.retiro as TarifasDespacho["retiro"],
       centro: num(t.centro), alejada: num(t.alejada), cercana: num(t.cercana), extrema: num(t.extrema),
       comunasCentro: t.comunasCentro as string[], regionesCercanas: t.regionesCercanas as string[],
       gratisDesde: (t.gratisDesde as number | null) ?? null,
@@ -1269,15 +1289,43 @@ function casillas(tipo: "comunas" | "regiones", nombres: string[], marcadasAhora
   );
 }
 
+// Zonas para "pagar al recibir" y nombres del retiro: fijos, se dibujan una vez.
+$("[data-casillas-alrecibir]", formDespacho).replaceChildren(
+  ...IDS_ZONAS.map((z) => {
+    const l = crear("label", "pa-casilla");
+    const c = crear("input");
+    c.type = "checkbox";
+    c.value = z;
+    l.append(c, document.createTextNode(" " + nombreZona(z)));
+    return l;
+  })
+);
+$("[data-retiro-nombres]", formDespacho).replaceChildren(
+  ...NOMBRES_RETIRO.map((n) => {
+    const o = crear("option", "", n);
+    o.value = n;
+    return o;
+  })
+);
+
 function llenarDespacho(t: TarifasDespacho) {
   $<HTMLInputElement>('input[name="pagarAhora"]', formDespacho).checked = t.pagarAhora;
+  const zonas = t.alRecibirZonas ?? IDS_ZONAS;
+  for (const c of $$<HTMLInputElement>("[data-casillas-alrecibir] input", formDespacho)) c.checked = zonas.includes(c.value as ZonaDespacho);
+  const r = t.retiro;
+  $<HTMLInputElement>('input[name="retiroActivo"]', formDespacho).checked = r?.activo === true;
+  $<HTMLSelectElement>('select[name="retiroNombre"]', formDespacho).value = r?.nombre ?? NOMBRES_RETIRO[0];
+  $<HTMLInputElement>('input[name="retiroComuna"]', formDespacho).value = r?.comuna ?? "";
+  $<HTMLInputElement>('input[name="retiroDireccion"]', formDespacho).value = r?.direccion ?? "";
+  $<HTMLTextAreaElement>('textarea[name="retiroInstrucciones"]', formDespacho).value = r?.instrucciones ?? "";
+  $<HTMLInputElement>('input[name="retiroSoloCorreo"]', formDespacho).checked = r?.direccionSoloEnCorreo !== false;
   for (const z of ["centro", "alejada", "cercana", "extrema"] as const) $<HTMLInputElement>(`input[name="${z}"]`, formDespacho).value = mostrarPesos(t[z]);
   $<HTMLInputElement>('input[name="gratisDesde"]', formDespacho).value = mostrarPesos(t.gratisDesde);
   $<HTMLInputElement>('input[name="mostrarValores"]', formDespacho).checked = t.mostrarValores !== false;
   casillas("comunas", despachoBase.comunasRM, t.comunasCentro);
   casillas("regiones", despachoBase.regiones, t.regionesCercanas);
   const tx = textosDespacho(t, despachoBase.detallePorPagar);
-  $("[data-despacho-resumen]").textContent = t.pagarAhora ? tx.corto : "Por pagar";
+  $("[data-despacho-resumen]").textContent = (t.pagarAhora ? tx.corto : "Por pagar") + (r?.activo ? ` · ${textoRetiro(r)}` : "");
   vistaDespacho();
 }
 

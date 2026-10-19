@@ -10,7 +10,7 @@ import { necesitaDespacho } from "../modulos/compra/cliente";
 import { aplicarResultado } from "../modulos/pago/servidor";
 import { productosDeLista, imagenSegura, idDeRuta, crearCatalogoEditable, crearSitemap } from "../modulos/catalogo/index";
 import type { EnvPago } from "../modulos/pago/config";
-import { calcularDespacho, crearDespachoEditable, textosDespacho, validarTarifas } from "../modulos/despacho/index";
+import { calcularDespacho, crearDespachoEditable, crearEndpointDespacho, tarifasPublicas, textosDespacho, validarTarifas } from "../modulos/despacho/index";
 import { correoComprador, correoTienda } from "../modulos/compra/plantilla-correo";
 
 let pasaron = 0;
@@ -435,6 +435,82 @@ async function run() {
     assert.match(c.html, /Despacho<\/td><td[^>]*>\$5\.500 \(Regiones zona cercana\)/);
     assert.match(correoTienda(configDespacho, { ...base, despacho: { forma: "al-recibir", costo: 0, zona: "alejada", gratisPorMonto: false } }).html, /Por pagar al recibir \(Santiago zona alejada\)/);
     assert.match(correoComprador(config, base).html, /Envío por pagar<\/strong>: Se paga al recibir/);
+  });
+
+  console.log("Pagar al recibir por zona y retiro:");
+
+  await prueba("pagar al recibir solo en las zonas marcadas: en Santiago se cobra igual", async () => {
+    const { env, datos } = entorno();
+    await despacho.guardar(env, { ...despacho.inicial, alRecibirZonas: ["cercana", "extrema"] });
+    await iniciarConDespacho(env, { items: gatito, comprador: destino(RM, "Providencia"), formaDespacho: "al-recibir" });
+    assert.equal(cobrado(), 18000 + 3500, "en la RM no se puede pagar al recibir: se cobra con la compra");
+    assert.equal(pedidoGuardado(datos).metadata.despacho.forma, "ahora");
+    const { env: env2, datos: datos2 } = entorno();
+    await despacho.guardar(env2, { ...despacho.inicial, alRecibirZonas: ["cercana", "extrema"] });
+    await iniciarConDespacho(env2, { items: gatito, comprador: destino("Valparaíso", "Viña del Mar"), formaDespacho: "al-recibir" });
+    assert.equal(cobrado(), 18000, "en regiones sí");
+    assert.equal(pedidoGuardado(datos2).metadata.despacho.forma, "al-recibir");
+    const t = validarTarifas({ ...despacho.inicial, alRecibirZonas: ["cercana", "extrema"] });
+    assert.ok(t.ok);
+    if (t.ok) {
+      assert.equal(calcularDespacho(t.datos, { region: RM, comuna: "Buin" }, 5000).puedeAlRecibir, false);
+      assert.equal(calcularDespacho(t.datos, { region: "Biobío", comuna: "Concepción" }, 5000).puedeAlRecibir, true);
+      assert.match(textosDespacho(t.datos, "x").ficha, /En regiones también puedes pagarlo al recibir/);
+      assert.doesNotMatch(textosDespacho(t.datos, "x").ficha, /También puedes pagarlo al recibir/);
+    }
+    const ninguna = validarTarifas({ ...despacho.inicial, alRecibirZonas: [] });
+    assert.ok(ninguna.ok && !ninguna.datos.pagarAlRecibir);
+    if (ninguna.ok) assert.doesNotMatch(textosDespacho(ninguna.datos, "x").ficha, /al recibir/);
+    assert.equal(validarTarifas({ ...despacho.inicial, alRecibirZonas: ["luna"] }).ok, false);
+    const antes = validarTarifas({ ...despacho.inicial, alRecibirZonas: undefined });
+    assert.ok(antes.ok && antes.datos.alRecibirZonas.length === 4, "lo guardado antes: todas las zonas, como antes");
+  });
+
+  const retiroOk = { activo: true, nombre: "Retiro coordinado", comuna: "Maipú", direccion: "Av. Pajaritos 1234, depto 5", instrucciones: "Te escribimos por WhatsApp.", direccionSoloEnCorreo: true };
+
+  await prueba("retiro: sin dirección del comprador, sin despacho, y la dirección va solo en el correo", async () => {
+    const { env, datos } = entorno();
+    assert.equal((await despacho.guardar(env, { ...despacho.inicial, retiro: retiroOk })).ok, true);
+    const sinDireccion = { nombre: "Ana", email: "ana@correo.cl", telefono: "+56 9 1234 5678", aceptaPolitica: true };
+    const r = await iniciarConDespacho(env, { items: gatito, comprador: sinDireccion, formaDespacho: "retiro", totalVisto: 18000 });
+    assert.equal(r.status, 200);
+    assert.equal(cobrado(), 18000);
+    const m = pedidoGuardado(datos).metadata;
+    assert.equal(m.despacho.forma, "retiro");
+    assert.equal(m.despacho.retiro.direccion, "Av. Pajaritos 1234, depto 5");
+    assert.equal(m.comprador.direccion, undefined);
+    // Sin retiro ofrecido, pedir "retiro" no salta la dirección.
+    const { env: env2 } = entorno();
+    assert.equal((await iniciarConDespacho(env2, { items: gatito, comprador: sinDireccion, formaDespacho: "retiro" })).status, 400);
+    // Lo público nunca trae la dirección si va solo en el correo.
+    const pub = await (await crearEndpointDespacho(despacho).onRequestGet({ env })).json() as { tarifas: { retiro: { direccion: string; comuna: string } }; textos: { ficha: string } };
+    assert.equal(pub.tarifas.retiro.direccion, "");
+    assert.equal(pub.tarifas.retiro.comuna, "Maipú");
+    assert.match(pub.textos.ficha, /También puedes retirarlo sin costo: Retiro coordinado en Maipú\./);
+    assert.doesNotMatch(JSON.stringify(pub), /Pajaritos/);
+    const visible = tarifasPublicas({ ...despacho.inicial, retiro: { ...retiroOk, nombre: "Punto de retiro", direccionSoloEnCorreo: false } });
+    assert.equal(visible.retiro.direccion, "Av. Pajaritos 1234, depto 5", "desmarcada la casilla, la dirección se publica");
+  });
+
+  await prueba("retiro: validación y correos", async () => {
+    for (const malo of [
+      { ...retiroOk, nombre: "Tienda" }, { ...retiroOk, comuna: "" }, { ...retiroOk, direccion: "x" },
+      { ...retiroOk, instrucciones: "a".repeat(301) }, { ...retiroOk, activo: "si" },
+    ]) assert.equal(validarTarifas({ ...despacho.inicial, retiro: malo }).ok, false, JSON.stringify(malo).slice(0, 70));
+    const apagado = validarTarifas({ ...despacho.inicial, retiro: { ...retiroOk, activo: false, comuna: "", direccion: "" } });
+    assert.ok(apagado.ok, "apagado no exige comuna ni dirección");
+    const limpio = validarTarifas({ ...despacho.inicial, retiro: { ...retiroOk, comuna: "  Maipú\u0007 " } });
+    assert.ok(limpio.ok && limpio.datos.retiro.comuna === "Maipú");
+    const base = { orden: "o2", monto: 18000, lineas: [{ productoId: "gatito", nombre: "Gatito", cantidad: 1, precioUnitario: 18000, subtotal: 18000 }], comprador: { nombre: "Ana", email: "ana@correo.cl", telefono: "+56 9 1234 5678", notas: "", aceptaPolitica: true as const }, requiereDespacho: true, tieneDigitales: false };
+    const d = { forma: "retiro" as const, costo: 0, gratisPorMonto: false, retiro: { nombre: "Retiro coordinado", comuna: "Maipú", direccion: "Av. <b>Pajaritos</b> 1234", instrucciones: "" } };
+    const cli = correoComprador(configDespacho, { ...base, despacho: d }).html;
+    assert.match(cli, /Dirección del retiro: <strong>Av. &lt;b&gt;Pajaritos&lt;\/b&gt; 1234<\/strong>/);
+    assert.match(cli, /Te escribiremos para coordinar el día y la hora del retiro/);
+    assert.match(cli, /Sin costo \(Retiro coordinado en Maipú\)/);
+    const tie = correoTienda(configDespacho, { ...base, despacho: d }).html;
+    assert.match(tie, /el comprador retira/);
+    assert.match(tie, /coordinar el retiro/);
+    assert.doesNotMatch(tie, /Despacho: ,/);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

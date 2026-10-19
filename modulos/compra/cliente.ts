@@ -31,11 +31,12 @@ export async function iniciarCompra(params: {
   endpoint?: string;
   /** El total que la persona vio en pantalla. Si no calza con el del servidor, no se cobra. */
   totalVisto?: number;
-  /** Cómo quiere pagar el despacho: "ahora" (con la compra) o "al-recibir". */
-  formaDespacho?: "ahora" | "al-recibir";
+  /** Cómo quiere recibir y pagar: "ahora" (despacho con la compra), "al-recibir" o "retiro" (sin dirección). */
+  formaDespacho?: "ahora" | "al-recibir" | "retiro";
 }): Promise<ResultadoCompra> {
   if (!params.items.length) return { ok: false, message: "Tu carrito está vacío." };
-  const despacho = necesitaDespacho(params.items, params.tipos);
+  // En el retiro no se pide dirección (el servidor confirma que el retiro esté ofrecido).
+  const despacho = necesitaDespacho(params.items, params.tipos) && params.formaDespacho !== "retiro";
   const v = validarComprador(params.comprador, despacho);
   if (!v.ok) {
     return { ok: false, message: "Revisa los campos marcados.", fieldErrors: v.fieldErrors };

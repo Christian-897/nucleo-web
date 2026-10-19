@@ -1,6 +1,6 @@
 /**
  * Módulo despacho: cobro por zona (RM, regiones, zonas extremas), "gratis
- * desde $X" o "por pagar", editable desde el panel.
+ * desde $X", "por pagar" (por zona) y retiro sin costo, editable desde el panel.
  *
  *   import { crearDespachoEditable } from "nucleo-web/despacho";
  */

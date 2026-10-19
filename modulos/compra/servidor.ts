@@ -20,16 +20,19 @@ import { ErrorPedido } from "../pago/tipos";
 import type { ConfigCompra, EnvCompra } from "./config";
 import { type Comprador, validarComprador } from "./esquema";
 import { correoComprador, correoTienda } from "./plantilla-correo";
-import { calcularDespacho, esComunaRM, REGION_RM, type FormaDespacho, type ZonaDespacho } from "../despacho/calculo";
+import { calcularDespacho, esComunaRM, esRetiro, REGION_RM, type FormaDespacho, type TarifasDespacho, type ZonaDespacho } from "../despacho/calculo";
 import { formatearPrecio } from "../carrito/formato";
 
 /** Lo que se cobró de despacho en este pedido (queda en la metadata). */
 export interface DespachoPedido {
-  /** "ahora": se cobró con la compra. "al-recibir": lo paga el comprador al courier. */
+  /** "ahora": se cobró con la compra. "al-recibir": lo paga el comprador al courier. "retiro": lo retira. */
   forma: FormaDespacho;
   costo: number;
-  zona: ZonaDespacho;
+  /** Sin zona en el retiro (no hay dirección del comprador). */
+  zona?: ZonaDespacho;
   gratisPorMonto: boolean;
+  /** Solo en el retiro: lo que se mostró al comprar, para el correo y el panel. */
+  retiro?: { nombre: string; comuna: string; direccion: string; instrucciones: string };
 }
 
 export interface MetadataCompra {
@@ -73,7 +76,11 @@ export function crearConfigPagoCompra(config: ConfigCompra): ConfigPago {
       const requiereDespacho = tipos.includes("fisico");
       const tieneDigitales = tipos.includes("digital");
 
-      const comprador = validarComprador(cuerpo.comprador, requiereDespacho);
+      // Retiro (si está ofrecido y lo eligió): no se pide la dirección del comprador.
+      let tarifas: TarifasDespacho | null = null;
+      if (requiereDespacho && config.despacho) tarifas = await config.despacho.obtener(env);
+      const retiro = tarifas !== null && esRetiro(tarifas, cuerpo.formaDespacho);
+      const comprador = validarComprador(cuerpo.comprador, requiereDespacho && !retiro);
       if (!comprador.ok || !comprador.datos) {
         const primero = Object.values(comprador.fieldErrors)[0]?.[0];
         throw new ErrorPedido(primero ? `Revisa tus datos: ${primero}` : "Revisa tus datos.");
@@ -89,13 +96,20 @@ export function crearConfigPagoCompra(config: ConfigCompra): ConfigPago {
       // ya validadas y las tarifas vigentes. Del navegador solo cuenta la forma
       // elegida (ahora o al recibir), y solo si está permitida.
       let costoDespacho = 0;
-      if (requiereDespacho && config.despacho) {
+      if (tarifas && retiro) {
+        const r = tarifas.retiro;
+        metadata.despacho = {
+          forma: "retiro",
+          costo: 0,
+          gratisPorMonto: false,
+          retiro: { nombre: r.nombre, comuna: r.comuna, direccion: r.direccion, instrucciones: r.instrucciones },
+        };
+      } else if (tarifas) {
         const { region, comuna } = comprador.datos;
         // En la RM la zona depende de la comuna: tiene que ser una de la lista.
         if (region === REGION_RM && !esComunaRM(comuna ?? "")) {
           throw new ErrorPedido("Revisa tus datos: elige tu comuna de la lista.");
         }
-        const tarifas = await config.despacho.obtener(env);
         const c = calcularDespacho(tarifas, { region, comuna }, carrito.total, cuerpo.formaDespacho);
         costoDespacho = c.costo;
         metadata.despacho = { forma: c.forma, costo: c.costo, zona: c.zona, gratisPorMonto: c.gratisPorMonto };

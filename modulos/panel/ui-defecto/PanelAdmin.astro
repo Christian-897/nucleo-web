@@ -419,7 +419,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <form data-form="despacho" novalidate>
           <fieldset class="pa-opciones">
             <label class="pa-casilla"><input type="checkbox" name="pagarAhora" /> <strong>Cobrar el despacho según la zona</strong></label>
-            <p class="pa-tenue pa-chico">Encendido: en el carrito el comprador elige si lo paga junto con la compra o al recibir. Apagado: todo es “por pagar” al recibir.</p>
+            <p class="pa-tenue pa-chico">Encendido: se cobra según la zona; en las zonas que marques abajo el comprador también puede elegir pagarlo al recibir. Apagado: todo es “por pagar” al recibir.</p>
           </fieldset>
 
           <div data-despacho-tarifas class="pa-despacho__tarifas">
@@ -454,7 +454,27 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
             <p class="pa-tenue pa-chico">Pon 0 en una zona para que ahí sea gratis.</p>
             <label class="pa-casilla"><input type="checkbox" name="mostrarValores" /> Mostrar los valores del despacho en la tienda (producto, carrito y Términos)</label>
             <p class="pa-tenue pa-chico">Desmarcado, no se publican los valores por zona: el comprador ve el valor de su despacho recién en el carrito, al elegir su región y comuna, sumado al total antes de pagar.</p>
+
+            <section class="pa-despacho__bloque">
+              <h3>Pagar el despacho al recibir</h3>
+              <p class="pa-tenue pa-chico">Marca las zonas donde el comprador puede elegir pagar el despacho al recibir. En las que no marques, se paga siempre junto con la compra (por ejemplo, si el courier de Santiago lo exige pagado).</p>
+              <div class="pa-despacho__casillas" data-casillas-alrecibir></div>
+            </section>
           </div>
+
+          <section class="pa-despacho__bloque" data-retiro>
+            <h3>Retiro sin costo</h3>
+            <label class="pa-casilla"><input type="checkbox" name="retiroActivo" /> <strong>Ofrecer retiro sin costo</strong></label>
+            <p class="pa-tenue pa-chico">En el carrito aparece como otra opción de entrega: no se cobra despacho y no se pide la dirección del comprador. Sirve aunque no tengas tienda física.</p>
+            <div class="pa-despacho__retiro" data-retiro-campos>
+              <label class="pa-campo">Nombre que se ve en la tienda<select name="retiroNombre" data-retiro-nombres></select></label>
+              <label class="pa-campo">Comuna (se ve en la tienda)<input name="retiroComuna" maxlength="60" autocomplete="off" placeholder="Ej: Maipú" /></label>
+              <label class="pa-campo">Dirección o punto exacto<input name="retiroDireccion" maxlength="140" autocomplete="off" placeholder="Ej: Metro Plaza de Maipú, salida norte" /></label>
+              <label class="pa-casilla"><input type="checkbox" name="retiroSoloCorreo" /> Mostrar la dirección solo en el correo de confirmación (después de pagar)</label>
+              <p class="pa-tenue pa-chico">Marcado, en la tienda solo se ve la comuna y la dirección exacta le llega al comprador en el correo, cuando ya pagó. Desmárcalo si quieres que también se vea en el carrito.</p>
+              <label class="pa-campo">Instrucciones (opcional)<textarea name="retiroInstrucciones" maxlength="300" rows="2" placeholder="Ej: Te escribiremos por WhatsApp para acordar el día y la hora."></textarea></label>
+            </div>
+          </section>
 
           <div class="pa-aviso">
             <strong>Así se verá en la tienda</strong>
@@ -1051,6 +1071,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-despacho__tarifas { display: grid; gap: 16px; }
   .pa-despacho__bloque { border: 1px solid var(--pa-borde); border-radius: 12px; padding: 14px; display: grid; gap: 10px; }
   .pa-despacho__bloque h3 { margin: 0; font-size: 1rem; }
+  .pa-despacho__retiro { display: grid; gap: 10px; }
+  .pa-despacho__retiro textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--pa-borde); border-radius: 10px; resize: vertical; }
   .pa-despacho__lista > summary { cursor: pointer; font-size: .95rem; padding: 6px 0; }
   .pa-despacho__buscar { width: 100%; font: inherit; padding: 8px 10px; border: 1px solid var(--pa-borde); border-radius: 10px; margin: 8px 0; }
   .pa-despacho__casillas { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; max-height: 320px; overflow: auto; padding: 4px 2px; }

@@ -4,7 +4,7 @@ import type { LineaValidada } from "../carrito/tipos";
 import type { ConfigCompra } from "./config";
 import type { Comprador } from "./esquema";
 import type { DespachoPedido } from "./servidor";
-import { nombreZona } from "../despacho/calculo";
+import { nombreZona, textoRetiro } from "../despacho/calculo";
 
 export interface DatosCorreoPedido {
   orden: string;
@@ -20,6 +20,7 @@ export interface DatosCorreoPedido {
 function textoDespachoCobrado(d: DatosCorreoPedido): string | null {
   const x = d.despacho;
   if (!d.requiereDespacho || !x) return null;
+  if (x.forma === "retiro") return x.retiro ? `Sin costo (${textoRetiro(x.retiro)})` : "Sin costo (retiro)";
   const zona = nombreZona(x.zona);
   const enZona = zona ? ` (${zona})` : "";
   if (x.forma === "al-recibir") return `Por pagar al recibir${enZona}`;
@@ -61,7 +62,15 @@ export function correoComprador(config: ConfigCompra, d: DatosCorreoPedido) {
     p(`Tu pago fue confirmado. Número de pedido: <strong>${escapeHtml(d.orden)}</strong>`),
     tablaLineas(d),
   ];
-  if (d.requiereDespacho) {
+  const r = d.despacho?.forma === "retiro" ? d.despacho.retiro : undefined;
+  if (d.requiereDespacho && d.despacho?.forma === "retiro") {
+    // El retiro: aquí sí va la dirección exacta (el pago ya está confirmado).
+    partes.push(
+      p(`<strong>${escapeHtml(r?.nombre ?? "Retiro")}</strong>${r?.comuna ? ` en ${escapeHtml(r.comuna)}` : ""}.`),
+      r?.direccion ? p(`Dirección del retiro: <strong>${escapeHtml(r.direccion)}</strong>`) : "",
+      p(escapeHtml(r?.instrucciones || "Te escribiremos para coordinar el día y la hora del retiro."))
+    );
+  } else if (d.requiereDespacho) {
     partes.push(
       textoDespachoCobrado(d)
         ? p("Despacharemos tu pedido a la dirección que indicaste.")
@@ -94,15 +103,21 @@ export function correoTienda(config: ConfigCompra, d: DatosCorreoPedido) {
     `Nombre: ${escapeHtml(c.nombre)}`,
     `Correo: ${escapeHtml(c.email)}`,
     `Teléfono: ${escapeHtml(c.telefono)}`,
-    d.requiereDespacho
-      ? `Despacho: ${escapeHtml(c.direccion ?? "")}, ${escapeHtml(c.comuna ?? "")}, ${escapeHtml(c.region ?? "")}`
-      : "Sin despacho (solo productos digitales)",
+    !d.requiereDespacho
+      ? "Sin despacho (solo productos digitales)"
+      : d.despacho?.forma === "retiro"
+        ? `Entrega: ${escapeHtml(d.despacho.retiro ? textoRetiro(d.despacho.retiro) : "retiro")} — el comprador retira (sin despacho)`
+        : `Despacho: ${escapeHtml(c.direccion ?? "")}, ${escapeHtml(c.comuna ?? "")}, ${escapeHtml(c.region ?? "")}`,
     c.notas ? `Notas: ${escapeHtml(c.notas)}` : "",
   ]
     .filter(Boolean)
     .join("<br>");
   const pendientes = [
-    d.requiereDespacho ? "Preparar y despachar los productos físicos." : "",
+    d.requiereDespacho
+      ? d.despacho?.forma === "retiro"
+        ? "Preparar los productos y coordinar el retiro con el comprador."
+        : "Preparar y despachar los productos físicos."
+      : "",
     d.tieneDigitales ? "Enviar por correo el material de los cursos o patrones." : "",
   ]
     .filter(Boolean)

@@ -7,7 +7,7 @@
  */
 import { calcularDespacho, type CalculoDespacho, type TarifasDespacho, type TextosDespacho } from "./calculo";
 
-export { COMUNAS_RM, REGION_RM, nombreZona, type FormaDespacho } from "./calculo";
+export { COMUNAS_RM, REGION_RM, nombreZona, textoRetiro, type FormaDespacho, type RetiroDespacho } from "./calculo";
 
 export interface DatosDespacho {
   tarifas: TarifasDespacho;

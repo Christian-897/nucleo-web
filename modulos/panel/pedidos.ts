@@ -45,7 +45,7 @@ export interface PedidoPanel {
   requiereDespacho?: boolean;
   tieneDigitales?: boolean;
   /** Lo que se cobró de despacho (módulo despacho). */
-  despacho?: { modo: string; costo: number; zona?: string; gratisPorMonto?: boolean };
+  despacho?: { forma: string; costo: number; zona?: string; gratisPorMonto?: boolean; retiro?: { nombre: string; comuna: string } };
   enviado: string | null;
   /** Anulado desde el panel (devolución o prueba). null si no. */
   anulado: AnulacionPedido | null;
