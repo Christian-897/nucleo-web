@@ -13,7 +13,7 @@ de Muebles Crea, que ya estaba probado en producción, y extendido para tiendas.
 | Resumen | Ventas de hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, pedidos por despachar, rango de fechas a elección, gráficos de barras/línea/torta y comparación por años (módulo `metricas`). |
 | Categorías | Crear (hasta 12 nuevas), editar nombre, corto, bajada y foto, y borrar (solo sin productos; avisa cuántos tiene). Las nuevas aparecen en menús y portada en los espacios del sitio, con su página desde la plantilla. |
 | Productos | Crear, editar, eliminar; precio, stock disponible y unidades vendidas (desde el último ajuste), categoría, físico/digital, destacado; foto. |
-| Pedidos | Ventas pagadas con datos de despacho; marcar como enviado. **Anular pedido** (solo el dueño, nunca un invitado): deja de contar en el Resumen, devuelve los productos al stock y queda marcado "Anulado" con fecha y quién; NO devuelve el dinero (eso se hace en Flow/Mercado Pago). **Borrar**: solo pedidos anulados (para los de prueba). |
+| Pedidos | Ventas pagadas con datos de despacho; marcar como enviado. **Anular pedido** (el dueño, o un invitado al que el dueño le marcó "Puede anular y borrar pedidos" en Seguridad → Usuarios, v0.31): deja de contar en el Resumen, devuelve los productos al stock y queda marcado "Anulado" con fecha y quién; NO devuelve el dinero (eso se hace en Flow/Mercado Pago). **Borrar**: solo pedidos anulados (para los de prueba). |
 | Mensajes | Lo que llega por el formulario de contacto (`mensajes: configContacto`, la misma config del endpoint del formulario): ver, responder por correo, marcar como respondido, borrar. Burbuja con los pendientes en la pestaña. Avisa si el correo de aviso no salió. |
 | Suscriptores | Total y descarga CSV del newsletter. |
 | Fotos | Guardadas en KV, servidas en `/media/<id>` con caché de un año. |
@@ -48,6 +48,9 @@ su contraseña (y su código, si tiene doble factor) y copia el enlace.
 - Los invitados usan toda la tienda, pero no ven ni manejan usuarios. El dueño
   puede anular enlaces sin usar y **quitar el acceso**: la sesión abierta del
   invitado deja de servir al instante.
+- Permiso por invitado (v0.31): casilla **"Puede anular y borrar pedidos"**
+  en la lista de usuarios (solo la ve y la cambia el dueño). Sirve para que la
+  clienta anule pedidos mientras el desarrollador sigue siendo el dueño.
 - No usa `ADMIN_SETUP_TOKEN` ni archivos nuevos en `functions/`: la invitación
   entra por `/api/admin/instalar` y se maneja desde `/api/admin/seguridad`.
 

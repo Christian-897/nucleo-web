@@ -1060,7 +1060,7 @@ async function run() {
     assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 2, "borrar no toca el stock");
   });
 
-  await prueba("anular/borrar: solo el dueño, con sesión y mismo origen; acción u orden inválida no", async () => {
+  await prueba("anular/borrar: el dueño o un invitado con permiso, con sesión y mismo origen; acción u orden inválida no", async () => {
     const { env } = entorno();
     const cookie = await instalarYEntrar(env);
     await pedidoPagado(env, "ORD9", 1);
@@ -1082,6 +1082,24 @@ async function run() {
     const intento = await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD9" } }) });
     assert.equal(intento.status, 403);
     assert.equal((await productoDisponible(catalogo, env, "gatito"))!.stock, 2, "nada cambió");
+    // La invitada no se puede dar el permiso a sí misma.
+    const solita = await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "permiso-pedidos", usuario: "ayudante", valor: true } }) });
+    assert.equal(solita.status, 403);
+    // El dueño se lo da: ahora sí puede anular y borrar.
+    for (const malo of [{ usuario: "ayudante", valor: "si" }, { usuario: "nadie", valor: true }]) {
+      assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "permiso-pedidos", ...malo } }) })).status, 400, JSON.stringify(malo));
+    }
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "permiso-pedidos", usuario: "ayudante", valor: true } }) })).status, 200);
+    const usuarios = (await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).usuarios as { usuario: string; puedeAnularPedidos: boolean }[];
+    assert.deepEqual(usuarios.map((u) => u.puedeAnularPedidos), [true, true]);
+    assert.equal((await json(await panel.pedidos.onRequestGet({ env, request: req("/x", { cookie: cookieInv }) }))).puedeAnular, true);
+    const anulada = await json(await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD9" } }) }));
+    assert.equal(anulada.anulado.por, "ayudante", "queda registrado quién anuló");
+    assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "borrar", orden: "ORD9" } }) })).status, 200);
+    // Se lo quita: vuelve a no poder.
+    await pedidoPagado(env, "ORD10", 1);
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "permiso-pedidos", usuario: "ayudante", valor: false } }) })).status, 200);
+    assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD10" } }) })).status, 403);
   });
 
   console.log("Panel — mensajes de contacto:");

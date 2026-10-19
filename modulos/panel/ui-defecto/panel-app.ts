@@ -2312,6 +2312,7 @@ interface FichaUsuario {
   dueno: boolean;
   dobleFactor: boolean;
   invitadoPor?: string;
+  puedeAnularPedidos?: boolean;
 }
 interface InvitacionPendiente {
   id: string;
@@ -2338,6 +2339,16 @@ function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendie
       if (!Number.isNaN(desde.getTime())) datos.append(crear("span", "", `desde el ${desde.toLocaleDateString("es-CL")}`));
       datos.append(crear("span", "", u.dobleFactor ? "con doble factor" : "sin doble factor"));
       info.append(datos);
+      if (!u.dueno) {
+        // Permiso del invitado: anular y borrar pedidos (el dueño siempre puede).
+        const l = crear("label", "pa-casilla pa-chico");
+        const c = crear("input");
+        c.type = "checkbox";
+        c.checked = u.puedeAnularPedidos === true;
+        c.addEventListener("change", () => permisoPedidosPanel(u.usuario, c));
+        l.append(c, document.createTextNode(" Puede anular y borrar pedidos"));
+        info.append(l);
+      }
       li.append(info);
       if (!u.dueno) {
         const quitar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Quitar acceso");
@@ -2375,6 +2386,19 @@ async function quitarUsuarioPanel(usuario: string) {
   if (!r.ok) return avisar(r.datos.message || "No se pudo quitar.");
   avisar(`${usuario} ya no tiene acceso.`);
   await cargarSeguridad();
+}
+
+async function permisoPedidosPanel(usuario: string, casilla: HTMLInputElement) {
+  const valor = casilla.checked;
+  casilla.disabled = true;
+  const r = await enviar(`${API}/seguridad`, { accion: "permiso-pedidos", usuario, valor });
+  casilla.disabled = false;
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    casilla.checked = !valor;
+    return avisar(r.datos.message || "No se pudo guardar el permiso.");
+  }
+  avisar(valor ? `${usuario} ya puede anular y borrar pedidos.` : `${usuario} ya no puede anular ni borrar pedidos.`);
 }
 
 async function anularInvitacionPanel(id: string) {

@@ -15,7 +15,7 @@ import type { CatalogoODinamico } from "../catalogo/almacen";
 import { devolverUnidades } from "../catalogo/stock";
 import { quitarPedido } from "../metricas/almacen";
 import type { PedidoGuardado } from "../pago/config";
-import { esDueno, obtenerUsuario } from "./auth";
+import { obtenerUsuario, puedeAnularPedidos } from "./auth";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
 
 const PREFIJO_PEDIDO = "pago:pedido:";
@@ -168,8 +168,8 @@ export function crearGestionPedidos(retencionDias = 90, catalogo?: CatalogoODina
       const s = await exigirSesion(ctx, false);
       if (s instanceof Response) return s;
       const todos = new URL(ctx.request.url).searchParams.get("todos") === "1";
-      const dueno = esDueno(await obtenerUsuario(ctx.env, s.usuario));
-      return jsonResponse(200, { pedidos: await listarPedidos(ctx, todos), puedeAnular: dueno });
+      const puede = puedeAnularPedidos(await obtenerUsuario(ctx.env, s.usuario));
+      return jsonResponse(200, { pedidos: await listarPedidos(ctx, todos), puedeAnular: puede });
     },
     async post(ctx: Ctx): Promise<Response> {
       const s = await exigirSesion(ctx, true);
@@ -183,9 +183,9 @@ export function crearGestionPedidos(retencionDias = 90, catalogo?: CatalogoODina
       const kv = ctx.env.REVIEWS_KV;
       if (!kv) return jsonResponse(503, { message: "Falta el almacenamiento (KV) en Cloudflare." });
       if (accion === "anular" || accion === "borrar") {
-        // Hacer desaparecer ventas es solo del dueño: un invitado no puede.
-        if (!esDueno(await obtenerUsuario(ctx.env, s.usuario))) {
-          return jsonResponse(403, { message: "Solo el dueño del panel puede anular o borrar pedidos." });
+        // Hacer desaparecer ventas: el dueño, o un invitado con el permiso que le dio el dueño.
+        if (!puedeAnularPedidos(await obtenerUsuario(ctx.env, s.usuario))) {
+          return jsonResponse(403, { message: "No tienes permiso para anular o borrar pedidos. Pídeselo al dueño del panel (Seguridad → Usuarios)." });
         }
         return accion === "anular" ? anular(ctx, orden, s.usuario) : borrar(ctx, orden);
       }

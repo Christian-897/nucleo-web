@@ -73,6 +73,8 @@ export interface UsuarioAdmin {
   invitado?: boolean;
   /** Quién lo invitó. */
   invitadoPor?: string;
+  /** El dueño le permite anular y borrar pedidos (v0.31). El dueño siempre puede. */
+  puedeAnularPedidos?: boolean;
 }
 
 export interface Sesion {
@@ -141,6 +143,19 @@ export async function obtenerUsuario(env: EnvPanel, usuario?: string): Promise<U
 
 export const esDueno = (registro: UsuarioAdmin | null | undefined) => Boolean(registro && !registro.invitado);
 
+/** Anular y borrar pedidos: el dueño, o un invitado al que el dueño se lo permitió. */
+export const puedeAnularPedidos = (registro: UsuarioAdmin | null | undefined) =>
+  Boolean(registro && (esDueno(registro) || registro.puedeAnularPedidos === true));
+
+/** El dueño da o quita a un invitado el permiso de anular y borrar pedidos. */
+export async function cambiarPermisoPedidos(env: EnvPanel, usuario: string, valor: boolean): Promise<{ ok: boolean; motivo?: string }> {
+  const registro = await obtenerUsuario(env, usuario);
+  if (!registro) return { ok: false, motivo: "Ese usuario no existe." };
+  if (esDueno(registro)) return { ok: false, motivo: "El dueño del panel siempre puede anular pedidos." };
+  registro.puedeAnularPedidos = valor;
+  return (await guardarUsuario(env, registro)) ? { ok: true } : { ok: false, motivo: "No se pudo guardar. Intenta de nuevo." };
+}
+
 export async function hayUsuario(env: EnvPanel): Promise<boolean> {
   return (await obtenerUsuario(env)) !== null;
 }
@@ -158,6 +173,8 @@ export interface FichaUsuario {
   dueno: boolean;
   dobleFactor: boolean;
   invitadoPor?: string;
+  /** Puede anular y borrar pedidos (el dueño siempre). */
+  puedeAnularPedidos: boolean;
 }
 
 /** Todos los usuarios del panel, el dueño primero. Sin datos secretos. */
@@ -168,6 +185,7 @@ export async function listarUsuarios(env: EnvPanel): Promise<FichaUsuario[]> {
     dueno: esDueno(r),
     dobleFactor: Boolean(r.dosFactores),
     ...(r.invitadoPor ? { invitadoPor: r.invitadoPor } : {}),
+    puedeAnularPedidos: puedeAnularPedidos(r),
   });
   const lista: FichaUsuario[] = [];
   const dueno = await leerRegistro(env, K_USUARIO);
