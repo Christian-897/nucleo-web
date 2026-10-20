@@ -102,11 +102,18 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "boletas",
     seccion: "general",
-    titulo: "Boletas y facturas",
-    palabras: ["boleta", "factura", "sii", "impuestos", "documento tributario", "boleta electrónica"],
+    titulo: "Boletas: cómo queda cada venta con su boleta",
+    palabras: ["boleta", "boleta electrónica", "factura", "sii", "impuestos", "voucher", "comprobante de pago", "modelo de emisión", "e-boleta", "documento tributario", "transferencia", "proveedor de boletas", "automatizar boletas"],
     contenido: [
-      "El panel no emite boletas ni facturas: se emiten aparte, en el sitio del SII o en tu sistema de facturación.",
-      "En **Pedidos** tienes los datos de cada venta (qué se compró, monto y datos del comprador) para hacerlas.",
+      "La boleta se maneja con el **SII** (el panel no la emite). Depende de cómo pagó el cliente:",
+      "**Con tarjeta de débito o crédito** (también en ventas por internet, como las que pasan por Flow o Mercado Pago): según el SII, el comprobante de pago vale como boleta electrónica. Para eso declaras tu modelo de emisión una sola vez:",
+      { pasos: ["Entra a **sii.cl → Servicios Online → Boleta de Ventas y Servicios Electrónica**.", "Toca **Declaración de Modelo de Emisión** e ingresa con tu RUT y Clave Tributaria.", "Elige **«No emito Boleta de Ventas y Servicios cuando recibo un pago electrónico»**.", "Toca **Enviar declaración**, luego **Confirmar**, y descarga el comprobante."] },
+      { nota: "El modelo rige desde el momento en que lo declaras y solo se puede cambiar una vez al día; el SII recomienda hacerlo el día 1 del mes. Después de declararlo, no emitas otra boleta por esos pagos: quedaría duplicada." },
+      "**Por transferencia o en efectivo:** el SII exige siempre boleta electrónica. Emítela gratis en la app **e-Boleta** del SII o en sii.cl cuando confirmes el pago. El monto y los datos del comprador están en **Pedidos**.",
+      "**Otros medios dentro de Flow o Mercado Pago** (por ejemplo, pagar con saldo de la cuenta o con transferencia): pregúntale a tu contador si esa venta necesita boleta.",
+      "**Factura:** si un cliente la pide para su empresa, se emite en el sistema de facturación del SII. El comprobante de pago no reemplaza una factura.",
+      "Antes de declarar el modelo, confírmalo con tu contador (depende de tu situación tributaria) y pregúntales a Flow y a Mercado Pago si informan esos pagos al SII.",
+      { nota: "Si no te confirman que su comprobante vale como boleta, debes emitir una boleta electrónica por cada venta: gratis y a mano en el sistema del SII (app e-Boleta o sii.cl), o de forma automática contratando un proveedor autorizado por el SII (con costo mensual)." },
     ],
   },
 
