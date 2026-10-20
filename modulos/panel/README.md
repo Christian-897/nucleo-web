@@ -15,6 +15,7 @@ de Muebles Crea, que ya estaba probado en producción, y extendido para tiendas.
 | Productos | Crear, editar, eliminar; precio, stock disponible y unidades vendidas (desde el último ajuste), categoría, físico/digital, destacado; foto. |
 | Pedidos | Ventas pagadas con datos de despacho; marcar como enviado. **Anular pedido** (el dueño, o un invitado al que el dueño le marcó "Puede anular y borrar pedidos" en Seguridad → Usuarios, v0.31): deja de contar en el Resumen, devuelve los productos al stock y queda marcado "Anulado" con fecha y quién; NO devuelve el dinero (eso se hace en Flow/Mercado Pago). **Borrar**: solo pedidos anulados (para los de prueba). |
 | Mensajes | Lo que llega por el formulario de contacto (`mensajes: configContacto`, la misma config del endpoint del formulario): ver, responder por correo, marcar como respondido, borrar. Burbuja con los pendientes en la pestaña. Avisa si el correo de aviso no salió. |
+| Sitio en construcción | Cuadro en Resumen (v0.32, `construccion` en `<PanelAdmin>` + `panel.construccion`): mostrar u ocultar el aviso, con quién y cuándo, y banda en todas las pestañas mientras está encendido. Quien tiene sesión ve la tienda con "Ver tienda". Ver el README de `construccion`. |
 | Suscriptores | Total y descarga CSV del newsletter. |
 | Fotos | Guardadas en KV, servidas en `/media/<id>` con caché de un año. |
 

@@ -13,6 +13,8 @@ export interface EnvConstruccion extends EnvBase {
    * Cambiarla corta el acceso a todos los que ya entraron.
    */
   ACCESO_PREVIA?: string;
+  /** La del panel. Si no hay ACCESO_PREVIA, la vista previa del panel se firma con una clave derivada de esta. */
+  ADMIN_PEPPER?: string;
 }
 
 export interface EnlaceContacto {

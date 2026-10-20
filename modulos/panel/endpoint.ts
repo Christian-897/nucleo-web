@@ -55,6 +55,7 @@ import { crearResumen } from "./resumen";
 import { visitasPanel } from "./visitas";
 import { crearGestionProductos } from "./productos";
 import { crearGestionMensajes } from "./mensajes";
+import { construccionGet, construccionPost } from "./construccion";
 
 export interface OpcionesPanel extends ConfigPanel {
   /** Catálogo editable (crearCatalogoEditable). Sin él, no hay sección Productos. */
@@ -205,6 +206,11 @@ export function crearPanel(opciones: OpcionesPanel) {
       onRequestGet: (c: Ctx) => (mensajes ? mensajes.get(c) : noDisponible()),
       onRequestPost: (c: Ctx) => (mensajes ? mensajes.post(c) : noDisponible()),
     },
+    /**
+     * Interruptor "Sitio en construcción" (cuadro en Resumen). Requiere que el
+     * sitio use el aviso de construcción con /admin y /api/admin/ en rutasLibres.
+     */
+    construccion: { onRequestGet: (c: Ctx) => construccionGet(c), onRequestPost: (c: Ctx) => construccionPost(c) },
     /** Fotos públicas subidas desde el panel. */
     media: {
       onRequestGet: ({ env, params }: { env: EnvPanel; params: Record<string, string | string[]> }) => {

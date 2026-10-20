@@ -124,6 +124,39 @@ async function run() {
     assert.equal(r.status, 503);
   });
 
+  await prueba("interruptor del panel (KV): enciende el aviso; KV roto o basura cuenta como apagado", async () => {
+    const { cambiarEstado, CLAVE_ESTADO_CONSTRUCCION } = await import("../modulos/construccion/index");
+    const datos = new Map<string, string>();
+    const kv = {
+      get: async (k: string) => datos.get(k) ?? null,
+      put: async (k: string, v: string) => void datos.set(k, v),
+      delete: async (k: string) => void datos.delete(k),
+      list: async () => ({ keys: [] }),
+    };
+    const env: EnvConstruccion = { REVIEWS_KV: kv, ACCESO_PREVIA: CLAVE };
+    assert.equal(await (await pedir("/", env)).text(), "SITIO REAL");
+    await cambiarEstado(env, true, "sasha");
+    assert.equal((await pedir("/", env)).status, 503);
+    assert.equal(await (await pedir("/api/pago/webhook-flow", env)).text(), "SITIO REAL", "los pagos siguen pasando");
+    await cambiarEstado(env, false, "sasha");
+    assert.equal(await (await pedir("/", env)).text(), "SITIO REAL");
+    // Basura en KV (env nuevo = sin caché).
+    datos.set(CLAVE_ESTADO_CONSTRUCCION, "{no es json");
+    const kv2 = { ...kv };
+    assert.equal(await (await pedir("/", { REVIEWS_KV: kv2, ACCESO_PREVIA: CLAVE })).text(), "SITIO REAL");
+    const roto = { ...kv, get: async () => { throw new Error("KV caído"); } };
+    assert.equal(await (await pedir("/", { REVIEWS_KV: roto, ACCESO_PREVIA: CLAVE })).text(), "SITIO REAL");
+  });
+
+  await prueba("sin ACCESO_PREVIA pero con ADMIN_PEPPER: la cookie derivada sirve; adivinar la pimienta en ?previa no", async () => {
+    const { cookieVistaPrevia } = await import("../modulos/construccion/index");
+    const env: EnvConstruccion = { CONSTRUCCION: "1", ADMIN_PEPPER: "pimienta-de-prueba-0123456789" };
+    const c = (await cookieVistaPrevia(env))!.split(";")[0];
+    assert.equal(await (await pedir("/", env, c)).text(), "SITIO REAL");
+    assert.equal((await pedir("/?previa=pimienta-de-prueba-0123456789", env)).status, 503);
+    assert.equal(await cookieVistaPrevia({ CONSTRUCCION: "1" }), null, "sin claves no hay vista previa");
+  });
+
   console.log(`\n${pasaron} pruebas pasaron.`);
 }
 

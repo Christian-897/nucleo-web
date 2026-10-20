@@ -39,11 +39,13 @@ interface Props {
   despacho?: boolean;
   /** Muestra la pestaña "Mensajes" (el sitio montó panel.mensajes y el formulario de contacto). */
   mensajes?: boolean;
+  /** Muestra el interruptor "Sitio en construcción" en Resumen (el sitio montó panel.construccion). */
+  construccion?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 import { LIMITES_BOLETIN } from "../../newsletter/boletin";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, construccion = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -98,6 +100,11 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <button class="pa-boton pa-boton--suave" type="button" data-salir>Salir</button>
     </div>
   </header>
+
+  <p class="pa-banda" data-construccion-banda hidden>
+    <span>Tu tienda está en <strong>modo construcción</strong>: los clientes ven el aviso y no pueden comprar.</span>
+    <button class="pa-enlace" type="button" data-ir-construccion>Cambiar</button>
+  </p>
 
   <main id="pa-principal" class="pa-principal">
     <!-- ───────────── acceso ───────────── -->
@@ -261,6 +268,14 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 7 días</p><p class="pa-kpi__valor" data-kpi="d7">—</p><p class="pa-kpi__nota" data-kpi-nota="d7"></p></div>
         <div class="pa-kpi"><p class="pa-kpi__titulo">Últimos 30 días</p><p class="pa-kpi__valor" data-kpi="d30">—</p><p class="pa-kpi__nota" data-kpi-nota="d30"></p></div>
         <div class="pa-kpi"><p class="pa-kpi__titulo">Venta promedio</p><p class="pa-kpi__valor" data-kpi="ticket">—</p><p class="pa-kpi__nota">por pedido, últimos 30 días</p></div>
+      </div>
+      <div class="pa-revision" data-construccion hidden={!construccion}>
+        <h2 class="pa-subtitulo">Estado de la tienda</h2>
+        <div class="pa-revision__estado" data-construccion-estado role="status">
+          <p class="pa-revision__titulo" data-construccion-titulo>—</p>
+          <p class="pa-tenue pa-chico" data-construccion-detalle></p>
+          <button class="pa-boton pa-boton--suave" type="button" data-construccion-boton hidden></button>
+        </div>
       </div>
       <div class="pa-revision" data-revision hidden={!revisionPagos}>
         <div class="pa-titulo-seccion">
@@ -1002,6 +1017,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-titulo--caja { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .pa-titulo--caja h2 { margin: 0; }
   .pa-revision { margin: 4px 0 22px; }
+  .pa-banda { margin: 0; padding: 10px 20px; background: #fff6e0; border-bottom: 1px solid #f0d58a; font-size: .95rem; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .pa-revision__estado .pa-boton { margin-top: 10px; }
   .pa-revision__estado { border: 1px solid var(--pa-borde); border-left: 5px solid var(--pa-ok); border-radius: 12px; padding: 12px 14px; background: #fff; margin-bottom: 10px; }
   .pa-revision__estado.pa-revision--alerta { border-left-color: var(--pa-error); background: #fff5f5; }
   .pa-revision__estado.pa-revision--neutro { border-left-color: var(--pa-borde); }

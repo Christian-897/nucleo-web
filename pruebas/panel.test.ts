@@ -1102,6 +1102,60 @@ async function run() {
     assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD10" } }) })).status, 403);
   });
 
+  console.log("Panel — sitio en construcción:");
+
+  await prueba("construcción: el panel lo enciende y apaga; el aviso lo respeta y quien tiene sesión ve la tienda", async () => {
+    const { crearAvisoConstruccion } = await import("../modulos/construccion/index");
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const aviso = crearAvisoConstruccion({ nombreSitio: "Tienda", rutasLibres: ["/admin", "/api/admin/"] });
+    const visitar = (cookieVisita?: string) =>
+      aviso.onRequest({ request: req("/tienda/", { cookie: cookieVisita }), env, next: async () => new Response("REAL") });
+    // Sin sesión, CSRF y cuerpos malos.
+    assert.equal((await panel.construccion.onRequestGet({ env, request: req("/x") })).status, 401);
+    assert.equal((await panel.construccion.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "cambiar", activo: true } }) })).status, 401);
+    assert.equal((await panel.construccion.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.com", cuerpo: { accion: "cambiar", activo: true } }) })).status, 403);
+    for (const cuerpo of [{ accion: "cambiar", activo: "si" }, { accion: "borrar", activo: true }, {}]) {
+      assert.equal((await panel.construccion.onRequestPost({ env, request: req("/x", { cookie, cuerpo }) })).status, 400, JSON.stringify(cuerpo));
+    }
+    // Apagado: abierto, sin cookie de vista previa.
+    const g0 = await panel.construccion.onRequestGet({ env, request: req("/x", { cookie }) });
+    assert.equal((await json(g0)).activo, false);
+    assert.equal(cookieDe(g0, "__Host-previa"), "");
+    assert.equal(await (await visitar()).text(), "REAL");
+    // Encender: el público ve el aviso; quien encendió queda registrado y recibe la cookie.
+    const on = await panel.construccion.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "cambiar", activo: true } }) });
+    const d = await json(on);
+    assert.equal(d.activo, true);
+    assert.equal(d.forzado, false);
+    assert.equal(d.por, "sasha");
+    const previa = cookieDe(on, "__Host-previa");
+    assert.ok(previa.length > 20, "da la cookie de vista previa");
+    assert.equal((await visitar()).status, 503);
+    assert.equal(await (await visitar(previa)).text(), "REAL", "con la cookie ve la tienda");
+    assert.equal((await visitar("__Host-previa=" + "0".repeat(64))).status, 503, "cookie inventada no sirve");
+    // La cookie viene de una clave derivada (no hay ACCESO_PREVIA): no es la pimienta ni la contiene.
+    assert.ok(!previa.includes(PEPPER));
+    // Apagar.
+    const off = await json(await panel.construccion.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "cambiar", activo: false } }) }));
+    assert.equal(off.activo, false);
+    assert.equal(await (await visitar()).text(), "REAL");
+  });
+
+  await prueba("construcción: si lo fuerza la variable de Cloudflare, el panel no lo apaga; un invitado puede encenderlo", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const inv = await json(await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas: 24, derivado: D1 } }) }));
+    await panel.instalar.onRequestPost({ env, request: req("/api/admin/instalar", { cuerpo: { invitacion: inv.token, usuario: "ayudante", derivado: "d".repeat(64) } }) });
+    const cookieInv = cookieDe(await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "ayudante", derivado: "d".repeat(64) } }) }), "mc_sesion");
+    const r = await json(await panel.construccion.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "cambiar", activo: true } }) }));
+    assert.equal(r.por, "ayudante");
+    const forzado = { ...env, CONSTRUCCION: "1" } as EnvPanel;
+    const g = await json(await panel.construccion.onRequestGet({ env: forzado, request: req("/x", { cookie }) }));
+    assert.equal(g.forzado, true);
+    assert.equal((await panel.construccion.onRequestPost({ env: forzado, request: req("/x", { cookie, cuerpo: { accion: "cambiar", activo: false } }) })).status, 409);
+  });
+
   console.log("Panel — mensajes de contacto:");
 
   await prueba("mensajes: el formulario avisa a la dueña (responder le llega al visitante) y queda en el panel", async () => {

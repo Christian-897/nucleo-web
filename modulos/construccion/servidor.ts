@@ -1,11 +1,13 @@
 /**
  * Aviso de "sitio en construcción" como middleware de Cloudflare Pages.
  *
- *  - Se enciende con la variable CONSTRUCCION="1"; sin ella, el sitio
- *    funciona normal y el middleware no hace nada.
+ *  - Se enciende con la variable CONSTRUCCION="1" o desde el panel
+ *    (interruptor en Resumen, ver estado.ts); si ninguno, el sitio funciona
+ *    normal y el middleware no hace nada.
  *  - Los visitantes reciben la página de aviso con estado 503 (le dice a
  *    Google "temporal, vuelve después": no castiga el posicionamiento).
- *  - El dueño entra con `?previa=CLAVE`. Se guarda una cookie con una
+ *  - Quien tiene sesión en el panel ve la tienda sin clave (el panel le da
+ *    la cookie). Además, el dueño puede entrar con `?previa=CLAVE`. Se guarda una cookie con una
  *    FIRMA de la clave (nunca la clave), HttpOnly y Secure, por N días.
  *  - `?previa=salir` borra la cookie (para ver lo que ve el público).
  *  - Siempre pasan los webhooks de pago, el retorno de Flow y robots.txt, más las rutas que
@@ -15,16 +17,10 @@
  * existe, nadie puede saltarse el aviso (falla cerrado); la página de aviso
  * no carga nada externo y lleva su propia CSP.
  */
-import { compararSeguro, hmacSha256Hex } from "../../core/cripto";
-import { limpiarVariable } from "../../core/correo";
+import { compararSeguro } from "../../core/cripto";
 import { getCookie } from "../../core/seguridad";
-import {
-  type ConfigConstruccion,
-  type EnvConstruccion,
-  LARGO_MINIMO_CLAVE_PREVIA,
-  NOMBRE_COOKIE,
-  RUTAS_LIBRES_POR_DEFECTO,
-} from "./config";
+import { type ConfigConstruccion, type EnvConstruccion, NOMBRE_COOKIE, RUTAS_LIBRES_POR_DEFECTO } from "./config";
+import { avisoEncendido, claveEfectiva, firmaAcceso, forzadoPorVariable } from "./estado";
 import { paginaConstruccion } from "./plantilla";
 
 export interface ContextoMiddleware {
@@ -33,20 +29,12 @@ export interface ContextoMiddleware {
   next: () => Promise<Response>;
 }
 
+/** Solo la variable de Cloudflare (sin mirar el panel). Para el estado completo: avisoEncendido. */
 export function avisoActivo(env: EnvConstruccion): boolean {
-  const v = limpiarVariable(env.CONSTRUCCION).toLowerCase();
-  return ["1", "true", "si", "sí", "on"].includes(v);
+  return forzadoPorVariable(env);
 }
 
-function claveValida(env: EnvConstruccion): string | null {
-  const c = limpiarVariable(env.ACCESO_PREVIA);
-  return c.length >= LARGO_MINIMO_CLAVE_PREVIA ? c : null;
-}
-
-/** Lo que se guarda en la cookie: una firma, no la clave. */
-export function firmaAcceso(clave: string): Promise<string> {
-  return hmacSha256Hex(clave, "acceso-previa:v1");
-}
+export { firmaAcceso };
 
 function rutaLibre(ruta: string, config: ConfigConstruccion): boolean {
   const libres = [...RUTAS_LIBRES_POR_DEFECTO, ...(config.rutasLibres ?? [])];
@@ -87,15 +75,15 @@ export async function procesarConstruccion(
   config: ConfigConstruccion
 ): Promise<Response> {
   const { request, env } = ctx;
-  if (!avisoActivo(env)) return ctx.next();
-
   const url = new URL(request.url);
+  // Rutas libres primero: no gastan lectura de KV (pagos, panel, fotos).
   if (rutaLibre(url.pathname, config)) return ctx.next();
+  if (!(await avisoEncendido(env))) return ctx.next();
 
   const parametro = config.parametro ?? "previa";
-  const clave = claveValida(env);
+  const clave = await claveEfectiva(env);
   if (!clave) {
-    console.warn("[construccion] ACCESO_PREVIA falta o es corta: nadie puede entrar a la vista previa");
+    console.warn("[construccion] sin ACCESO_PREVIA ni ADMIN_PEPPER: nadie puede entrar a la vista previa");
   }
 
   const pedido = url.searchParams.get(parametro);

@@ -260,6 +260,7 @@ function cerrarLocal(mensaje?: string) {
   ($("[data-editor]") as HTMLDialogElement).close();
   ($("[data-editor-diapo]") as HTMLDialogElement).close();
   ($("[data-editor-categoria]") as HTMLDialogElement).close();
+  $("[data-construccion-banda]").hidden = true;
   mostrar("entrar");
 }
 
@@ -276,6 +277,7 @@ async function abrirPestana(v: Vista) {
   mostrar(v);
   if (v === "resumen") {
     void cargarRevision();
+    void cargarConstruccion();
     await cargarResumen();
   }
   if (v === "productos") await cargarProductos();
@@ -293,6 +295,8 @@ async function abrirPestana(v: Vista) {
 
 async function entrarAlPanel(segundos: number) {
   iniciarInactividad(segundos);
+  // La banda de "modo construcción" se ve en todas las pestañas.
+  void cargarConstruccion();
   // La burbuja de "Mensajes" se ve desde que entra, sin abrir la pestaña.
   if (!$('[data-tab="mensajes"]').hidden) void cargarMensajes(true);
   await abrirPestana("resumen");
@@ -1401,6 +1405,69 @@ for (const grupo of $$("[data-tipo-grafico]")) {
   }
 }
 marcarTipos();
+
+// ─── sitio en construcción (cuadro en Resumen + banda arriba) ───
+
+interface EstadoConstruccion { activo: boolean; forzado: boolean; previa: boolean; por?: string; fecha?: string }
+
+function mostrarConstruccion(d: EstadoConstruccion) {
+  $("[data-construccion-banda]").hidden = !d.activo;
+  const estado = $("[data-construccion-estado]");
+  const titulo = $("[data-construccion-titulo]");
+  const detalle = $("[data-construccion-detalle]");
+  const boton = $<HTMLButtonElement>("[data-construccion-boton]");
+  estado.classList.toggle("pa-revision--alerta", d.activo);
+  const quien = d.por && d.fecha
+    ? ` Lo cambió ${d.por} el ${new Date(d.fecha).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}.`
+    : "";
+  if (!d.activo) {
+    titulo.textContent = "Tu tienda está abierta ✓";
+    detalle.textContent = "Si necesitas cerrarla un tiempo (vacaciones, cambios grandes), puedes mostrar el aviso «Sitio en construcción». Tus datos y pedidos no se borran." + quien;
+    boton.textContent = "Mostrar aviso de construcción";
+    boton.dataset.activo = "true";
+    boton.hidden = false;
+    return;
+  }
+  titulo.textContent = "Tu tienda muestra el aviso «Sitio en construcción»";
+  const tu = d.previa ? " Tú sí ves la tienda con «Ver tienda» (vista previa)." : "";
+  if (d.forzado) {
+    detalle.textContent = "Los clientes no pueden ver productos ni comprar. Está encendido desde Cloudflare: para abrir la tienda, pídeselo a quien administra el sitio." + tu;
+    boton.hidden = true;
+    return;
+  }
+  detalle.textContent = "Los clientes no pueden ver productos ni comprar." + quien + tu;
+  boton.textContent = "Abrir la tienda al público";
+  boton.dataset.activo = "false";
+  boton.hidden = false;
+}
+
+async function cargarConstruccion() {
+  if ($("[data-construccion]").hidden) return;
+  const r = await obtener<EstadoConstruccion>(`${API}/construccion`);
+  if (siSeCerro(r.status)) return;
+  if (r.ok) mostrarConstruccion(r.datos);
+}
+
+$("[data-construccion-boton]").addEventListener("click", async (e) => {
+  const b = e.currentTarget as HTMLButtonElement;
+  const activo = b.dataset.activo === "true";
+  const pregunta = activo
+    ? "¿Mostrar el aviso «Sitio en construcción»? Los clientes no podrán ver productos ni comprar hasta que vuelvas a abrir la tienda."
+    : "¿Abrir la tienda al público? Todos podrán ver productos y comprar.";
+  if (!confirm(pregunta)) return;
+  b.disabled = true;
+  const r = await enviar<EstadoConstruccion>(`${API}/construccion`, { accion: "cambiar", activo });
+  b.disabled = false;
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo cambiar. Intenta de nuevo.");
+  mostrarConstruccion(r.datos);
+  avisar(activo ? "Listo: aviso encendido. Puede tardar hasta un minuto en verse en todos lados." : "Listo: tienda abierta. Puede tardar hasta un minuto en verse en todos lados.");
+});
+
+$("[data-ir-construccion]").addEventListener("click", async () => {
+  await abrirPestana("resumen");
+  $("[data-construccion]").scrollIntoView({ block: "center" });
+});
 
 async function cargarResumen() {
   const r = await obtener<ResumenPanel>(`${API}/resumen`);

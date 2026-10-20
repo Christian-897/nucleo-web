@@ -7,4 +7,13 @@
  */
 export * from "./config";
 export { crearAvisoConstruccion, procesarConstruccion, avisoActivo, firmaAcceso } from "./servidor";
+export {
+  CLAVE_ESTADO_CONSTRUCCION,
+  type EstadoConstruccion,
+  type EstadoGuardado,
+  avisoEncendido,
+  cambiarEstado,
+  cookieVistaPrevia,
+  obtenerEstado,
+} from "./estado";
 export { paginaConstruccion, enlaceSeguro } from "./plantilla";

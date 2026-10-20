@@ -3,7 +3,31 @@
 Muestra un aviso de **"Sitio en construcción"** a todo el público mientras el
 dueño sigue viendo y probando el sitio real.
 
-## Cómo se usa (en Cloudflare, sin tocar código)
+## Desde el panel (v0.32, lo recomendado para la clienta)
+
+Si el sitio monta `panel.construccion` y pasa `construccion` a `<PanelAdmin>`,
+en **Resumen** aparece el cuadro **"Estado de la tienda"** con un botón
+para mostrar u ocultar el aviso. Cualquier usuario del panel puede usarlo
+(no borra nada y se deshace con el mismo botón). Queda guardado quién y cuándo.
+Mientras está encendido, una banda amarilla lo recuerda en todas las pestañas.
+
+- Quien tiene sesión en el panel ve la tienda real con **"Ver tienda"**: el
+  panel le deja la cookie de vista previa, sin clave.
+- La clave de esa cookie es `ACCESO_PREVIA` o, si no existe, una derivada de
+  `ADMIN_PEPPER` (nunca se muestra).
+- Tarda hasta ~1 minuto en verse en todos lados (caché de 10 s + KV).
+- Si la variable `CONSTRUCCION=1` está en Cloudflare, **manda ella**: el panel
+  lo muestra encendido y no lo puede apagar.
+- El sitio debe tener `/admin` y `/api/admin/` en `rutasLibres` (si no, el
+  panel queda detrás del aviso).
+
+```ts
+// functions/api/admin/construccion.ts
+import { panel } from "../../../src/servidor/panel";
+export const { onRequestGet, onRequestPost } = panel.construccion;
+```
+
+## Por variable (en Cloudflare, sin tocar código)
 
 | Variable | Tipo | Valor |
 |---|---|---|
@@ -35,7 +59,8 @@ export const { onRequest } = crearAvisoConstruccion({
 | Google | Responde **503 + Retry-After**: "temporal". No penaliza ni indexa el aviso. |
 | La clave en el navegador | La cookie guarda una **firma** HMAC, nunca la clave. HttpOnly + Secure + `__Host-`. |
 | Adivinar la clave | Comparación en tiempo constante; clave equivocada = mismo aviso, sin pistas. |
-| Configuración incompleta | Sin `ACCESO_PREVIA` válida nadie entra (falla cerrado). |
+| Configuración incompleta | Sin `ACCESO_PREVIA` ni `ADMIN_PEPPER` válidas nadie entra (falla cerrado). |
+| Interruptor del panel | Solo con sesión; POST exige mismo origen. Si KV falla o tiene basura, cuenta como apagado (la tienda sigue vendiendo). Las rutas libres no leen KV. |
 | Pagos de prueba | Los webhooks de pago y el retorno de Flow (`/api/pago/retorno-`) pasan siempre: llegan sin la cookie de vista previa. |
 | Correo del newsletter | Confirmar, darse de baja y pedir el enlace de baja (`/newsletter/confirmar`, `/newsletter/baja`, sus `/api/newsletter/…` y `/api/newsletter/pedir-baja`) pasan siempre: se abren desde el correo, sin la cookie. Suscribirse sigue bloqueado. Para que esas páginas se vean con estilos, el sitio debe dejar pasar también sus estilos (`/_astro/`). |
 | Vista previa indexada | Las páginas vistas con acceso llevan `noindex` y `no-store`. |
