@@ -24,6 +24,7 @@ import {
   type TipoTiempo,
 } from "./resumen-vista";
 import { crearVistaSitio } from "./sitio-vista";
+import { crearVistaAyuda } from "./ayuda-vista";
 import { IDS_ZONAS, NOMBRES_RETIRO, nombreZona, textoRetiro, textosDespacho, type TarifasDespacho, type ZonaDespacho } from "../../despacho/calculo";
 
 type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "mensajes" | "suscriptores" | "seguridad";
@@ -261,6 +262,7 @@ function cerrarLocal(mensaje?: string) {
   ($("[data-editor-diapo]") as HTMLDialogElement).close();
   ($("[data-editor-categoria]") as HTMLDialogElement).close();
   $("[data-construccion-banda]").hidden = true;
+  ($("[data-ayuda]") as HTMLDialogElement).close();
   mostrar("entrar");
 }
 
@@ -292,6 +294,10 @@ async function abrirPestana(v: Vista) {
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
 }
+
+// ─── ayuda (botón "? Ayuda" arriba y "?" en cada sección) ───
+const ayuda = crearVistaAyuda({ raiz, irA: (p) => void abrirPestana(p as Vista) });
+$("[data-ayuda-abrir]").addEventListener("click", () => ayuda.abrir());
 
 async function entrarAlPanel(segundos: number) {
   iniciarInactividad(segundos);

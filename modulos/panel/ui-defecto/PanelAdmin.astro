@@ -96,6 +96,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <button type="button" data-tab="seguridad">Seguridad</button>
     </nav>
     <div class="pa-acciones">
+      <button class="pa-boton pa-boton--suave" type="button" data-ayuda-abrir>? Ayuda</button>
       <a class="pa-boton pa-boton--suave" href={tienda} target="_blank" rel="noopener">Ver tienda ↗</a>
       <button class="pa-boton pa-boton--suave" type="button" data-salir>Salir</button>
     </div>
@@ -830,6 +831,21 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
     <button class="pa-boton" type="button" data-seguir>Seguir trabajando</button>
   </dialog>
 
+  <dialog class="pa-dialogo pa-ayuda" data-ayuda aria-labelledby="pa-ayuda-titulo">
+    <div class="pa-ayuda__cabeza">
+      <div class="pa-titulo-seccion">
+        <h2 id="pa-ayuda-titulo">Ayuda</h2>
+        <button class="pa-boton pa-boton--suave pa-boton--chico" type="button" data-ayuda-cerrar>Cerrar</button>
+      </div>
+      <label class="pa-campo">¿Qué necesitas hacer?
+        <input type="search" data-ayuda-buscar placeholder="Ej.: cambiar precio, anular pedido, vacaciones" autocomplete="off" />
+      </label>
+      <p class="pa-tenue pa-chico" data-ayuda-filtro hidden><span data-ayuda-filtro-texto></span> <button class="pa-enlace" type="button" data-ayuda-todo>Ver toda la ayuda</button></p>
+      <p class="pa-tenue pa-chico" role="status" aria-live="polite" data-ayuda-estado></p>
+    </div>
+    <div class="pa-ayuda__lista" data-ayuda-lista></div>
+  </dialog>
+
   <div class="pa-toast" role="status" aria-live="polite" data-toast hidden></div>
 </div>
 </body>
@@ -1017,6 +1033,24 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-titulo--caja { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .pa-titulo--caja h2 { margin: 0; }
   .pa-revision { margin: 4px 0 22px; }
+  .pa-ayuda { width: min(100% - 24px, 720px); height: min(100vh - 24px, 820px); }
+  .pa-ayuda[open] { display: flex; flex-direction: column; }
+  .pa-ayuda__cabeza { padding: 18px 20px 6px; border-bottom: 1px solid var(--pa-borde); }
+  .pa-ayuda__cabeza h2 { margin: 0; }
+  .pa-ayuda__cabeza .pa-titulo-seccion { margin: 0; }
+  .pa-ayuda__cabeza .pa-campo { margin: 10px 0 4px; }
+  .pa-ayuda__cabeza p { margin: 4px 0; }
+  .pa-ayuda__lista { padding: 8px 20px 20px; overflow-y: auto; flex: 1; }
+  .pa-ayuda__seccion { margin: 18px 0 6px; font-size: .95rem; color: var(--pa-acento-oscuro); }
+  .pa-ayuda__tema { border: 1px solid var(--pa-borde); border-radius: 12px; background: #fff; margin-bottom: 8px; }
+  .pa-ayuda__tema summary { cursor: pointer; padding: 12px 14px; font-weight: 600; }
+  .pa-ayuda__tema[open] summary { border-bottom: 1px solid var(--pa-borde); }
+  .pa-ayuda__cuerpo { padding: 4px 14px 14px; line-height: 1.5; }
+  .pa-ayuda__cuerpo ol { padding-left: 20px; margin: 8px 0; }
+  .pa-ayuda__cuerpo li { margin-bottom: 4px; }
+  .pa-ayuda__nota { background: #fff6e0; border: 1px solid #f0d58a; border-radius: 10px; padding: 8px 10px; }
+  .pa-ayuda__mini { margin-left: 10px; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--pa-borde); background: #fff; color: var(--pa-acento-oscuro); font: inherit; font-size: .95rem; font-weight: 700; cursor: pointer; vertical-align: middle; }
+  .pa-ayuda__mini:hover, .pa-ayuda__mini:focus-visible { border-color: var(--pa-acento); }
   .pa-banda { margin: 0; padding: 10px 20px; background: #fff6e0; border-bottom: 1px solid #f0d58a; font-size: .95rem; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .pa-revision__estado .pa-boton { margin-top: 10px; }
   .pa-revision__estado { border: 1px solid var(--pa-borde); border-left: 5px solid var(--pa-ok); border-radius: 12px; padding: 12px 14px; background: #fff; margin-bottom: 10px; }

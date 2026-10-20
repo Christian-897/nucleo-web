@@ -17,6 +17,7 @@ de Muebles Crea, que ya estaba probado en producción, y extendido para tiendas.
 | Mensajes | Lo que llega por el formulario de contacto (`mensajes: configContacto`, la misma config del endpoint del formulario): ver, responder por correo, marcar como respondido, borrar. Burbuja con los pendientes en la pestaña. Avisa si el correo de aviso no salió. |
 | Sitio en construcción | Cuadro en Resumen (v0.32, `construccion` en `<PanelAdmin>` + `panel.construccion`): mostrar u ocultar el aviso, con quién y cuándo, y banda en todas las pestañas mientras está encendido. Quien tiene sesión ve la tienda con "Ver tienda". Ver el README de `construccion`. |
 | Suscriptores | Total y descarga CSV del newsletter. |
+| Ayuda | Botón **"? Ayuda"** arriba y un **"?"** junto al título de cada sección (v0.34). Respuestas cortas con buscador que corre en el navegador (sin servicios externos): tolera tildes, plurales y errores de tipeo. Solo muestra los temas de lo que el sitio tiene activo (cada tema puede llevar `requiere`, un selector del panel). El contenido está en `ayuda.ts`: **al cambiar un botón o una función del panel, actualizar ahí también** (la prueba `ayuda.test.ts` revisa formato, voseo y que el buscador encuentre lo común). |
 | Fotos | Guardadas en KV, servidas en `/media/<id>` con caché de un año. |
 
 ## Seguridad (lo importante)
