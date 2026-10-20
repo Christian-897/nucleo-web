@@ -1102,6 +1102,47 @@ async function run() {
     assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD10" } }) })).status, 403);
   });
 
+  console.log("Panel — restablecer doble factor:");
+
+  await prueba("restablecer doble factor: solo el dueño, solo a invitados; cierra sesiones y deja entrar solo con contraseña", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const inv = await json(await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas: 24, derivado: D1 } }) }));
+    const DI = "d".repeat(64);
+    await panel.instalar.onRequestPost({ env, request: req("/api/admin/instalar", { cuerpo: { invitacion: inv.token, usuario: "ayudante", derivado: DI } }) });
+    const entrarInv = () => panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "ayudante", derivado: DI } }) });
+    let cookieInv = cookieDe(await entrarInv(), "mc_sesion");
+    // La invitada activa su doble factor.
+    const prop = await json(await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "proponer" } }) }));
+    assert.ok(String(prop.qr).startsWith("<svg"));
+    const secreto = (await descifrarSecreto((await obtenerUsuario(env, "ayudante"))!.propuesta!.secreto, PEPPER))!;
+    const codigo = await codigoPara(secreto, Math.floor(Date.now() / 1000 / PERIODO));
+    const act = await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "activar", codigo } }) });
+    assert.equal(act.status, 200);
+    assert.ok((await obtenerUsuario(env, "ayudante"))?.dosFactores, "quedó con doble factor");
+    // Sin sesión, CSRF, invitada a sí misma y objetivos inválidos: no.
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "restablecer-2fa", usuario: "ayudante" } }) })).status, 401);
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.com", cuerpo: { accion: "restablecer-2fa", usuario: "ayudante" } }) })).status, 403);
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "restablecer-2fa", usuario: "ayudante" } }) })).status, 403, "un invitado no se lo hace a sí mismo");
+    for (const usuario of ["sasha", "nadie", ""]) {
+      assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "restablecer-2fa", usuario } }) })).status, 400, usuario);
+    }
+    assert.ok((await obtenerUsuario(env, "ayudante"))?.dosFactores, "los intentos malos no tocaron nada");
+    // El dueño lo restablece.
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "restablecer-2fa", usuario: "ayudante" } }) })).status, 200);
+    assert.equal((await obtenerUsuario(env, "ayudante"))?.dosFactores, undefined);
+    assert.equal((await panel.sesion.onRequestGet({ env, request: req("/x", { cookie: cookieInv }) })).status, 401, "su sesión vieja se cerró");
+    const nueva = await entrarInv();
+    assert.equal((await json(nueva)).segundoFactor, undefined, "ya no pide código");
+    cookieInv = cookieDe(nueva, "mc_sesion");
+    assert.ok(cookieInv, "entra solo con contraseña");
+    // Repetirlo: ya no tiene doble factor.
+    assert.equal((await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "restablecer-2fa", usuario: "ayudante" } }) })).status, 400);
+    // Lo ve como "sin doble factor" en la lista.
+    const lista = (await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).usuarios as { usuario: string; dobleFactor: boolean }[];
+    assert.equal(lista.find((u) => u.usuario === "ayudante")!.dobleFactor, false);
+  });
+
   console.log("Panel — sitio en construcción:");
 
   await prueba("construcción: el panel lo enciende y apaga; el aviso lo respeta y quien tiene sesión ve la tienda", async () => {

@@ -18,6 +18,7 @@ import {
   OPCIONES_VIGENCIA,
   quitarUsuario,
   cambiarPermisoPedidos,
+  restablecerDobleFactor,
   tokenValido,
   vigenciaValida,
   cambiarClave,
@@ -266,6 +267,7 @@ export async function seguridadPost(ctx: Ctx, config: ConfigPanel): Promise<Resp
     case "invitar":
     case "anular-invitacion":
     case "quitar-usuario":
+    case "restablecer-2fa":
     case "permiso-pedidos": {
       const registro = await obtenerUsuario(env, yo);
       if (!registro || !esDueno(registro)) return jsonResponse(403, { message: "Solo el dueño del panel puede manejar los usuarios." });
@@ -277,6 +279,10 @@ export async function seguridadPost(ctx: Ctx, config: ConfigPanel): Promise<Resp
       if (cuerpo.accion === "permiso-pedidos") {
         if (typeof cuerpo.valor !== "boolean") return jsonResponse(400, { message: "Solicitud inválida." });
         const r = await cambiarPermisoPedidos(env, String(cuerpo.usuario || ""), cuerpo.valor);
+        return r.ok ? jsonResponse(200, { ok: true }) : jsonResponse(400, { message: r.motivo });
+      }
+      if (cuerpo.accion === "restablecer-2fa") {
+        const r = await restablecerDobleFactor(env, String(cuerpo.usuario || ""));
         return r.ok ? jsonResponse(200, { ok: true }) : jsonResponse(400, { message: r.motivo });
       }
       if (cuerpo.accion === "quitar-usuario") {

@@ -52,6 +52,13 @@ su contraseña (y su código, si tiene doble factor) y copia el enlace.
 - Permiso por invitado (v0.31): casilla **"Puede anular y borrar pedidos"**
   en la lista de usuarios (solo la ve y la cambia el dueño). Sirve para que la
   clienta anule pedidos mientras el desarrollador sigue siendo el dueño.
+- **Restablecer doble factor** (v0.33): si un invitado pierde el celular y sus
+  códigos de respaldo, el dueño toca **Restablecer doble factor** en su fila
+  (Seguridad → Usuarios). Se le quita el doble factor y se le cierran las
+  sesiones; vuelve a entrar solo con su contraseña y lo puede activar de nuevo.
+  No borra su usuario ni sus permisos. Solo el dueño, solo a invitados, con
+  sesión y mismo origen. El doble factor del dueño no se restablece desde aquí:
+  el dueño debe guardar sus códigos de respaldo.
 - No usa `ADMIN_SETUP_TOKEN` ni archivos nuevos en `functions/`: la invitación
   entra por `/api/admin/instalar` y se maneja desde `/api/admin/seguridad`.
 

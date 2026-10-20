@@ -2422,6 +2422,12 @@ function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendie
         quitar.type = "button";
         quitar.addEventListener("click", () => quitarUsuarioPanel(u.usuario));
         const botones = crear("div", "pa-fila__botones");
+        if (u.dobleFactor) {
+          const restablecer = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Restablecer doble factor");
+          restablecer.type = "button";
+          restablecer.addEventListener("click", () => restablecerDobleFactorPanel(u.usuario));
+          botones.append(restablecer);
+        }
         botones.append(quitar);
         li.append(botones);
       }
@@ -2452,6 +2458,15 @@ async function quitarUsuarioPanel(usuario: string) {
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudo quitar.");
   avisar(`${usuario} ya no tiene acceso.`);
+  await cargarSeguridad();
+}
+
+async function restablecerDobleFactorPanel(usuario: string) {
+  if (!confirm(`¿Restablecer el doble factor de ${usuario}? Úsalo solo si perdió su celular y sus códigos de respaldo. Se le cierra la sesión; al volver a entrar solo pedirá su contraseña y podrá activarlo de nuevo.`)) return;
+  const r = await enviar(`${API}/seguridad`, { accion: "restablecer-2fa", usuario });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo restablecer.");
+  avisar(`Listo: ${usuario} entra solo con su contraseña. Dile que active el doble factor de nuevo.`);
   await cargarSeguridad();
 }
 

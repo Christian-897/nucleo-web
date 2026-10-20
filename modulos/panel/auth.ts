@@ -156,6 +156,24 @@ export async function cambiarPermisoPedidos(env: EnvPanel, usuario: string, valo
   return (await guardarUsuario(env, registro)) ? { ok: true } : { ok: false, motivo: "No se pudo guardar. Intenta de nuevo." };
 }
 
+/**
+ * El dueño le quita el doble factor a un invitado que perdió el celular y los
+ * códigos de respaldo. Le cierra las sesiones; al volver a entrar solo pide
+ * contraseña y puede activarlo de nuevo. Al dueño no se le puede restablecer
+ * desde aquí (no hay nadie por encima).
+ */
+export async function restablecerDobleFactor(env: EnvPanel, usuario: string): Promise<{ ok: boolean; motivo?: string }> {
+  const registro = await obtenerUsuario(env, usuario);
+  if (!registro) return { ok: false, motivo: "Ese usuario no existe." };
+  if (esDueno(registro)) return { ok: false, motivo: "El doble factor del dueño no se restablece desde aquí." };
+  if (!registro.dosFactores && !registro.propuesta) return { ok: false, motivo: "Ese usuario no tiene doble factor activado." };
+  delete registro.dosFactores;
+  delete registro.propuesta;
+  if (!(await guardarUsuario(env, registro))) return { ok: false, motivo: "No se pudo guardar. Intenta de nuevo." };
+  await cerrarSesionesDe(env, usuario);
+  return { ok: true };
+}
+
 export async function hayUsuario(env: EnvPanel): Promise<boolean> {
   return (await obtenerUsuario(env)) !== null;
 }
