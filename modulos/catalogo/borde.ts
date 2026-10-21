@@ -476,6 +476,13 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
         },
       };
 
+      const parteApagada = (parte: string | null) =>
+        (parte === "categoria" && !ajustes.categoria) ||
+        (parte === "disponible" && !ajustes.disponible) ||
+        (parte === "lupa" && !ajustes.lupa) ||
+        (parte === "confianza" && !ajustes.confianza) ||
+        (parte === "cuenta" && (!ajustes.cuentaColores || colores.length < 2));
+
       let r = new HTMLRewriter()
         .on("title", { element: (el) => el.setInnerContent(`${p.nombre} | ${opciones.sitio.nombre}`, { html: false }) })
         .on('meta[name="description"]', { element: (el) => el.setAttribute("content", descripcion) })
@@ -489,14 +496,7 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
         // Partes opcionales apagadas en el panel: fuera del HTML.
         .on("[data-ficha-opcional]", {
           element(el) {
-            const parte = el.getAttribute("data-ficha-opcional");
-            const apagada =
-              (parte === "categoria" && !ajustes.categoria) ||
-              (parte === "disponible" && !ajustes.disponible) ||
-              (parte === "lupa" && !ajustes.lupa) ||
-              (parte === "confianza" && !ajustes.confianza) ||
-              (parte === "cuenta" && (!ajustes.cuentaColores || colores.length < 2));
-            if (apagada) el.remove();
+            if (parteApagada(el.getAttribute("data-ficha-opcional"))) el.remove();
           },
         })
         .on("script[data-ficha-jsonld]", {
@@ -504,6 +504,8 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
         })
         .on("[data-ficha]", {
           element(el) {
+            // Ya quitada por apagada: escribirle contenido la haría reaparecer como texto suelto.
+            if (parteApagada(el.getAttribute("data-ficha-opcional"))) return;
             for (const campo of (el.getAttribute("data-ficha") ?? "").split(/\s+/)) {
               if (campo === "producto") {
                 el.setAttribute("data-producto", p.id);
