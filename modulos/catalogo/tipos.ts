@@ -1,4 +1,5 @@
 import type { Producto } from "../carrito/tipos";
+import type { ColorProducto, TituloColores } from "./colores";
 
 /**
  * Producto de catálogo. Extiende al del carrito con lo que necesita una
@@ -22,6 +23,20 @@ export interface ProductoCatalogo extends Producto {
   /** Código de un video de YouTube (11 caracteres). Opcional. Ver video.ts. */
   video?: string;
   destacado?: boolean;
+  /**
+   * Colores (o modelos), cada uno con su foto y su stock (v0.35). Con
+   * colores, el stock del producto es la suma de los colores y para
+   * comprar hay que elegir uno. Ver colores.ts.
+   */
+  colores?: ColorProducto[];
+  /** Cómo se llama el selector en la ficha. Por defecto "Color". */
+  tituloColores?: TituloColores;
+  /**
+   * Punto de la foto (en %) al que se acerca la miniatura en el estilo
+   * "textura". Uno por producto: las fotos de una misma línea suelen tener
+   * el mismo encuadre. Por defecto el centro.
+   */
+  enfoqueColores?: { x: number; y: number };
 }
 
 export interface CategoriaCatalogo {

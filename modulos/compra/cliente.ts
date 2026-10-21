@@ -3,6 +3,7 @@
  * mismo esquema del servidor (errores por campo al instante) y luego
  * inicia el pago. Ningún precio sale de acá: el servidor recalcula todo.
  */
+import { idBase } from "../catalogo/colores";
 import { irAPagar } from "../pago/cliente";
 import type { Proveedor } from "../pago/tipos";
 import type { ItemCarrito } from "../carrito/tipos";
@@ -20,7 +21,8 @@ export function necesitaDespacho(
   tipos: Record<string, "fisico" | "digital">
 ): boolean {
   // Si no se conoce el tipo, se pide dirección: más vale de más que de menos.
-  return items.some((i) => tipos[i.productoId] !== "digital");
+  // Un color (`prod~rojo`) tiene el tipo de su producto.
+  return items.some((i) => tipos[idBase(i.productoId)] !== "digital");
 }
 
 export async function iniciarCompra(params: {

@@ -6,6 +6,7 @@
  */
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 import { ID_VIDEO } from "./video";
+import { problemaColores } from "./colores";
 
 export const ID_VALIDO = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /** Fotos por producto, contando la principal. */
@@ -57,6 +58,8 @@ export function validarCatalogo(
     if (p.video !== undefined && (typeof p.video !== "string" || !ID_VIDEO.test(p.video))) {
       throw new ErrorCatalogo(`"${p.id}" tiene un video inválido (solo el código de YouTube)`);
     }
+    const colores = problemaColores(p);
+    if (colores) throw new ErrorCatalogo(`"${p.id}": ${colores}`);
     if (idsCategorias.size && !idsCategorias.has(p.categoria)) {
       throw new ErrorCatalogo(`"${p.id}" apunta a una categoría que no existe: "${p.categoria}"`);
     }

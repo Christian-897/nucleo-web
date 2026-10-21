@@ -189,6 +189,26 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <label class="pa-campo pa-campo--fila">Buscar<input type="search" data-buscar-producto placeholder="Nombre…" /></label>
         <label class="pa-campo pa-campo--fila">Categoría<select data-filtro-categoria><option value="">Todas</option></select></label>
       </div>
+      <details class="pa-caja pa-caja--ancha pa-ficha-ajustes" data-ficha-ajustes>
+        <summary><strong>Cómo se ve la ficha del producto</strong> <span class="pa-tenue pa-chico">(miniaturas de colores y partes opcionales)</span></summary>
+        <form data-form="ficha-ajustes" novalidate>
+          <fieldset class="pa-opciones">
+            <legend>Miniaturas de los colores</legend>
+            <label class="pa-casilla"><input type="radio" name="miniatura" value="completa" /> <span><strong>Foto completa</strong> · se ve el producto entero</span></label>
+            <label class="pa-casilla"><input type="radio" name="miniatura" value="acercamiento" /> <span><strong>Acercamiento</strong> · de cerca, para ver la textura (el punto se ajusta en cada producto)</span></label>
+          </fieldset>
+          <fieldset class="pa-opciones">
+            <legend>Mostrar en la ficha</legend>
+            <label class="pa-casilla"><input type="checkbox" name="categoria" /> La categoría sobre el nombre</label>
+            <label class="pa-casilla"><input type="checkbox" name="disponible" /> «Disponible», «¡Quedan 2!» o «Agotado» junto al precio</label>
+            <label class="pa-casilla"><input type="checkbox" name="cuentaColores" /> Cuántos colores hay («12 colores»)</label>
+            <label class="pa-casilla"><input type="checkbox" name="lupa" /> La lupa para ver la foto en pantalla completa</label>
+            <label class="pa-casilla"><input type="checkbox" name="confianza" /> Los recuadros de envío, pago seguro y atención</label>
+          </fieldset>
+          <p class="pa-error" role="alert" data-error></p>
+          <button class="pa-boton" type="submit">Guardar</button>
+        </form>
+      </details>
       <p class="pa-tenue" data-resumen-productos></p>
       <ul class="pa-lista" data-lista-productos aria-live="polite"></ul>
     </section>
@@ -694,6 +714,29 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <label class="pa-casilla"><input type="checkbox" name="destacado" /> Mostrar en "Productos destacados" del inicio</label>
         </div>
       </div>
+      <section class="pa-variantes" data-editor-colores aria-labelledby="pa-colores-titulo">
+        <div class="pa-variantes__cabeza">
+          <h3 id="pa-colores-titulo" class="pa-subtitulo">Colores <span class="pa-tenue" data-colores-cuenta></span></h3>
+          <label class="pa-campo pa-campo--fila">Se llama en la tienda
+            <select data-colores-titulo><option value="Color">Color</option><option value="Modelo">Modelo</option></select>
+          </label>
+        </div>
+        <p class="pa-tenue pa-chico">Puedes agregar <strong>hasta <span data-colores-maximo>100</span> colores</strong> (o modelos) por producto, con <strong>una foto cada uno</strong>. Si el producto viene en un solo color, no agregues ninguno. Al elegir varias fotos a la vez, el nombre de cada archivo se usa como nombre del color (por ejemplo «Azul rey.jpg»). Las unidades son por color; vacío = sin límite.</p>
+        <ul class="pa-variantes__lista" data-colores-lista></ul>
+        <label class="pa-boton pa-boton--suave pa-archivo" data-colores-agregar>
+          + Agregar colores
+          <input type="file" accept="image/jpeg,image/png,image/webp" multiple data-colores-archivo />
+        </label>
+        <details class="pa-variantes__enfoque" data-colores-enfoque-caja hidden>
+          <summary>Ajustar el acercamiento de las miniaturas</summary>
+          <p class="pa-tenue pa-chico">Solo se usa si en «Cómo se ve la ficha» elegiste <strong>Acercamiento</strong>. Toca en la foto el punto que quieres ver de cerca; vale para todos los colores de este producto.</p>
+          <div class="pa-enfoque">
+            <button type="button" class="pa-enfoque__foto" data-enfoque-foto aria-label="Elegir el punto del acercamiento"><img alt="" data-enfoque-img /><span class="pa-enfoque__punto" data-enfoque-punto aria-hidden="true"></span></button>
+            <div class="pa-enfoque__muestra"><span class="pa-tenue pa-chico">Así se ve</span><span class="pa-enfoque__mini"><img alt="" data-enfoque-muestra /></span></div>
+          </div>
+        </details>
+        <p class="pa-error" role="alert" data-error-colores></p>
+      </section>
       <p class="pa-error" role="alert" data-error></p>
       <div class="pa-pie-dialogo">
         <button class="pa-boton pa-boton--suave" type="button" data-cerrar-editor>Cancelar</button>
@@ -1033,6 +1076,28 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-titulo--caja { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
   .pa-titulo--caja h2 { margin: 0; }
   .pa-revision { margin: 4px 0 22px; }
+  .pa-ficha-ajustes summary { cursor: pointer; }
+  .pa-ficha-ajustes form { display: grid; gap: 12px; margin-top: 12px; }
+  .pa-variantes { border-top: 1px solid var(--pa-borde); margin-top: 8px; padding-top: 14px; display: grid; gap: 10px; }
+  .pa-variantes__cabeza { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .pa-variantes__cabeza h3 { margin: 0; }
+  .pa-variantes__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 420px; overflow-y: auto; }
+  .pa-variante { display: grid; grid-template-columns: 64px minmax(0, 1fr) 110px auto; gap: 10px; align-items: center; border: 1px solid var(--pa-borde); border-radius: 12px; padding: 8px; background: #fff; }
+  .pa-variante img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; display: block; background: var(--pa-borde); }
+  .pa-variante input { width: 100%; box-sizing: border-box; }
+  .pa-variante__vendidos { grid-column: 2 / -1; margin: -4px 0 0; }
+  .pa-variante__botones { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+  .pa-variante__botones button, .pa-variante__botones label { min-width: 36px; min-height: 36px; }
+  .pa-variante__nuevo { font-size: .75rem; color: var(--pa-acento-oscuro); font-weight: 700; }
+  .pa-variantes__enfoque summary { cursor: pointer; font-weight: 600; }
+  .pa-enfoque { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; margin-top: 8px; }
+  .pa-enfoque__foto { position: relative; padding: 0; border: 1px solid var(--pa-borde); border-radius: 12px; overflow: hidden; background: #fff; cursor: crosshair; width: 220px; }
+  .pa-enfoque__foto img { width: 220px; height: auto; display: block; }
+  .pa-enfoque__punto { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 2px var(--pa-acento); pointer-events: none; }
+  .pa-enfoque__muestra { display: grid; gap: 6px; justify-items: start; }
+  .pa-enfoque__mini { width: 96px; height: 96px; border-radius: 12px; overflow: hidden; border: 1px solid var(--pa-borde); display: block; }
+  .pa-enfoque__mini img { width: 100%; height: 100%; object-fit: cover; transform: scale(2.2); display: block; }
+  @media (max-width: 640px) { .pa-variante { grid-template-columns: 56px minmax(0, 1fr); } .pa-variante__botones { grid-column: 1 / -1; justify-content: flex-start; } }
   .pa-ayuda { width: min(100% - 24px, 720px); height: min(100vh - 24px, 820px); }
   .pa-ayuda[open] { display: flex; flex-direction: column; }
   .pa-ayuda__cabeza { padding: 18px 20px 6px; border-bottom: 1px solid var(--pa-borde); }

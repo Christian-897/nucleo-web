@@ -45,6 +45,8 @@ import { type CatalogoODinamico, esDinamico, resolverCatalogo } from "./almacen"
 import { ID_VALIDO } from "./catalogo";
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 import { ID_VIDEO, miniaturaVideo } from "./video";
+import { idConColor, imagenPrincipal, tieneColores } from "./colores";
+import { AJUSTES_FICHA_POR_DEFECTO, type AjustesFicha, obtenerAjustesFicha } from "./ficha";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
 interface ElementoHtml {
@@ -140,11 +142,38 @@ export function htmlGaleria(fotos: string[], video?: string): string {
   return minis.join("");
 }
 
+/** Texto seguro dentro de HTML (nombres de colores). */
+function escaparHtml(t: string): string {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/**
+ * Miniaturas de los colores (botones). Los ids y direcciones ya están
+ * validados (solo letras, números, - ~ / _ .); los nombres van escapados.
+ * El primero queda elegido; el navegador marca los agotados con el stock real.
+ */
+export function htmlColores(p: ProductoCatalogo, imagenPorDefecto: string): string {
+  return (p.colores ?? [])
+    .map((c, i) => {
+      const id = idConColor(p.id, c.id);
+      const foto = imagenSegura(c.foto ?? p.imagen, imagenPorDefecto);
+      const mini = imagenSegura(c.mini ?? c.foto ?? p.imagen, imagenPorDefecto);
+      const nombre = escaparHtml(c.nombre);
+      return `<li><button type="button" class="colores__mini" data-color="${id}" data-color-nombre="${nombre}" data-color-foto="${foto}" data-color-mini="${mini}" aria-label="${nombre}" aria-pressed="${i === 0}" title="${nombre}"><img src="${mini}" alt="" width="76" height="76" loading="lazy" decoding="async"></button></li>`;
+    })
+    .join("");
+}
+
+function plural(titulo: string, n: number): string {
+  const t = titulo.toLowerCase();
+  return n === 1 ? `1 ${t}` : `${n} ${t === "color" ? "colores" : `${t}s`}`;
+}
+
 // ───────────────────────────── relleno de campos ─────────────────────────────
 
 function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: OpcionesBorde) {
   const url = `/producto/${p.id}/`;
-  const imagen = imagenSegura(p.imagen, op.imagenPorDefecto);
+  const imagen = imagenSegura(imagenPrincipal(p), op.imagenPorDefecto);
   switch (campo) {
     case "enlace":
       el.setAttribute("href", url);
@@ -167,6 +196,14 @@ function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: O
       else el.setAttribute("hidden", "");
       break;
     case "agregar":
+      if (tieneColores(p)) {
+        // Con colores no se agrega desde la lista: el botón lleva a la ficha para elegir.
+        el.setAttribute("data-elegir", url);
+        el.setAttribute("data-id", p.id);
+        el.setAttribute("aria-label", `Elegir ${(p.tituloColores ?? "Color").toLowerCase()} de ${p.nombre}`);
+        break;
+      }
+      el.removeAttribute("data-elegir");
       el.setAttribute("data-id", p.id);
       el.setAttribute("data-nombre", p.nombre);
       el.setAttribute("data-precio", String(p.precio));
@@ -409,7 +446,16 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
 
       const cat = catalogo.categoria(p.categoria);
       const canonica = new URL(`/producto/${p.id}/`, opciones.sitio.dominio).href;
-      const imagen = imagenSegura(p.imagen, opciones.imagenPorDefecto);
+      let ajustes: AjustesFicha = AJUSTES_FICHA_POR_DEFECTO;
+      try {
+        ajustes = await obtenerAjustesFicha(env);
+      } catch {
+        /* si KV falla, rigen los de fábrica */
+      }
+      const colores = tieneColores(p) ? p.colores! : [];
+      const primero = colores[0];
+      const titulo = p.tituloColores ?? "Color";
+      const imagen = imagenSegura(primero?.foto ?? p.imagen, opciones.imagenPorDefecto);
       const imagenAbs = new URL(imagen, opciones.sitio.dominio).href;
       const galeria = fotosSeguras(p);
       const descripcion = (p.descripcion || p.nombre).slice(0, 300);
@@ -440,6 +486,19 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
         .on('link[rel="canonical"]', { element: (el) => el.setAttribute("href", canonica) })
         // La plantilla no se indexa por sí misma; la ficha sí.
         .on('meta[name="robots"][data-plantilla]', { element: (el) => el.remove() })
+        // Partes opcionales apagadas en el panel: fuera del HTML.
+        .on("[data-ficha-opcional]", {
+          element(el) {
+            const parte = el.getAttribute("data-ficha-opcional");
+            const apagada =
+              (parte === "categoria" && !ajustes.categoria) ||
+              (parte === "disponible" && !ajustes.disponible) ||
+              (parte === "lupa" && !ajustes.lupa) ||
+              (parte === "confianza" && !ajustes.confianza) ||
+              (parte === "cuenta" && (!ajustes.cuentaColores || colores.length < 2));
+            if (apagada) el.remove();
+          },
+        })
         .on("script[data-ficha-jsonld]", {
           element: (el) => el.setInnerContent(JSON.stringify(jsonLd).replace(/</g, "\\u003c"), { html: true }),
         })
@@ -462,6 +521,38 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
                   el.removeAttribute("hidden");
                   el.setInnerContent(htmlGaleria(fotos, video), { html: true });
                 }
+              } else if (campo === "colores-bloque") {
+                if (!colores.length) el.setAttribute("hidden", "");
+                else {
+                  el.removeAttribute("hidden");
+                  el.setAttribute("data-miniatura", ajustes.miniatura);
+                  const e = p.enfoqueColores ?? { x: 50, y: 50 };
+                  el.setAttribute("style", `--enfoque-x:${Math.round(e.x)}%;--enfoque-y:${Math.round(e.y)}%`);
+                }
+              } else if (campo === "colores") {
+                el.setInnerContent(htmlColores(p, opciones.imagenPorDefecto), { html: true });
+                el.setAttribute("data-colores-total", String(colores.length));
+                el.setAttribute("data-plural", plural(titulo, 2).slice(2));
+              } else if (campo === "colores-titulo") {
+                el.setInnerContent(`Elige tu ${titulo.toLowerCase()}`, { html: false });
+              } else if (campo === "colores-etiqueta") {
+                el.setInnerContent(`${titulo}:`, { html: false });
+              } else if (campo === "colores-elegido") {
+                el.setInnerContent(primero?.nombre ?? "", { html: false });
+              } else if (campo === "colores-cuenta") {
+                el.setInnerContent(plural(titulo, colores.length), { html: false });
+                el.removeAttribute("hidden");
+              } else if (campo === "imagen-alt" && primero) {
+                el.setAttribute("src", imagen);
+                el.setAttribute("alt", `${p.nombre} · ${primero.nombre}`);
+              } else if (campo === "agregar" && primero) {
+                const mini = imagenSegura(primero.mini ?? primero.foto ?? p.imagen, opciones.imagenPorDefecto);
+                el.setAttribute("data-id", idConColor(p.id, primero.id));
+                el.setAttribute("data-nombre", `${p.nombre} · ${primero.nombre}`);
+                el.setAttribute("data-precio", String(p.precio));
+                el.setAttribute("data-imagen", mini);
+                el.setAttribute("data-producto-base", p.id);
+                el.removeAttribute("data-elegir");
               } else if (campo === "cantidad") {
                 el.setAttribute("max", p.stock === undefined ? "99" : String(Math.max(1, p.stock)));
               } else {
@@ -470,8 +561,12 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
             }
           },
         });
-      // Relacionados: misma categoría, sin el propio producto.
-      r = conListas(r, catalogo, opciones, (f) => (f === "relacionados" ? `relacionados:${p.categoria}:${p.id}` : f));
+      // Relacionados: misma categoría, sin el propio producto. El filtro queda
+      // escrito en la página: el borde de listas (middleware) vuelve a pasar
+      // por esta respuesta y, con "relacionados" a secas, la vaciaba.
+      const filtroRelacionados = `relacionados:${p.categoria}:${p.id}`;
+      r = r.on('[data-cat-lista="relacionados"]', { element: (el) => el.setAttribute("data-cat-lista", filtroRelacionados) });
+      r = conListas(r, catalogo, opciones, (f) => (f === "relacionados" ? filtroRelacionados : f));
       return r.transform(respuesta);
     },
   };

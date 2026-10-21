@@ -117,3 +117,58 @@ img-src 'self' data: https://i.ytimg.com
 
 `idVideoYoutube(texto)`, `urlInsercionVideo(id)`, `miniaturaVideo(id)` y `ID_VIDEO` están en
 `nucleo-web/catalogo`.
+
+## Colores o modelos por producto (v0.35)
+
+Un producto puede tener hasta **100 colores** (o "modelos"), cada uno con su
+foto, su miniatura y su **stock propio**. Se cargan en el panel
+(Productos → Editar → Colores). Funciona en cualquier categoría.
+
+**Cómo viaja un color:** el id de la línea del carrito es `producto~color`
+(`lana-peluche-wenzo~azul-rey`). El servidor arma ese "producto" desde el
+catálogo (nombre "Producto · Color", su foto, su stock), así que carrito,
+pago, pedidos, correos, anular y métricas usan el mismo camino validado.
+Un color inventado o agotado se rechaza como un producto inexistente o
+agotado. Un producto con colores **no** se vende sin color.
+
+- Stock: `catalogo:vendidos:<producto>~<color>` en KV. El "stock" del
+  producto es la suma de sus colores (sin límite si algún color no tiene).
+- `/api/stock?producto=<id>` → stock de todos sus colores (la ficha lo usa).
+- Fotos: el panel sube una grande (sin recortar) y una miniatura cuadrada
+  (320 px). Las recién subidas solo se aceptan para SU producto (prefijo
+  `color-<id>-` + 12 caracteres al azar).
+- Si el producto no tiene foto propia, se usa la del primer color
+  (`imagenPrincipal`).
+
+**Ajustes de la ficha** (`catalogo:ficha`, panel → Productos → "Cómo se ve
+la ficha"): miniaturas `completa` o `acercamiento` (con el punto de
+`enfoqueColores` de cada producto) y partes opcionales que el borde **quita
+del HTML** si están apagadas: `categoria`, `disponible`, `cuenta`, `lupa`,
+`confianza`.
+
+### Qué pone el sitio en la plantilla de la ficha
+
+```html
+<span data-ficha-opcional="cuenta" data-ficha="colores-cuenta" hidden></span>     <!-- "18 colores" -->
+<button data-lupa data-ficha-opcional="lupa">…</button>                            <!-- pantalla completa -->
+<a data-ficha="categoria-enlace categoria-nombre" data-ficha-opcional="categoria"></a>
+<span data-disponible data-ficha-opcional="disponible" hidden></span>              <!-- Disponible / ¡Quedan 2! / Agotado -->
+<div data-ficha="colores-bloque" hidden>                                           <!-- data-miniatura + --enfoque-x/y -->
+  <span data-ficha="colores-titulo"></span>                                        <!-- Elige tu color -->
+  <span data-ficha="colores-etiqueta"></span> <span data-color-elegido data-ficha="colores-elegido"></span>
+  <ul data-ficha="colores" data-colores-lista data-visibles="24" data-visibles-movil="15"></ul>
+  <button data-colores-mas hidden><span data-colores-mas-texto></span></button>
+</div>
+<button data-agregar data-ficha="agregar">…</button>                              <!-- recibe data-producto-base y el id del color -->
+<ul data-ficha-opcional="confianza">…</ul>
+```
+
+Y en el navegador: `iniciarColores()` de `nucleo-web/catalogo/colores-ficha`
+(elige color, cambia la foto y el botón, `?color=` en la dirección, agotados,
+"Ver los N", lupa). En las **listas**, el botón de agregar de un producto con
+colores recibe `data-elegir="/producto/<id>/"`: el sitio debe llevar ahí en
+vez de agregar. Para el despacho, `necesitaDespacho` ya mira el producto base.
+
+**Relacionados (arreglo v0.35):** la ficha deja escrito el filtro concreto
+(`relacionados:<cat>:<id>`) en `data-cat-lista`; antes, con el catálogo
+editado, el borde de listas (middleware) volvía a pasar y vaciaba la sección.

@@ -242,6 +242,41 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "colores-producto",
+    seccion: "productos",
+    titulo: "Agregar colores (o modelos) a un producto",
+    palabras: ["colores", "color", "variantes", "modelos", "tonos", "miniaturas", "ovillos", "lanas de colores", "agregar color", "cuántas fotos"],
+    contenido: [
+      "Un mismo producto puede venir en varios colores, cada uno con **su foto y sus unidades**. En la tienda, el cliente toca la miniatura del color y la foto grande cambia.",
+      { pasos: ["Ve a **Productos → Editar** (o crea el producto).", "Abajo, en **Colores**, toca **+ Agregar colores** y elige las fotos (puedes elegir varias a la vez; **una foto por color**).", "Revisa el **nombre** de cada color (si el archivo se llamaba «Azul rey.jpg», ya viene escrito) y escribe sus **unidades** (vacío = sin límite).", "Ordena con ↑ ↓ y toca **Guardar cambios**."] },
+      "Puedes agregar **hasta 100 colores por producto**. Si el producto viene en un solo color, no agregues ninguno.",
+      "En **Se llama en la tienda** eliges si dice «Color» o «Modelo» (por ejemplo, para un peluche que cambia de diseño).",
+      { nota: "Para que las miniaturas se puedan comparar, saca todas las fotos de un producto con la misma luz, el mismo fondo y el mismo encuadre." },
+    ],
+  },
+  {
+    id: "colores-stock",
+    seccion: "productos",
+    titulo: "Unidades y agotados por color",
+    palabras: ["stock por color", "agotado un color", "se acabó un color", "reponer color", "unidades por color", "quitar color"],
+    contenido: [
+      "Con colores, las unidades se escriben **en cada color** (el «Disponible» del producto muestra la suma). Cada venta descuenta del color vendido y, si anulas el pedido, vuelve a ese color.",
+      "Si un color llega a 0, en la tienda se ve apagado y no se puede elegir; los demás se siguen vendiendo. Para reponerlo, cambia sus unidades y guarda.",
+      "**Quitar** un color lo saca de la tienda al guardar (los pedidos que ya lo tenían no se pierden).",
+    ],
+  },
+  {
+    id: "ficha-ajustes",
+    seccion: "productos",
+    titulo: "Cómo se ve la ficha del producto (miniaturas y partes opcionales)",
+    palabras: ["ficha", "miniatura", "acercamiento", "foto completa", "textura", "lupa", "zoom", "disponible", "ocultar", "quitar etiqueta", "recuadros"],
+    contenido: [
+      "En **Productos**, abre **Cómo se ve la ficha del producto**:",
+      { pasos: ["**Miniaturas de los colores**: **Foto completa** (se ve el producto entero) o **Acercamiento** (de cerca, para ver la textura).", "**Mostrar en la ficha**: marca o desmarca la categoría, «Disponible», cuántos colores hay, la lupa y los recuadros de envío y pago.", "Toca **Guardar**."] },
+      "Vale para toda la tienda. Con **Acercamiento**, en cada producto puedes elegir el punto que se ve de cerca: **Editar → Colores → Ajustar el acercamiento de las miniaturas** y toca en la foto.",
+    ],
+  },
+  {
     id: "producto-digital",
     seccion: "productos",
     titulo: "Cursos y patrones (productos digitales)",

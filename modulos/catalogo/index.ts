@@ -14,7 +14,22 @@ export {
   PREFIJO_VENDIDOS,
   reponerStock,
   unidadesVendidas,
+  stockDeColores,
 } from "./stock";
+export {
+  SEPARADOR_COLOR,
+  MAXIMO_COLORES,
+  ID_COLOR,
+  partirId,
+  idBase,
+  idConColor,
+  tieneColores,
+  idColorDesdeNombre,
+  buscarColor,
+  imagenPrincipal,
+  type ColorProducto,
+  type TituloColores,
+} from "./colores";
 export {
   crearCatalogoEditable,
   resolverCatalogo,
@@ -41,7 +56,7 @@ export {
 } from "./categorias";
 export { crearEndpointCatalogoPublico, type ProductoPublico } from "./publico";
 export { crearEndpointStock } from "./endpoint";
-export { consultarStock } from "./cliente";
+export { consultarStock, consultarStockColores } from "./cliente";
 export {
   crearBordeCatalogo,
   crearFichaProducto,

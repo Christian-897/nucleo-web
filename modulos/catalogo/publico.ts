@@ -7,6 +7,7 @@
 import type { EnvBase } from "../../core/tipos";
 import { type CatalogoODinamico, resolverCatalogo } from "./almacen";
 import { productoDisponible } from "./stock";
+import { imagenPrincipal } from "./colores";
 
 export interface ProductoPublico {
   id: string;
@@ -32,7 +33,7 @@ export function crearEndpointCatalogoPublico(catalogo: CatalogoODinamico) {
           precio: p.precio,
           categoria: p.categoria,
           tipo: p.tipo,
-          imagen: p.imagen,
+          imagen: imagenPrincipal(p),
           disponible: d?.stock === undefined ? null : Number(d.stock),
         });
       }

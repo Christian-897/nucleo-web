@@ -159,3 +159,12 @@ export async function subirFotoContenido(clave: string, foto: File, base = "/api
   form.set("archivo", foto);
   return llamar<{ imagen: string }>(`${base}/contenido-foto`, { method: "POST", body: form });
 }
+
+/** Sube la foto de un color (ya reducida). Devuelve su dirección; queda puesta al guardar los colores. */
+export async function subirFotoColor(id: string, foto: File, base = "/api/admin") {
+  const form = new FormData();
+  form.set("id", id);
+  form.set("modo", "color");
+  form.set("archivo", foto);
+  return llamar<{ imagen: string }>(`${base}/producto-foto`, { method: "POST", body: form });
+}

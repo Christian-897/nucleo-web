@@ -1102,6 +1102,66 @@ async function run() {
     assert.equal((await panel.pedidos.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "anular", orden: "ORD10" } }) })).status, 403);
   });
 
+  console.log("Panel — colores de producto:");
+
+  await prueba("colores: subir fotos, guardar con stock por color, ids estables, fotos ajenas no, quitar borra fotos", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const subir = async (id: string) => {
+      const f = formFoto(id, png(800, 800));
+      f.set("modo", "color");
+      return json(await panel.productoFoto.onRequestPost({ env, request: req("/x", { cookie, form: f }) }));
+    };
+    const a = await subir("gatito");
+    const b = await subir("gatito");
+    assert.match(a.imagen, /^\/media\/color-gatito-[0-9a-f]{12}$/);
+    // La foto subida NO se pega sola al producto.
+    assert.equal(catalogo.inicial.buscar("gatito")?.colores, undefined);
+    const guardar = (cuerpo: Record<string, unknown>, c = cookie) =>
+      panel.productos.onRequestPost({ env, request: req("/x", { cookie: c, cuerpo: { accion: "colores", id: "gatito", ...cuerpo } }) });
+    // Sin sesión / CSRF.
+    assert.equal((await panel.productos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "colores", id: "gatito", colores: [] } }) })).status, 401);
+    // Foto de otro producto o inventada: no.
+    const ajena = await subir("curso");
+    for (const foto of [ajena.imagen, "/media/color-gatito-zzzzzzzzzzzz", "/img/otra.webp", "https://malo.com/x.png"]) {
+      const r = await guardar({ colores: [{ nombre: "Naranjo", disponible: 2, foto, mini: b.imagen }] });
+      assert.equal(r.status, 400, String(foto));
+    }
+    // Nombres repetidos o stock raro: no.
+    assert.equal((await guardar({ colores: [{ nombre: "A", disponible: 1, foto: a.imagen, mini: b.imagen }, { nombre: "a", disponible: 1, foto: a.imagen, mini: b.imagen }] })).status, 400);
+    assert.equal((await guardar({ colores: [{ nombre: "A", disponible: -2, foto: a.imagen, mini: b.imagen }] })).status, 400);
+    // Bien.
+    const ok = await json(await guardar({ titulo: "Modelo", enfoque: { x: 30, y: 140 }, colores: [{ nombre: "Naranjo", disponible: 2, foto: a.imagen, mini: b.imagen }, { nombre: "Gris", disponible: null, foto: a.imagen, mini: b.imagen }] }));
+    assert.equal(ok.ok, true);
+    assert.deepEqual(ok.producto.colores.map((c: { id: string }) => c.id), ["naranjo", "gris"]);
+    assert.equal(ok.producto.tituloColores, "Modelo");
+    assert.deepEqual(ok.producto.enfoqueColores, { x: 30, y: 100 });
+    assert.equal(ok.producto.stock, undefined, "con colores el stock vive en cada color");
+    // Venta del naranjo y lista del panel con vendidos por color.
+    await registrarVenta(catalogo, env, [{ productoId: "gatito~naranjo", cantidad: 1 }]);
+    const lista = await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const g = lista.productos.find((p: { id: string }) => p.id === "gatito");
+    assert.deepEqual(g.colores.map((c: { disponible: number | null; vendidos: number | null }) => [c.disponible, c.vendidos]), [[1, 1], [null, null]]);
+    assert.equal(g.disponible, null, "un color sin límite = producto sin límite");
+    assert.equal(lista.maximoColores, 100);
+    // Renombrar mantiene el id (va en carritos); cambiar unidades reinicia el contador de ese color.
+    const c2 = await subir("gatito");
+    const d2 = await subir("gatito");
+    const r2 = await json(await guardar({ colores: [{ id: "naranjo", nombre: "Naranjo claro", disponible: 1, foto: a.imagen, mini: b.imagen }, { nombre: "Azul", disponible: 4, foto: c2.imagen, mini: d2.imagen }] }));
+    assert.deepEqual(r2.producto.colores.map((c: { id: string }) => c.id), ["naranjo", "azul"]);
+    assert.equal((await productoDisponible(catalogo, env, "gatito~naranjo"))?.stock, 1, "unidades sin tocar: el vendido se sigue descontando");
+    assert.equal((await productoDisponible(catalogo, env, "gatito~gris")), null, "el color quitado ya no existe");
+    // Quitar todos: las fotos que ya nadie usa se borran.
+    const r3 = await json(await guardar({ colores: [] }));
+    assert.equal(r3.producto.colores, undefined);
+    for (const f of [a.imagen, b.imagen, c2.imagen, d2.imagen]) assert.equal(datos.has("foto:" + f.slice("/media/".length)), false, f);
+    // Ajustes de la ficha.
+    const aj = await json(await panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "ajustes-ficha", ajustes: { miniatura: "acercamiento", lupa: false } } }) }));
+    assert.equal(aj.ajustesFicha.miniatura, "acercamiento");
+    assert.equal(aj.ajustesFicha.lupa, false);
+    assert.equal((await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }))).ajustesFicha.lupa, false);
+  });
+
   console.log("Panel — restablecer doble factor:");
 
   await prueba("restablecer doble factor: solo el dueño, solo a invitados; cierra sesiones y deja entrar solo con contraseña", async () => {

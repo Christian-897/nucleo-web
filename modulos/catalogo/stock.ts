@@ -15,6 +15,8 @@ import type { EnvBase } from "../../core/tipos";
 import type { ConfigCarritoServidor } from "../carrito/config";
 import type { Producto } from "../carrito/tipos";
 import { type CatalogoODinamico, resolverCatalogo } from "./almacen";
+import { buscarColor, idConColor, partirId, tieneColores } from "./colores";
+import type { Catalogo } from "./tipos";
 
 export const PREFIJO_VENDIDOS = "catalogo:vendidos:";
 
@@ -24,16 +26,78 @@ async function vendidos(env: EnvBase, id: string): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-/** Producto con el stock disponible de verdad (o null si no existe). */
+/**
+ * Producto con el stock disponible de verdad (o null si no existe).
+ *  - `prod~color`: ese color como producto propio (nombre "Prod · Color",
+ *    su foto y su stock). Color inexistente = null.
+ *  - Producto con colores pedido sin color: su stock es la suma de los
+ *    colores y lleva `requiereColor: true` (sirve para "agotado" en las
+ *    listas, pero el carrito no lo acepta: ver fuenteCarrito).
+ */
 export async function productoDisponible(
   catalogo: CatalogoODinamico,
   env: EnvBase,
   id: string
 ): Promise<Producto | null> {
-  const p = (await resolverCatalogo(catalogo, env)).buscar(id);
+  const vigente: Catalogo = await resolverCatalogo(catalogo, env);
+  const { base, color } = partirId(id);
+  const p = vigente.buscar(base);
   if (!p) return null;
+  if (color !== undefined) {
+    const c = buscarColor(p, color);
+    if (!c) return null;
+    const compuesto = idConColor(p.id, c.id);
+    return {
+      ...p,
+      id: compuesto,
+      nombre: `${p.nombre} · ${c.nombre}`,
+      imagen: c.mini ?? c.foto ?? p.imagen,
+      productoBase: p.id,
+      color: c.nombre,
+      stock: c.stock === undefined ? undefined : Math.max(0, c.stock - (await vendidos(env, compuesto))),
+    };
+  }
+  if (tieneColores(p)) {
+    let total: number | undefined = 0;
+    for (const c of p.colores!) {
+      if (c.stock === undefined) {
+        total = undefined;
+        break;
+      }
+      total += Math.max(0, c.stock - (await vendidos(env, idConColor(p.id, c.id))));
+    }
+    return { ...p, stock: total, requiereColor: true };
+  }
   if (p.stock === undefined) return { ...p };
   return { ...p, stock: Math.max(0, p.stock - (await vendidos(env, id))) };
+}
+
+/** Stock de cada color de un producto (null = sin límite). Para la ficha. */
+export async function stockDeColores(
+  catalogo: CatalogoODinamico,
+  env: EnvBase,
+  idProducto: string
+): Promise<Record<string, number | null>> {
+  const p = (await resolverCatalogo(catalogo, env)).buscar(idProducto);
+  const salida: Record<string, number | null> = {};
+  for (const c of p?.colores ?? []) {
+    const compuesto = idConColor(p!.id, c.id);
+    salida[compuesto] = c.stock === undefined ? null : Math.max(0, c.stock - (await vendidos(env, compuesto)));
+  }
+  return salida;
+}
+
+/** El stock declarado (antes de descontar ventas) de un id, con o sin color. */
+function stockDeclarado(vigente: Catalogo, id: string): { clave: string; limitado: boolean } | null {
+  const { base, color } = partirId(id);
+  const p = vigente.buscar(base);
+  if (!p) return null;
+  if (color !== undefined) {
+    const c = buscarColor(p, color);
+    return c ? { clave: idConColor(p.id, c.id), limitado: c.stock !== undefined } : null;
+  }
+  if (tieneColores(p)) return null; // sin color no se vende
+  return { clave: p.id, limitado: p.stock !== undefined };
 }
 
 /** Config del carrito lista para `crearEndpointCarrito((env) => ...)`. */
@@ -42,7 +106,11 @@ export function fuenteCarrito(
   opciones: { maxPorLinea?: number } = {}
 ): (env: EnvBase) => ConfigCarritoServidor {
   return (env) => ({
-    obtenerProducto: (id) => productoDisponible(catalogo, env, id),
+    // Un producto con colores solo se vende eligiendo uno (`prod~color`).
+    obtenerProducto: async (id) => {
+      const p = await productoDisponible(catalogo, env, id);
+      return p && p.requiereColor ? null : p;
+    },
     maxPorLinea: opciones.maxPorLinea,
   });
 }
@@ -56,12 +124,12 @@ export async function registrarVenta(
   if (!env.REVIEWS_KV) return;
   const vigente = await resolverCatalogo(catalogo, env);
   for (const l of lineas) {
-    const p = vigente.buscar(l.productoId);
-    if (!p || p.stock === undefined) continue; // sin límite: no se cuenta
+    const d = stockDeclarado(vigente, l.productoId);
+    if (!d || !d.limitado) continue; // sin límite: no se cuenta
     const cantidad = Math.max(0, Math.floor(l.cantidad));
     if (!cantidad) continue;
-    const actual = await vendidos(env, p.id);
-    await env.REVIEWS_KV.put(PREFIJO_VENDIDOS + p.id, String(actual + cantidad));
+    const actual = await vendidos(env, d.clave);
+    await env.REVIEWS_KV.put(PREFIJO_VENDIDOS + d.clave, String(actual + cantidad));
   }
 }
 
@@ -79,14 +147,14 @@ export async function devolverUnidades(
   if (!env.REVIEWS_KV) return;
   const vigente = await resolverCatalogo(catalogo, env);
   for (const l of lineas) {
-    const p = vigente.buscar(l.productoId);
-    if (!p || p.stock === undefined) continue;
+    const d = stockDeclarado(vigente, l.productoId);
+    if (!d || !d.limitado) continue;
     const cantidad = Math.max(0, Math.floor(l.cantidad));
     if (!cantidad) continue;
-    const actual = await vendidos(env, p.id);
+    const actual = await vendidos(env, d.clave);
     const nuevo = Math.max(0, actual - cantidad);
-    if (nuevo === 0) await env.REVIEWS_KV.delete(PREFIJO_VENDIDOS + p.id);
-    else await env.REVIEWS_KV.put(PREFIJO_VENDIDOS + p.id, String(nuevo));
+    if (nuevo === 0) await env.REVIEWS_KV.delete(PREFIJO_VENDIDOS + d.clave);
+    else await env.REVIEWS_KV.put(PREFIJO_VENDIDOS + d.clave, String(nuevo));
   }
 }
 
@@ -97,7 +165,8 @@ export async function stockDisponible(
   ids: string[]
 ): Promise<Record<string, number | null>> {
   const salida: Record<string, number | null> = {};
-  for (const id of ids.slice(0, 100)) {
+  // 120: una ficha pide los colores de su producto (hasta 100) más algunos relacionados.
+  for (const id of ids.slice(0, 120)) {
     const p = await productoDisponible(catalogo, env, id);
     if (p) salida[id] = p.stock ?? null;
   }

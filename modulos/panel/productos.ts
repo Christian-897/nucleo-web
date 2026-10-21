@@ -14,11 +14,13 @@ import { normalizeInput } from "../../core/validar";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import { ID_VALIDO, MAXIMO_FOTOS } from "../catalogo/catalogo";
 import { productoDisponible, reponerStock, unidadesVendidas } from "../catalogo/stock";
+import { type ColorProducto, idColorDesdeNombre, idConColor, MAXIMO_COLORES, tieneColores } from "../catalogo/colores";
+import { guardarAjustesFicha, obtenerAjustesFicha } from "../catalogo/ficha";
 import type { ProductoCatalogo } from "../catalogo/tipos";
 import { idVideoYoutube } from "../catalogo/video";
 import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
-import { borrarFoto, direccionMediaValida, guardarFoto, medidasAceptables, tipoRealDeImagen } from "./imagenes";
+import { borrarFoto, direccionMediaValida, guardarFoto, medidasAceptables, nuevoIdentificador, tipoRealDeImagen } from "./imagenes";
 
 const PRECIO_MAXIMO = 100_000_000;
 const STOCK_MAXIMO = 100_000;
@@ -47,6 +49,72 @@ function imagenValida(v: unknown): v is string {
 /** Todas las fotos de un producto, la principal primero. */
 export function fotosDe(p: Pick<ProductoCatalogo, "imagen" | "fotos">): string[] {
   return [...(p.imagen ? [p.imagen] : []), ...(p.fotos ?? [])];
+}
+
+/** Fotos de los colores (grandes y miniaturas). */
+export function fotosDeColores(p: Pick<ProductoCatalogo, "colores">): string[] {
+  return (p.colores ?? []).flatMap((c) => [c.foto, c.mini].filter((f): f is string => typeof f === "string"));
+}
+
+/** Prefijo con que se guardan las fotos de colores de un producto (para reconocer las recién subidas). */
+export function prefijoFotoColor(id: string): string {
+  return nuevoIdentificador(`color-${id}`).replace(/-[0-9a-f]{12}$/, "-");
+}
+
+export interface EntradaColor {
+  id?: string;
+  nombre: string;
+  /** null = sin límite. */
+  disponible: number | null;
+  foto: string;
+  mini: string;
+}
+
+/**
+ * Valida la lista de colores que manda la pantalla. Las fotos solo pueden
+ * ser las que el producto YA tenía o recién subidas para ESTE producto
+ * (prefijo color-<id>): nadie puede apuntar un color a una foto ajena.
+ */
+export function validarColores(
+  crudo: unknown,
+  actual: ProductoCatalogo
+): { ok: true; colores: EntradaColor[]; titulo: "Color" | "Modelo"; enfoque: { x: number; y: number } } | { ok: false; motivo: string } {
+  const o = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
+  const lista = o.colores;
+  if (!Array.isArray(lista)) return { ok: false, motivo: "La lista de colores no es válida." };
+  if (lista.length > MAXIMO_COLORES) return { ok: false, motivo: `Cada producto puede tener hasta ${MAXIMO_COLORES} colores.` };
+  const titulo = o.titulo === "Modelo" ? "Modelo" : "Color";
+  const e = (o.enfoque && typeof o.enfoque === "object" ? o.enfoque : {}) as Record<string, unknown>;
+  const pct = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : 50);
+  const enfoque = { x: pct(e.x), y: pct(e.y) };
+  const propias = new Set(fotosDeColores(actual));
+  const prefijo = `/media/${prefijoFotoColor(actual.id)}`;
+  // Recién subida para ESTE producto: prefijo exacto + los 12 caracteres al azar (ni uno más).
+  const recienSubida = (f: string) => direccionMediaValida(f) && f.startsWith(prefijo) && /^[0-9a-f]{12}$/.test(f.slice(prefijo.length));
+  const fotoValida = (f: unknown): f is string => typeof f === "string" && (propias.has(f) || recienSubida(f));
+  const idsActuales = new Set((actual.colores ?? []).map((c) => c.id));
+  const salida: EntradaColor[] = [];
+  const nombres = new Set<string>();
+  for (const [i, x] of lista.entries()) {
+    const c = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const nombre = typeof c.nombre === "string" ? normalizeInput(c.nombre) : "";
+    if (!nombre) return { ok: false, motivo: `Escribe el nombre del color ${i + 1}.` };
+    if (nombre.length > 40) return { ok: false, motivo: `El nombre «${nombre.slice(0, 20)}…» es muy largo (máximo 40).` };
+    if (nombres.has(nombre.toLowerCase())) return { ok: false, motivo: `Hay dos colores llamados «${nombre}».` };
+    nombres.add(nombre.toLowerCase());
+    let disponible: number | null = null;
+    if (c.disponible !== null && c.disponible !== undefined && c.disponible !== "") {
+      const d = typeof c.disponible === "string" ? Number(c.disponible) : c.disponible;
+      if (typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > STOCK_MAXIMO) {
+        return { ok: false, motivo: `Revisa las unidades de «${nombre}»: un número entero, o vacío para sin límite.` };
+      }
+      disponible = d;
+    }
+    if (!fotoValida(c.foto) || !fotoValida(c.mini)) return { ok: false, motivo: `La foto de «${nombre}» no es válida. Vuelve a subirla.` };
+    const id = typeof c.id === "string" && idsActuales.has(c.id) ? c.id : undefined;
+    salida.push({ id, nombre, disponible, foto: c.foto, mini: c.mini });
+  }
+  return { ok: true, colores: salida, titulo, enfoque };
 }
 
 /** Deja `fotos` como galería: la primera pasa a ser la principal. */
@@ -141,15 +209,37 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     const productos = [];
     for (const p of vigente.productos) {
       const d = await productoDisponible(vigente, ctx.env, p.id);
+      const colores = [];
+      for (const c of p.colores ?? []) {
+        const compuesto = idConColor(p.id, c.id);
+        const dc = await productoDisponible(vigente, ctx.env, compuesto);
+        colores.push({
+          ...c,
+          disponible: c.stock === undefined ? null : Number(dc?.stock ?? 0),
+          vendidos: c.stock === undefined ? null : await unidadesVendidas(ctx.env, compuesto),
+        });
+      }
+      const conColores = tieneColores(p);
       productos.push({
         ...p,
-        disponible: p.stock === undefined ? null : Number(d?.stock ?? 0),
-        vendidos: p.stock === undefined ? null : await unidadesVendidas(ctx.env, p.id),
+        colores,
+        disponible: conColores ? (d?.stock === undefined ? null : Number(d.stock)) : p.stock === undefined ? null : Number(d?.stock ?? 0),
+        vendidos: conColores
+          ? colores.reduce((n, c) => n + (c.vendidos ?? 0), 0)
+          : p.stock === undefined
+            ? null
+            : await unidadesVendidas(ctx.env, p.id),
       });
     }
     // Los nombres de categoría vigentes (pueden haberse cambiado en el panel).
     const categorias = vigente.categorias.map((c) => ({ id: c.id, nombre: c.nombre }));
-    return jsonResponse(200, { editado: await catalogo.editado(ctx.env), categorias, productos });
+    return jsonResponse(200, {
+      editado: await catalogo.editado(ctx.env),
+      categorias,
+      productos,
+      ajustesFicha: await obtenerAjustesFicha(ctx.env),
+      maximoColores: MAXIMO_COLORES,
+    });
   }
 
   async function guardar(ctx: Ctx, entrada: EntradaProducto): Promise<Response> {
@@ -175,7 +265,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       };
       if (entrada.video) producto.video = entrada.video;
       else delete producto.video;
-      if (entrada.disponible !== disponibleAhora) {
+      // Con colores, el stock vive en cada color (sección Colores).
+      if (!tieneColores(actual) && entrada.disponible !== disponibleAhora) {
         reponer = true;
         if (entrada.disponible === null) delete producto.stock;
         else producto.stock = entrada.disponible;
@@ -212,8 +303,9 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudo eliminar." });
     // Las fotos se borran DESPUÉS de sacar el producto: si algo falla a mitad,
     // nunca queda un producto apuntando a una foto que no existe.
-    for (const f of fotosDe(quitado)) await borrarFoto(ctx.env, f);
+    for (const f of [...fotosDe(quitado), ...fotosDeColores(quitado)]) await borrarFoto(ctx.env, f);
     await reponerStock(ctx.env, id);
+    for (const c of quitado.colores ?? []) await reponerStock(ctx.env, idConColor(id, c.id));
     return jsonResponse(200, { ok: true });
   }
 
@@ -224,12 +316,89 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     if (!cuerpo) return jsonResponse(400, { message: "Solicitud inválida." });
     if (cuerpo.accion === "eliminar") return eliminar(ctx, cuerpo.id);
     if (cuerpo.accion === "fotos") return ordenarFotos(ctx, cuerpo.id, cuerpo.fotos);
+    if (cuerpo.accion === "colores") return guardarColores(ctx, cuerpo);
+    if (cuerpo.accion === "ajustes-ficha") {
+      try {
+        return jsonResponse(200, { ok: true, ajustesFicha: await guardarAjustesFicha(ctx.env, cuerpo.ajustes) });
+      } catch {
+        return jsonResponse(500, { message: "No se pudo guardar. Intenta de nuevo." });
+      }
+    }
     if (cuerpo.accion === "guardar") {
       const v = validarEntrada(cuerpo.producto, (await catalogo.obtener(ctx.env)).categorias);
       if (!v.ok) return jsonResponse(400, { message: "Revisa los campos marcados.", errores: v.errores });
       return guardar(ctx, v.datos);
     }
     return jsonResponse(400, { message: "Esa acción no existe." });
+  }
+
+  /**
+   * Colores de un producto: la lista completa, en orden. Los que ya
+   * existían mantienen su id (va en carritos y pedidos); los nuevos lo
+   * sacan del nombre. Cambiar las unidades de un color reinicia su
+   * contador de vendidos (como el stock de un producto). Las fotos de los
+   * colores quitados se borran DESPUÉS de guardar.
+   */
+  async function guardarColores(ctx: Ctx, cuerpo: Record<string, unknown>): Promise<Response> {
+    const id = cuerpo.id;
+    if (typeof id !== "string" || !ID_VALIDO.test(id)) return jsonResponse(400, { message: "Producto inválido." });
+    const vigente = await catalogo.obtener(ctx.env);
+    const lista = vigente.productos.map((p) => ({ ...p }));
+    const i = lista.findIndex((p) => p.id === id);
+    if (i < 0) return jsonResponse(404, { message: "Ese producto ya no existe. Recarga la página." });
+    const actual = lista[i];
+    const v = validarColores(cuerpo, actual);
+    if (!v.ok) return jsonResponse(400, { message: v.motivo });
+
+    const usados = new Set(v.colores.filter((c) => c.id).map((c) => c.id!));
+    const reponer: string[] = [];
+    const nuevos: ColorProducto[] = [];
+    for (const c of v.colores) {
+      const previo = c.id ? actual.colores?.find((x) => x.id === c.id) : undefined;
+      const idColor = c.id ?? idColorDesdeNombre(c.nombre, usados);
+      usados.add(idColor);
+      const color: ColorProducto = { id: idColor, nombre: c.nombre, foto: c.foto, mini: c.mini };
+      const compuesto = idConColor(id, idColor);
+      if (previo) {
+        const ahora = previo.stock === undefined ? null : Number((await productoDisponible(vigente, ctx.env, compuesto))?.stock ?? 0);
+        if (c.disponible !== ahora) {
+          reponer.push(compuesto);
+          if (c.disponible !== null) color.stock = c.disponible;
+        } else if (previo.stock !== undefined) color.stock = previo.stock;
+      } else {
+        reponer.push(compuesto);
+        if (c.disponible !== null) color.stock = c.disponible;
+      }
+      nuevos.push(color);
+    }
+    const quitados = (actual.colores ?? []).filter((c) => !nuevos.some((n) => n.id === c.id));
+    const producto: ProductoCatalogo = { ...actual };
+    if (nuevos.length) {
+      producto.colores = nuevos;
+      producto.tituloColores = v.titulo;
+      producto.enfoqueColores = v.enfoque;
+      // Con colores, el stock del producto es la suma de los colores.
+      delete producto.stock;
+    } else {
+      delete producto.colores;
+      delete producto.tituloColores;
+      delete producto.enfoqueColores;
+    }
+    lista[i] = producto;
+    const r = await catalogo.guardar(ctx.env, lista);
+    if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudieron guardar los colores." });
+    for (const k of reponer) await reponerStock(ctx.env, k);
+    const enUso = new Set(fotosDeColores(producto));
+    for (const c of quitados) {
+      await reponerStock(ctx.env, idConColor(id, c.id));
+      for (const f of [c.foto, c.mini]) if (f && !enUso.has(f)) await borrarFoto(ctx.env, f);
+    }
+    // Fotos reemplazadas en colores que siguen (foto nueva para el mismo color).
+    for (const c of actual.colores ?? []) {
+      if (quitados.includes(c)) continue;
+      for (const f of [c.foto, c.mini]) if (f && !enUso.has(f)) await borrarFoto(ctx.env, f);
+    }
+    return jsonResponse(200, { ok: true, producto });
   }
 
   /**
@@ -279,6 +448,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     const id = form.get("id");
     const archivo = form.get("archivo");
     const agregar = form.get("modo") === "agregar";
+    const paraColor = form.get("modo") === "color";
     if (typeof id !== "string" || !ID_VALIDO.test(id)) return jsonResponse(400, { message: "Producto inválido." });
     if (!archivo || typeof archivo === "string") return jsonResponse(400, { message: "No llegó ninguna foto." });
     if (archivo.size === 0) return jsonResponse(400, { message: "El archivo está vacío." });
@@ -295,6 +465,15 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     const lista = vigente.productos.map((p) => ({ ...p }));
     const i = lista.findIndex((p) => p.id === id);
     if (i < 0) return jsonResponse(404, { message: "Ese producto ya no existe. Recarga la página." });
+    if (paraColor) {
+      // Foto de un color: se guarda y se devuelve; queda puesta al guardar los colores.
+      if (fotosDeColores(lista[i]).length >= MAXIMO_COLORES * 2 + 40) {
+        return jsonResponse(400, { message: "Este producto ya tiene demasiadas fotos de colores." });
+      }
+      const g = await guardarFoto(ctx.env, `color-${id}`, datos, tipo);
+      if (!g.ok || !g.direccion) return jsonResponse(500, { message: "No se pudo guardar la foto." });
+      return jsonResponse(200, { ok: true, imagen: g.direccion });
+    }
     if (agregar && fotosDe(lista[i]).length >= MAXIMO_FOTOS) {
       return jsonResponse(400, { message: `Cada producto puede tener hasta ${MAXIMO_FOTOS} fotos.` });
     }

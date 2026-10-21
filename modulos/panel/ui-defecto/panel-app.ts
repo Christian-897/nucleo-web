@@ -3,7 +3,7 @@
  * REGLA: lo que llega del servidor se escribe SIEMPRE con textContent o
  * atributos; nunca con innerHTML.
  */
-import { agregarFotoProducto, derivarClave, enviar, obtener, reducirFoto, subirFotoBoletin, subirFotoCarrusel, subirFotoCategoria } from "../cliente";
+import { agregarFotoProducto, derivarClave, enviar, obtener, reducirFoto, subirFotoBoletin, subirFotoCarrusel, subirFotoCategoria, subirFotoColor } from "../cliente";
 import { formatearPrecio } from "../../carrito/formato";
 import { ayudaVendidos, textoStock } from "../texto-stock";
 import {
@@ -44,6 +44,25 @@ interface Producto {
   video?: string;
   disponible: number | null;
   vendidos: number | null;
+  colores?: ColorPanel[];
+  tituloColores?: "Color" | "Modelo";
+  enfoqueColores?: { x: number; y: number };
+}
+interface ColorPanel {
+  id: string;
+  nombre: string;
+  foto?: string;
+  mini?: string;
+  disponible: number | null;
+  vendidos: number | null;
+}
+interface AjustesFicha {
+  miniatura: "completa" | "acercamiento";
+  categoria: boolean;
+  disponible: boolean;
+  cuentaColores: boolean;
+  lupa: boolean;
+  confianza: boolean;
 }
 interface Pedido {
   orden: string;
@@ -362,11 +381,13 @@ let productos: Producto[] = [];
 let categorias: { id: string; nombre: string }[] = [];
 
 async function cargarProductos() {
-  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string }[] }>(`${API}/productos`);
+  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string }[]; ajustesFicha?: AjustesFicha; maximoColores?: number }>(`${API}/productos`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar los productos.");
   productos = r.datos.productos;
   categorias = r.datos.categorias;
+  if (r.datos.maximoColores) maximoColores = r.datos.maximoColores;
+  if (r.datos.ajustesFicha) pintarAjustesFicha(r.datos.ajustesFicha);
   const filtro = $<HTMLSelectElement>("[data-filtro-categoria]");
   const elegida = filtro.value;
   filtro.replaceChildren(new Option("Todas", ""), ...categorias.map((c) => new Option(c.nombre, c.id)));
@@ -389,7 +410,7 @@ function pintarProductos() {
     ...visibles.map((p) => {
       const li = crear("li", "pa-fila");
       const img = crear("img");
-      img.src = p.imagen || "";
+      img.src = p.imagen || p.colores?.[0]?.mini || p.colores?.[0]?.foto || "";
       img.alt = "";
       img.width = 64;
       img.height = 64;
@@ -411,7 +432,8 @@ function pintarProductos() {
       if (p.tipo === "digital") datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Digital"));
       if (p.destacado) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Destacado"));
       if (p.video) datos.append(crear("span", "pa-etiqueta pa-etiqueta--suave", "Con video"));
-      if (!p.imagen) datos.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Sin foto"));
+      if (p.colores?.length) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", `${p.colores.length} ${p.colores.length === 1 ? (p.tituloColores ?? "Color").toLowerCase() : p.tituloColores === "Modelo" ? "modelos" : "colores"}`));
+      if (!p.imagen && !p.colores?.length) datos.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Sin foto"));
       info.append(nombre, datos);
       const botones = crear("div", "pa-fila__botones");
       const editar = crear("button", "pa-boton pa-boton--chico", "Editar");
@@ -526,12 +548,16 @@ function abrirEditor(p: Producto | null) {
   fotosOriginales = p ? [...(p.imagen ? [p.imagen] : []), ...(p.fotos ?? [])] : [];
   fotosEditor = fotosOriginales.map((url) => ({ url }));
   pintarFotosEditor();
+  abrirColores(p);
   editor().showModal();
   campo("nombre").focus();
 }
 $("[data-nuevo-producto]").addEventListener("click", () => abrirEditor(null));
 $("[data-cerrar-editor]").addEventListener("click", () => editor().close());
-editor().addEventListener("close", soltarVistasPrevias);
+editor().addEventListener("close", () => {
+  soltarVistasPrevias();
+  soltarVistasColores();
+});
 
 $<HTMLInputElement>("[data-editor-archivo]").addEventListener("change", async (e) => {
   const input = e.currentTarget as HTMLInputElement;
@@ -619,10 +645,294 @@ formProducto().addEventListener("submit", async (e) => {
         return;
       }
     }
+    // 3) Colores: sube las fotos nuevas (grande y miniatura) y guarda la lista, solo si algo cambió.
+    if (firmaColores() !== coloresOriginal) {
+      const errorC = $("[data-error-colores]");
+      const pendientes = coloresEditor.filter((c) => c.archivoFoto && c.archivoMini);
+      for (const [n, c] of pendientes.entries()) {
+        errorC.textContent = `Subiendo ${n + 1} de ${pendientes.length}…`;
+        const a = await subirFotoColor(id, c.archivoFoto!);
+        if (siSeCerro(a.status)) return;
+        const b = a.ok ? await subirFotoColor(id, c.archivoMini!) : a;
+        if (siSeCerro(b.status)) return;
+        if (!a.ok || !b.ok) {
+          errorC.textContent = `${b.datos.message || "Una foto no se pudo subir."} Revisa y vuelve a Guardar cambios.`;
+          return;
+        }
+        URL.revokeObjectURL(c.vista);
+        c.foto = a.datos.imagen;
+        c.mini = b.datos.imagen;
+        c.vista = c.mini;
+        delete c.archivoFoto;
+        delete c.archivoMini;
+      }
+      const rc = await enviar<{ producto: Producto }>(`${API}/productos`, {
+        accion: "colores",
+        id,
+        titulo: $<HTMLSelectElement>("[data-colores-titulo]").value,
+        enfoque: enfoqueColores,
+        colores: coloresEditor.map((c) => ({
+          id: c.id,
+          nombre: c.nombre.trim(),
+          disponible: c.disponible.trim() === "" ? null : Number(c.disponible),
+          foto: c.foto,
+          mini: c.mini,
+        })),
+      });
+      if (siSeCerro(rc.status)) return;
+      if (!rc.ok) {
+        errorC.textContent = rc.datos.message || "No se pudieron guardar los colores.";
+        // El producto ya existe: lo que siga, se guarda como edición.
+        editando = { ...(editando ?? (r.datos.producto as Producto)), id } as Producto;
+        return;
+      }
+      errorC.textContent = "";
+    }
     fotosEditor = [];
     editor().close();
     avisar("Guardado. La tienda se actualiza en unos segundos.");
     await cargarProductos();
+  });
+});
+
+// ─── colores del producto (editor) ───
+
+interface ColorEditor {
+  id?: string;
+  nombre: string;
+  disponible: string;
+  vendidos: number | null;
+  foto?: string;
+  mini?: string;
+  archivoFoto?: File;
+  archivoMini?: File;
+  /** Lo que se muestra: la miniatura guardada o la vista previa local. */
+  vista: string;
+}
+let maximoColores = 100;
+let coloresEditor: ColorEditor[] = [];
+let coloresOriginal = "";
+let enfoqueColores = { x: 50, y: 50 };
+
+function firmaColores(): string {
+  return JSON.stringify({
+    t: $<HTMLSelectElement>("[data-colores-titulo]").value,
+    e: enfoqueColores,
+    c: coloresEditor.map((c) => [c.id ?? "", c.nombre.trim(), c.disponible.trim(), c.foto ?? "", c.mini ?? "", c.archivoFoto ? "nuevo" : ""]),
+  });
+}
+
+function soltarVistasColores() {
+  for (const c of coloresEditor) if (c.archivoMini) URL.revokeObjectURL(c.vista);
+}
+
+/** "Azul rey.jpg" → "Azul rey"; las fotos de WhatsApp o cámara (IMG-2026…) → "Color 3". */
+function nombreDeArchivo(nombre: string, n: number): string {
+  const limpio = nombre.replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[_]+/g, " ").trim();
+  if (!limpio || /^(img|dsc|pxl|photo|foto|image|wa)[-_ ]?\d/i.test(limpio) || /^\d+$/.test(limpio) || /^IMG-\d{8}-WA\d+/i.test(limpio)) return `Color ${n}`;
+  return limpio.slice(0, 40);
+}
+
+function totalColores(): string {
+  if (!coloresEditor.length) return "";
+  if (coloresEditor.some((c) => c.disponible.trim() === "")) return "";
+  return String(coloresEditor.reduce((n, c) => n + (Number(c.disponible) || 0), 0));
+}
+
+function pintarColores() {
+  const lista = $("[data-colores-lista]");
+  const total = coloresEditor.length;
+  lista.replaceChildren(
+    ...coloresEditor.map((c, i) => {
+      const li = crear("li", "pa-variante");
+      const img = crear("img");
+      img.src = c.vista;
+      img.alt = `Miniatura de ${c.nombre || `color ${i + 1}`}`;
+      img.width = 64;
+      img.height = 64;
+      const nombre = crear("input");
+      nombre.value = c.nombre;
+      nombre.maxLength = 40;
+      nombre.setAttribute("aria-label", `Nombre del color ${i + 1}`);
+      nombre.addEventListener("input", () => {
+        c.nombre = nombre.value;
+        img.alt = `Miniatura de ${c.nombre}`;
+      });
+      const disp = crear("input");
+      disp.value = c.disponible;
+      disp.inputMode = "numeric";
+      disp.placeholder = "Sin límite";
+      disp.setAttribute("aria-label", `Unidades de ${c.nombre || `color ${i + 1}`}`);
+      disp.addEventListener("input", () => {
+        c.disponible = disp.value;
+        pintarTotalColores();
+      });
+      const botones = crear("div", "pa-variante__botones");
+      const boton = (texto: string, etiqueta: string, accion: () => void, desactivado = false) => {
+        const b = crear("button", "pa-boton pa-boton--suave pa-boton--chico", texto);
+        b.type = "button";
+        b.title = etiqueta;
+        b.setAttribute("aria-label", etiqueta);
+        b.disabled = desactivado;
+        b.addEventListener("click", accion);
+        return b;
+      };
+      const mover = (a: number, b: number) => {
+        [coloresEditor[a], coloresEditor[b]] = [coloresEditor[b], coloresEditor[a]];
+        pintarColores();
+      };
+      const cambiar = crear("label", "pa-boton pa-boton--suave pa-boton--chico pa-archivo", "Cambiar foto");
+      const archivo = crear("input");
+      archivo.type = "file";
+      archivo.accept = "image/jpeg,image/png,image/webp";
+      archivo.addEventListener("change", async () => {
+        const f = archivo.files?.[0];
+        archivo.value = "";
+        if (!f) return;
+        const listo = await prepararFotoColor(f);
+        if (!listo) return;
+        if (c.archivoMini) URL.revokeObjectURL(c.vista);
+        Object.assign(c, listo);
+        pintarColores();
+      });
+      cambiar.append(archivo);
+      botones.append(
+        boton("↑", `Subir ${c.nombre}`, () => mover(i, i - 1), i === 0),
+        boton("↓", `Bajar ${c.nombre}`, () => mover(i, i + 1), i === total - 1),
+        cambiar,
+        boton("Quitar", `Quitar ${c.nombre}`, () => {
+          if (c.id && !confirm(`¿Quitar el color «${c.nombre}»? Deja de verse en la tienda al guardar.`)) return;
+          const [q] = coloresEditor.splice(i, 1);
+          if (q.archivoMini) URL.revokeObjectURL(q.vista);
+          pintarColores();
+        })
+      );
+      li.append(img, nombre, disp, botones);
+      if (c.vendidos) li.append(crear("p", "pa-tenue pa-chico pa-variante__vendidos", `Vendidos desde el último ajuste: ${c.vendidos}`));
+      else if (!c.id) li.append(crear("p", "pa-variante__nuevo pa-variante__vendidos", "Nuevo: se sube al guardar"));
+      return li;
+    })
+  );
+  $("[data-colores-cuenta]").textContent = `(${total} de ${maximoColores})`;
+  $("[data-colores-maximo]").textContent = String(maximoColores);
+  $("[data-colores-agregar]").hidden = total >= maximoColores;
+  $("[data-colores-enfoque-caja]").hidden = total === 0;
+  pintarEnfoque();
+  pintarTotalColores();
+}
+
+/** Con colores, las unidades van por color: el "Disponible" del producto muestra la suma. */
+function pintarTotalColores() {
+  const campo = formProducto().elements.namedItem("disponible") as HTMLInputElement;
+  const con = coloresEditor.length > 0;
+  campo.disabled = con;
+  if (con) campo.value = totalColores();
+  campo.placeholder = con ? "Suma de los colores" : "Sin límite";
+  if (con) $("[data-editor-vendidos]").textContent = "Con colores, las unidades se escriben en cada color (abajo).";
+}
+
+async function prepararFotoColor(f: File): Promise<Pick<ColorEditor, "archivoFoto" | "archivoMini" | "vista"> | null> {
+  try {
+    // Grande sin recortar (para la ficha y la lupa) y miniatura cuadrada liviana.
+    const foto = await reducirFoto(f, 1200, 400 * 1024, "libre");
+    const mini = await reducirFoto(f, 320, 60 * 1024, "cuadrado");
+    return { archivoFoto: foto, archivoMini: mini, vista: URL.createObjectURL(mini) };
+  } catch {
+    $("[data-error-colores]").textContent = `No pudimos usar «${f.name}». Usa fotos JPG, PNG o WebP.`;
+    return null;
+  }
+}
+
+function pintarEnfoque() {
+  const primero = coloresEditor[0];
+  const img = $<HTMLImageElement>("[data-enfoque-img]");
+  const muestra = $<HTMLImageElement>("[data-enfoque-muestra]");
+  if (!primero) return;
+  img.src = primero.vista;
+  muestra.src = primero.vista;
+  muestra.style.transformOrigin = `${enfoqueColores.x}% ${enfoqueColores.y}%`;
+  const punto = $("[data-enfoque-punto]");
+  punto.style.left = `${enfoqueColores.x}%`;
+  punto.style.top = `${enfoqueColores.y}%`;
+}
+
+$("[data-enfoque-foto]").addEventListener("click", (e) => {
+  const caja = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const ev = e as MouseEvent;
+  enfoqueColores = {
+    x: Math.round(Math.min(100, Math.max(0, ((ev.clientX - caja.left) / caja.width) * 100))),
+    y: Math.round(Math.min(100, Math.max(0, ((ev.clientY - caja.top) / caja.height) * 100))),
+  };
+  pintarEnfoque();
+});
+
+function abrirColores(p: Producto | null) {
+  soltarVistasColores();
+  $("[data-error-colores]").textContent = "";
+  $<HTMLSelectElement>("[data-colores-titulo]").value = p?.tituloColores ?? "Color";
+  enfoqueColores = p?.enfoqueColores ? { ...p.enfoqueColores } : { x: 50, y: 50 };
+  coloresEditor = (p?.colores ?? []).map((c) => ({
+    id: c.id,
+    nombre: c.nombre,
+    disponible: c.disponible === null ? "" : String(c.disponible),
+    vendidos: c.vendidos,
+    foto: c.foto,
+    mini: c.mini,
+    vista: c.mini ?? c.foto ?? "",
+  }));
+  pintarColores();
+  coloresOriginal = firmaColores();
+  if (!coloresEditor.length) {
+    const campo = formProducto().elements.namedItem("disponible") as HTMLInputElement;
+    campo.disabled = false;
+  }
+}
+
+$<HTMLInputElement>("[data-colores-archivo]").addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const archivos = [...(input.files ?? [])];
+  input.value = "";
+  const error = $("[data-error-colores]");
+  error.textContent = "";
+  const libres = maximoColores - coloresEditor.length;
+  if (archivos.length > libres) error.textContent = `Solo caben ${libres} colores más (máximo ${maximoColores}). Se agregaron los primeros.`;
+  for (const [n, f] of archivos.slice(0, libres).entries()) {
+    $("[data-colores-cuenta]").textContent = `(preparando ${n + 1} de ${Math.min(archivos.length, libres)}…)`;
+    const listo = await prepararFotoColor(f);
+    if (listo) coloresEditor.push({ nombre: nombreDeArchivo(f.name, coloresEditor.length + 1), disponible: "", vendidos: null, ...listo });
+  }
+  pintarColores();
+});
+
+// ─── cómo se ve la ficha (ajustes de toda la tienda) ───
+
+function pintarAjustesFicha(a: AjustesFicha) {
+  const f = $<HTMLFormElement>('[data-form="ficha-ajustes"]');
+  for (const r of $$<HTMLInputElement>('input[name="miniatura"]', f)) r.checked = r.value === a.miniatura;
+  for (const k of ["categoria", "disponible", "cuentaColores", "lupa", "confianza"] as const) {
+    (f.elements.namedItem(k) as HTMLInputElement).checked = a[k];
+  }
+}
+
+$<HTMLFormElement>('[data-form="ficha-ajustes"]').addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget as HTMLFormElement;
+  errorDe(f);
+  const casilla = (n: string) => (f.elements.namedItem(n) as HTMLInputElement).checked;
+  const ajustes = {
+    miniatura: f.querySelector<HTMLInputElement>('input[name="miniatura"]:checked')?.value ?? "completa",
+    categoria: casilla("categoria"),
+    disponible: casilla("disponible"),
+    cuentaColores: casilla("cuentaColores"),
+    lupa: casilla("lupa"),
+    confianza: casilla("confianza"),
+  };
+  await conBoton(f, async () => {
+    const r = await enviar<{ ajustesFicha: AjustesFicha }>(`${API}/productos`, { accion: "ajustes-ficha", ajustes });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) return errorDe(f, r.datos.message || "No se pudo guardar.");
+    pintarAjustesFicha(r.datos.ajustesFicha);
+    avisar("Guardado. Las fichas se actualizan en unos segundos.");
   });
 });
 
