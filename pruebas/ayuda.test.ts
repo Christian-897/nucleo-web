@@ -81,6 +81,11 @@ prueba("encuentra lo que la gente escribe", () => {
     ["agregar colores", "colores-producto"],
     ["se acabó un color", "colores-stock"],
     ["acercamiento", "ficha-ajustes"],
+    ["ver los colores", "colores-tienda"],
+    ["muchos colores", "colores-tienda"],
+    ["foto con letras del proveedor", "colores-consejos"],
+    ["productos repetidos por color", "colores-consejos"],
+    ["quedan pocos", "colores-stock"],
   ];
   for (const [q, id] of casos) assert.ok(entre(q, 2).includes(id), `«${q}» → ${entre(q, 3).join(", ")} (esperaba ${id})`);
   assert.equal(primero("cambiar precio"), "cambiar-precio");
