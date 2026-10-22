@@ -54,6 +54,8 @@ const html = htmlCarrusel(estado, opciones);
     color: var(--carrusel-tinta);
   }
   .carrusel__pista { display: grid; touch-action: pan-y; }
+  /* Con foto para celular, la <picture> no cambia el diseño: la <img> sigue siendo la que se ubica. */
+  .carrusel__foto { display: contents; }
   .carrusel__diapo {
     grid-area: 1 / 1;
     position: relative;

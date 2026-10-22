@@ -1135,6 +1135,7 @@ interface Diapo {
   id?: string;
   imagen: string;
   imagenAlt: string;
+  imagenMovil?: string;
   enfoque?: "izquierda" | "centro" | "derecha";
   antetitulo?: string;
   titulo?: string;
@@ -1274,6 +1275,20 @@ let indiceDiapo: number | null = null; // null = nueva
 let imagenDiapo = "";
 let fotoPendienteDiapo: File | null = null;
 let vistaPreviaDiapo = "";
+// Foto para celular (opcional, v0.36).
+let imagenMovilDiapo = "";
+let fotoPendienteMovil: File | null = null;
+let vistaPreviaMovil = "";
+
+function pintarFotoMovil() {
+  const img = $<HTMLImageElement>("[data-diapo-foto-movil]");
+  const src = vistaPreviaMovil || imagenMovilDiapo;
+  img.hidden = !src;
+  if (src) img.src = src;
+  else img.removeAttribute("src");
+  img.alt = src ? "Foto para celular" : "";
+  $("[data-quitar-foto-movil]").hidden = !src;
+}
 
 function limpiarErroresDiapo() {
   const f = formDiapo();
@@ -1281,6 +1296,7 @@ function limpiarErroresDiapo() {
   $$("[data-error-diapo]", f).forEach((e) => (e.textContent = ""));
   $$("[aria-invalid]", f).forEach((e) => e.removeAttribute("aria-invalid"));
   $("[data-error-foto-diapo]").textContent = "";
+  $("[data-error-foto-movil]").textContent = "";
 }
 
 function abrirEditorDiapo(i: number | null) {
@@ -1289,6 +1305,10 @@ function abrirEditorDiapo(i: number | null) {
   indiceDiapo = i;
   imagenDiapo = d?.imagen ?? "";
   fotoPendienteDiapo = null;
+  imagenMovilDiapo = d?.imagenMovil ?? "";
+  fotoPendienteMovil = null;
+  if (vistaPreviaMovil) URL.revokeObjectURL(vistaPreviaMovil);
+  vistaPreviaMovil = "";
   const f = formDiapo();
   f.reset();
   limpiarErroresDiapo();
@@ -1307,6 +1327,7 @@ function abrirEditorDiapo(i: number | null) {
   const img = $<HTMLImageElement>("[data-diapo-foto]");
   img.src = imagenDiapo;
   img.alt = d ? "Foto actual de la diapositiva" : "";
+  pintarFotoMovil();
   editorDiapo().showModal();
   campo("titulo").focus();
 }
@@ -1331,6 +1352,33 @@ $<HTMLInputElement>("[data-diapo-archivo]").addEventListener("change", async (e)
     fotoPendienteDiapo = null;
     error.textContent = err instanceof Error ? err.message : "No pudimos usar esa foto.";
   }
+});
+
+$<HTMLInputElement>("[data-diapo-archivo-movil]").addEventListener("change", async (e) => {
+  const input = e.currentTarget as HTMLInputElement;
+  const archivo = input.files?.[0];
+  input.value = "";
+  const error = $("[data-error-foto-movil]");
+  error.textContent = "";
+  if (!archivo) return;
+  try {
+    error.textContent = "Preparando la foto…";
+    fotoPendienteMovil = await reducirFoto(archivo, 1200, 900 * 1024, "libre");
+    error.textContent = "";
+    if (vistaPreviaMovil) URL.revokeObjectURL(vistaPreviaMovil);
+    vistaPreviaMovil = URL.createObjectURL(fotoPendienteMovil);
+    pintarFotoMovil();
+  } catch (err) {
+    fotoPendienteMovil = null;
+    error.textContent = err instanceof Error ? err.message : "No pudimos usar esa foto.";
+  }
+});
+$("[data-quitar-foto-movil]").addEventListener("click", () => {
+  imagenMovilDiapo = "";
+  fotoPendienteMovil = null;
+  if (vistaPreviaMovil) URL.revokeObjectURL(vistaPreviaMovil);
+  vistaPreviaMovil = "";
+  pintarFotoMovil();
 });
 
 formDiapo().addEventListener("submit", async (e) => {
@@ -1358,11 +1406,24 @@ formDiapo().addEventListener("submit", async (e) => {
       imagenDiapo = subida.datos.imagen;
       fotoPendienteDiapo = null;
     }
+    if (fotoPendienteMovil) {
+      $("[data-error-foto-movil]").textContent = "Subiendo la foto para celular…";
+      const subida = await subirFotoCarrusel(fotoPendienteMovil);
+      if (siSeCerro(subida.status)) return;
+      if (!subida.ok) {
+        $("[data-error-foto-movil]").textContent = subida.datos.message || "No se pudo subir la foto para celular.";
+        return;
+      }
+      $("[data-error-foto-movil]").textContent = "";
+      imagenMovilDiapo = subida.datos.imagen;
+      fotoPendienteMovil = null;
+    }
     const anterior = indiceDiapo === null ? null : portada!.diapositivas[indiceDiapo];
     const diapo: Diapo = {
       ...(anterior?.id ? { id: anterior.id } : {}),
       imagen: imagenDiapo,
       imagenAlt: t("imagenAlt"),
+      ...(imagenMovilDiapo ? { imagenMovil: imagenMovilDiapo } : {}),
       enfoque: (t("enfoque") || "centro") as Diapo["enfoque"],
       antetitulo: t("antetitulo"),
       titulo: t("titulo"),
@@ -1382,6 +1443,7 @@ formDiapo().addEventListener("submit", async (e) => {
       if (Number(n) !== posicion || !campo) continue;
       marcados++;
       if (campo === "imagen") $("[data-error-foto-diapo]").textContent = texto;
+      if (campo === "imagenMovil") $("[data-error-foto-movil]").textContent = texto;
       const lugar = f.querySelector<HTMLElement>(`[data-error-diapo="${campo}"]`);
       if (lugar) lugar.textContent = texto;
       f.querySelector(`[name="${campo}"]`)?.setAttribute("aria-invalid", "true");

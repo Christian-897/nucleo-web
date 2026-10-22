@@ -363,6 +363,19 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
       "Arriba eliges cada cuántos segundos avanzan solas y cómo se ven los botones. **Ver portada** muestra el resultado.",
     ],
   },
+  {
+    id: "portada-celular",
+    seccion: "portada",
+    titulo: "Usar otra foto de portada en el celular",
+    palabras: ["celular", "teléfono", "móvil", "foto vertical", "portada celular", "banner celular", "se corta en el celular"],
+    requiere: '[data-tab="portada"]:not([hidden])',
+    contenido: [
+      "Cada diapositiva puede tener una **foto para celular**: vertical o cuadrada, para que en el teléfono no se corte la persona o el producto.",
+      { pasos: ["Ve a **Portada** y toca **Editar** en la diapositiva.", "Abajo de la foto, toca **Elegir foto para celular**.", "Toca **Guardar cambios**."] },
+      "Si no eliges una, en el celular se usa la foto normal. **Quitar la foto para celular** vuelve a eso.",
+      { nota: "Deja espacio libre donde van los textos (en la mayoría de los diseños, a la izquierda o arriba)." },
+    ],
+  },
 
   // ───────────── diseño y textos ─────────────
   {

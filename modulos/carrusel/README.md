@@ -93,6 +93,28 @@ ajusta con variables CSS (`--carrusel-fondo`, `--carrusel-alto`,
 `--carrusel-ancho-imagen`, `--carrusel-tinta`, `--carrusel-acento`,
 `--carrusel-control-fondo`) o pisando las clases `.carrusel__*` en el sitio.
 
+## Foto para celular (v0.36)
+
+Cada diapositiva puede llevar `imagenMovil` (opcional, vertical o cuadrada):
+en pantallas de hasta `anchoMovil` px (760 por defecto) se usa esa foto en
+vez de `imagen`. Se carga en el panel (Portada → Editar → **Elegir foto para
+celular**) y se valida igual que la otra (solo `/img/…` o `/media/…`).
+
+```html
+<picture class="carrusel__foto">
+  <source media="(max-width: 760px)" srcset="/media/portada-…" width="1000" height="1060" />
+  <img class="carrusel__imagen" src="/media/portada-…" …>
+</picture>
+```
+
+- Sin `imagenMovil` el marcado es el de siempre (solo `<img>`).
+- `.carrusel__foto` va con `display: contents`: el diseño sigue apuntando a
+  `.carrusel__imagen`. El sitio decide en su CSS cómo se ve en celular
+  (por ejemplo, la foto de fondo con el texto encima).
+- `OpcionesCarrusel.anchoMovil` y `medidasMovil` (por defecto 1000 × 1060).
+- Al guardar, el panel no borra la foto para celular como "sobrante"; sí la
+  borra cuando se quita.
+
 ## Cómo se guarda
 
 - Mientras nadie edite, rige el carrusel del sitio (el de `src/carrusel.ts`).

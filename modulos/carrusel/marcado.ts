@@ -43,6 +43,10 @@ function diapositiva(d: Diapositiva, i: number, total: number, op: OpcionesCarru
   const imagen = imagenValida(d.imagen) ? d.imagen : imagenValida(op.imagenPorDefecto) ? op.imagenPorDefecto : "";
   const carga = primera ? 'fetchpriority="high"' : 'loading="lazy" decoding="async"';
   const enfoque = d.enfoque && d.enfoque !== "centro" ? ` carrusel__imagen--${d.enfoque}` : "";
+  // Foto para celular (opcional): <picture> con <source> para pantallas angostas.
+  const movil = imagen && imagenValida(d.imagenMovil) ? d.imagenMovil : "";
+  const mm = op.medidasMovil ?? { ancho: 1000, alto: 1060 };
+  const corte = Number.isInteger(op.anchoMovil) && (op.anchoMovil as number) > 0 ? op.anchoMovil : 760;
 
   const partes: string[] = [];
   if (d.antetitulo) partes.push(`<p class="carrusel__antetitulo">${escapar(d.antetitulo)}</p>`);
@@ -73,7 +77,9 @@ function diapositiva(d: Diapositiva, i: number, total: number, op: OpcionesCarru
   return (
     `<div class="carrusel__diapo" data-carrusel-diapo role="group" aria-roledescription="diapositiva" aria-label="${i + 1} de ${total}"${primera ? " data-activa" : ""}>` +
     (imagen
-      ? `<img class="carrusel__imagen${enfoque}" src="${escapar(imagen)}" alt="${escapar(d.imagenAlt)}" width="${ancho}" height="${alto}" ${carga} />`
+      ? (movil ? `<picture class="carrusel__foto"><source media="(max-width: ${corte}px)" srcset="${escapar(movil)}" width="${mm.ancho}" height="${mm.alto}" />` : "") +
+        `<img class="carrusel__imagen${enfoque}" src="${escapar(imagen)}" alt="${escapar(d.imagenAlt)}" width="${ancho}" height="${alto}" ${carga} />` +
+        (movil ? "</picture>" : "")
       : "") +
     contenido +
     `</div>`

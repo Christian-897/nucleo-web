@@ -16,7 +16,9 @@ import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
 import { borrarFoto, direccionMediaValida, guardarFoto, medidasAceptables, tipoRealDeImagen } from "./imagenes";
 
-const fotosDe = (e: EstadoCarrusel) => new Set(e.diapositivas.map((d) => d.imagen).filter(direccionMediaValida));
+// Incluye la foto para celular (v0.36): si no, al guardar se borraría por "sobrante".
+const fotosDe = (e: EstadoCarrusel) =>
+  new Set(e.diapositivas.flatMap((d) => [d.imagen, d.imagenMovil ?? ""]).filter(direccionMediaValida));
 
 async function borrarSobrantes(ctx: Ctx, antes: EstadoCarrusel, despues: EstadoCarrusel | null) {
   const siguen = despues ? fotosDe(despues) : new Set<string>();

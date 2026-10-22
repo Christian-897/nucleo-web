@@ -20,7 +20,7 @@ Para formularios de presupuesto: **Muebles Crea**.
 
 | Módulo | Para qué | Monta en el sitio |
 |---|---|---|
-| `carrusel` | Portada con diapositivas (hasta 8; texto hasta 220 caracteres; `*cursiva*` en título y subtítulo) | `crearCarruselEditable` + `crearBordeCarrusel` + `<Carrusel>` |
+| `carrusel` | Portada con diapositivas (hasta 8; texto hasta 220 caracteres; `*cursiva*` en título y subtítulo; **foto para celular** opcional, v0.36) | `crearCarruselEditable` + `crearBordeCarrusel` + `<Carrusel>` |
 | `contenido` | Colores (con aviso de contraste), 34 tipografías servidas desde el sitio (sin serif, serif de lectura, serif de lujo y de firma), textos, enlaces y fotos | `crearContenidoEditable` + `crearBordeContenido` + `crearTemaCss` (`/tema.css`) |
 | `contacto` | WhatsApp, teléfono, correo y redes, validados | `enlacesContacto({ ...contacto, redes })` |
 | `secciones` | Rutina en pasos (fotos numeradas con flechas, botón y frase a mano) y mosaico de fotos con frase, editables en "Diseño y textos" | `camposRutina` / `camposMosaico` en el esquema del contenido + `<Rutina>` / `<Mosaico>` (`nucleo-web/secciones/…astro`) |

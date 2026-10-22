@@ -22,6 +22,11 @@ export interface Diapositiva {
   imagen: string;
   /** Qué muestra la foto, en pocas palabras (para Google y para quien no ve). */
   imagenAlt: string;
+  /**
+   * Foto para celular (opcional, v0.36): vertical o cuadrada, se usa en
+   * pantallas angostas en vez de `imagen`. Misma regla: /img/… o /media/….
+   */
+  imagenMovil?: string;
   enfoque?: Enfoque;
   /** Texto chico sobre el título ("Bienvenida a"). */
   antetitulo?: string;
@@ -54,6 +59,10 @@ export interface OpcionesCarrusel {
   iconoBoton?: string;
   /** Medidas declaradas de las fotos (evita saltos al cargar). Por defecto 1600 × 1000. */
   medidas?: { ancho: number; alto: number };
+  /** Medidas declaradas de la foto para celular. Por defecto 1000 × 1060. */
+  medidasMovil?: { ancho: number; alto: number };
+  /** Hasta qué ancho de pantalla (px) se usa la foto para celular. Por defecto 760. */
+  anchoMovil?: number;
   /** Foto si una diapositiva quedó sin foto válida (/img/… o /media/…). */
   imagenPorDefecto?: string;
   /** La primera diapositiva lleva el título principal de la página (h1). Por defecto sí. */

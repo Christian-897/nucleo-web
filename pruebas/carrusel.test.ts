@@ -351,6 +351,42 @@ async function run() {
     assert.match(html, /data-automatico="no"/);
   });
 
+  await prueba("foto para celular: opcional, propia y validada; sin ella todo queda igual", () => {
+    const c = copia();
+    c.diapositivas[0].imagenMovil = "/media/portada-celular.webp";
+    const r = validarCarrusel(c);
+    assert.ok(r.ok);
+    if (r.ok) assert.equal(r.datos.diapositivas[0].imagenMovil, "/media/portada-celular.webp");
+    // Vacía = sin foto para celular (no es error).
+    const v = copia();
+    v.diapositivas[0].imagenMovil = "";
+    const rv = validarCarrusel(v);
+    assert.ok(rv.ok);
+    if (rv.ok) assert.equal(rv.datos.diapositivas[0].imagenMovil, undefined);
+    for (const mala of ["https://otro.cl/a.jpg", "/media/../secreto", "javascript:alert(1)", "/otra/carpeta.jpg"]) {
+      const m = copia();
+      m.diapositivas[1].imagenMovil = mala;
+      const rm = validarCarrusel(m);
+      assert.ok(!rm.ok, mala);
+      if (!rm.ok) assert.ok(rm.errores["1.imagenMovil"], mala);
+    }
+  });
+
+  await prueba("foto para celular: <picture> con <source> para pantallas angostas; sin ella, solo <img>", () => {
+    const c = copia();
+    c.diapositivas[0].imagenMovil = "/media/portada-celular.webp";
+    const html = htmlCarrusel(c, { anchoMovil: 700, medidasMovil: { ancho: 900, alto: 1200 } });
+    assert.match(html, /<picture class="carrusel__foto"><source media="\(max-width: 700px\)" srcset="\/media\/portada-celular.webp" width="900" height="1200" \/><img class="carrusel__imagen"/);
+    assert.equal((html.match(/<picture/g) ?? []).length, 1, "solo la diapositiva que la tiene");
+    const sin = htmlCarrusel(copia());
+    assert.ok(!sin.includes("<picture"));
+    assert.ok(!sin.includes("<source"));
+    // Datos que no pasaron por validar: una foto para celular ajena no se dibuja.
+    const mala = copia();
+    (mala.diapositivas[0] as { imagenMovil?: string }).imagenMovil = 'https://otro.cl/x.jpg" onerror="alert(1)';
+    assert.ok(!htmlCarrusel(mala).includes("<source"));
+  });
+
   console.log(`\n${pasaron} pruebas pasaron.`);
 }
 

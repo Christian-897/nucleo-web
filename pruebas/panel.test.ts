@@ -601,6 +601,26 @@ async function run() {
     assert.ok(!datos.has("foto:" + f2.slice(7)), "al restablecer, las fotos subidas se borran");
   });
 
+  await prueba("portada: la foto para celular se guarda, no se borra como sobrante y se borra al quitarla", async () => {
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const g = await json(await panel.carrusel.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const subir = async () => (await json(await panel.carruselFoto.onRequestPost({ env, request: req("/x", { cookie, form: formFoto("", png(900, 1200)) }) }))).imagen as string;
+    const movil = await subir();
+    const carrusel = { ...g.carrusel, diapositivas: [{ ...g.carrusel.diapositivas[0], imagenMovil: movil }, g.carrusel.diapositivas[1]] };
+    const r1 = await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", carrusel } }) });
+    assert.equal(r1.status, 200);
+    assert.equal((await json(r1)).carrusel.diapositivas[0].imagenMovil, movil);
+    // Guardar otra vez (p. ej. cambiar el orden o un texto) no borra la foto para celular.
+    carrusel.diapositivas[0].titulo = "Otro título";
+    await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", carrusel } }) });
+    assert.ok(datos.has("foto:" + movil.slice(7)), "sigue en uso: no se borra");
+    // Quitarla la borra.
+    delete (carrusel.diapositivas[0] as { imagenMovil?: string }).imagenMovil;
+    await panel.carrusel.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", carrusel } }) });
+    assert.ok(!datos.has("foto:" + movil.slice(7)), "quitada: se borra");
+  });
+
   await prueba("portada: errores por campo; un enlace javascript: o una foto ajena no se guardan", async () => {
     const { env, datos } = entorno();
     const cookie = await instalarYEntrar(env);

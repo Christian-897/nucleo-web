@@ -73,6 +73,9 @@ export function validarCarrusel(crudo: unknown): Resultado {
     usados.add(id);
 
     if (!imagenValida(d.imagen)) err("imagen", "Falta la foto.");
+    // Foto para celular: opcional; si viene, tiene que ser propia como la otra.
+    const imagenMovil = typeof d.imagenMovil === "string" ? d.imagenMovil.trim() : "";
+    if (imagenMovil && !imagenValida(imagenMovil)) err("imagenMovil", "La foto para celular no es válida. Vuelve a elegirla.");
     const imagenAlt = texto(d.imagenAlt);
     if (imagenAlt.length < 3) err("imagenAlt", "Describe la foto en pocas palabras (ayuda a Google y a quien no ve).");
     largo("imagenAlt", imagenAlt, "Descripción de la foto");
@@ -101,6 +104,7 @@ export function validarCarrusel(crudo: unknown): Resultado {
       id,
       imagen: typeof d.imagen === "string" ? d.imagen : "",
       imagenAlt,
+      ...(imagenMovil && imagenValida(imagenMovil) ? { imagenMovil } : {}),
       enfoque,
       ...(antetitulo ? { antetitulo } : {}),
       ...(titulo ? { titulo } : {}),

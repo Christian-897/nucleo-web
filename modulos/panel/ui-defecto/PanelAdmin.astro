@@ -798,6 +798,17 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
             <label class="pa-casilla"><input type="radio" name="enfoque" value="centro" /> Centro</label>
             <label class="pa-casilla"><input type="radio" name="enfoque" value="derecha" /> Derecha</label>
           </fieldset>
+          <div class="pa-foto-movil">
+            <p class="pa-foto-movil__titulo">Foto para celular (opcional)</p>
+            <img class="pa-foto-movil__img" data-diapo-foto-movil alt="" width="120" height="160" hidden />
+            <label class="pa-boton pa-boton--suave pa-archivo">
+              Elegir foto para celular
+              <input type="file" accept="image/jpeg,image/png,image/webp" data-diapo-archivo-movil />
+            </label>
+            <button class="pa-enlace" type="button" data-quitar-foto-movil hidden>Quitar la foto para celular</button>
+            <p class="pa-tenue pa-chico">Vertical o cuadrada. Si no eliges una, en el celular se usa la foto de arriba.</p>
+            <p class="pa-error" role="alert" data-error-foto-movil></p>
+          </div>
         </div>
         <div class="pa-editor__campos">
           <label class="pa-campo">Qué muestra la foto<input name="imagenAlt" maxlength={LIMITES.imagenAlt} required placeholder="Ej: gatito tejido a crochet entre ovillos de lana" /></label>
@@ -1071,6 +1082,9 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-pie-dialogo { display: flex; justify-content: end; gap: 8px; }
   .pa-editor--ancho { grid-template-columns: 320px 1fr; }
   .pa-editor__foto .pa-foto-ancha { width: 320px; height: 200px; }
+  .pa-foto-movil { display: grid; gap: 6px; justify-items: start; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--pa-borde, #eadde3); }
+  .pa-foto-movil__titulo { margin: 0; font-weight: 700; }
+  .pa-foto-movil__img { width: 120px; height: 160px; object-fit: cover; border-radius: 10px; background: #f4eef1; }
   .pa-fila--diapo { grid-template-columns: 112px 1fr auto; }
   .pa-fila--correo { grid-template-columns: 1fr auto; }
   .pa-titulo--caja { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
