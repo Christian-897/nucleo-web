@@ -55,6 +55,7 @@ export const temaCss = crearTemaCss(fuenteContenido);
 | `data-c-si` | vacío → se quita el elemento; con valor → se muestra (varias claves: si alguna tiene valor) |
 | `data-c-mapa` | en el mapa de `nucleo-web/mapa`: pone la dirección del mapa insertado (campo `tipo: "mapa"`) |
 | `data-c-faq="faq"` | en el `<script type="application/ld+json">` de preguntas frecuentes |
+| `data-c-redes=""` | en el `<script type="application/ld+json">` del negocio: pone en `sameAs` las redes cargadas en el panel (vacío = todos los campos `url` con `red`; o una lista de claves). Así Google une el sitio con sus redes |
 
 Para párrafos con saltos de línea, el sitio pone `white-space: pre-line`.
 

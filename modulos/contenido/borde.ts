@@ -14,6 +14,10 @@
  *                           dirección del mapa insertado (data-mapa-src)
  *   data-c-faq="prefijo"    en <script type="application/ld+json">: rearma el FAQPage
  *                           con <prefijo>.N.pregunta / <prefijo>.N.respuesta
+ *   data-c-redes="clave …"  en <script type="application/ld+json">: pone en "sameAs"
+ *                           los enlaces de esas redes que tengan valor (vacío = todos
+ *                           los campos url con `red`). Así Google une el sitio con
+ *                           las redes que se cargan en el panel.
  *
  * Colores y tipografías: si cambiaron, se agregan al final del <head> la
  * hoja de cada tipografía nueva y /tema.css?v=<versión> (las variables).
@@ -39,8 +43,14 @@ interface ElementoHtml {
   append(contenido: string, opciones?: { html?: boolean }): void;
   remove(): void;
 }
+interface TrozoTexto {
+  text: string;
+  lastInTextNode: boolean;
+  replace(contenido: string, opciones?: { html?: boolean }): void;
+  remove(): void;
+}
 interface Reescritor {
-  on(selector: string, manejador: { element(el: ElementoHtml): void }): Reescritor;
+  on(selector: string, manejador: { element?(el: ElementoHtml): void; text?(t: TrozoTexto): void }): Reescritor;
   transform(r: Response): Response;
 }
 declare const HTMLRewriter: { new (): Reescritor };
@@ -84,6 +94,23 @@ export function jsonLdFaq(prefijo: string, valores: Valores): string {
   return JSON.stringify(ld).replace(/</g, "\\u003c");
 }
 
+/**
+ * El JSON-LD original con "sameAs" = esas direcciones (solo https). Si el
+ * original no es un objeto JSON válido, se devuelve tal cual. Puro.
+ */
+export function jsonLdConRedes(original: string, urls: string[]): string {
+  let ld: unknown;
+  try {
+    ld = JSON.parse(original);
+  } catch {
+    return original;
+  }
+  if (!ld || typeof ld !== "object" || Array.isArray(ld)) return original;
+  const validas = [...new Set(urls.filter((u) => /^https:\/\/[^\s"<>]+$/.test(u)))];
+  (ld as Record<string, unknown>).sameAs = validas;
+  return JSON.stringify(ld).replace(/</g, "\\u003c");
+}
+
 /** Lo que se agrega al <head> cuando cambiaron colores o tipografías. */
 export function enlacesTema(estado: EstadoContenido): string {
   if (!estado.temaEditado) return "";
@@ -94,6 +121,7 @@ export function enlacesTema(estado: EstadoContenido): string {
 export function crearBordeContenido(fuente: FuenteContenido) {
   const campos = new Map(fuente.esquema.campos.map((c) => [c.clave, c]));
   const TEXTO = new Set(["texto", "parrafo", "email", "telefono", "url", "mapa"]);
+  const clavesRedes = fuente.esquema.campos.filter((c) => c.tipo === "url" && "red" in c && c.red).map((c) => c.clave);
 
   return {
     async onRequest(ctx: { request: Request; env: EnvBase; next: () => Promise<Response> }): Promise<Response> {
@@ -173,6 +201,22 @@ export function crearBordeContenido(fuente: FuenteContenido) {
             el.setInnerContent(jsonLdFaq(el.getAttribute("data-c-faq") || "faq", v), { html: true });
           },
         });
+      // sameAs con las redes del panel: se junta el texto del <script> y se reescribe al final.
+      let claves: string[] = [];
+      let trozos = "";
+      r = r.on("script[data-c-redes]", {
+        element(el) {
+          const pedidas = (el.getAttribute("data-c-redes") || "").split(/\s+/).filter((k) => campos.get(k)?.tipo === "url");
+          claves = pedidas.length ? pedidas : clavesRedes;
+          trozos = "";
+        },
+        text(t) {
+          trozos += t.text;
+          if (!t.lastInTextNode) return t.remove();
+          t.replace(jsonLdConRedes(trozos, claves.map((k) => v[k] ?? "").filter(Boolean)), { html: true });
+          trozos = "";
+        },
+      });
       if (cabeza) r = r.on("head", { element: (el) => el.append(cabeza, { html: true }) });
       return r.transform(res);
     },

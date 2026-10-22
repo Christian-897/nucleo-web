@@ -14,7 +14,7 @@ export * from "./color";
 export { imagenValida, limpiarTexto, validarValor, validarCambios } from "./validar";
 export { variablesTema, cssTema } from "./tema";
 export { crearContenidoEditable, huella, CLAVE_CONTENIDO, type FuenteContenido, type EstadoContenido, type OpcionesContenido } from "./almacen";
-export { crearBordeContenido, crearTemaCss, hrefDe, jsonLdFaq, enlacesTema } from "./borde";
+export { crearBordeContenido, crearTemaCss, hrefDe, jsonLdFaq, jsonLdConRedes, enlacesTema } from "./borde";
 
 import type { Campo } from "./tipos";
 

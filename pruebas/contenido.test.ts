@@ -14,6 +14,7 @@ import {
   enlacesTema,
   hrefDe,
   jsonLdFaq,
+  jsonLdConRedes,
   oscurecer,
   validarValor,
   type Campo,
@@ -225,6 +226,17 @@ async function run() {
     const datos = JSON.parse(ld);
     assert.equal(datos.mainEntity.length, 2);
     assert.equal(JSON.parse(jsonLdFaq("faq", INICIALES)).mainEntity.length, 1, "la pregunta vacía no se publica");
+  });
+
+  await prueba("redes en el JSON-LD (sameAs): solo https, sin repetir, sin cerrar el <script>; JSON roto queda igual", () => {
+    const base = JSON.stringify({ "@type": "Store", name: "X", sameAs: [] });
+    const ld = JSON.parse(jsonLdConRedes(base, ["https://instagram.com/x", "https://instagram.com/x", "http://malo.cl", "javascript:alert(1)", "https://tiktok.com/@x"]));
+    assert.deepEqual(ld.sameAs, ["https://instagram.com/x", "https://tiktok.com/@x"]);
+    assert.equal(ld.name, "X");
+    assert.ok(!jsonLdConRedes(JSON.stringify({ name: "</script>" }), []).includes("</script>"));
+    assert.equal(jsonLdConRedes("{roto", ["https://a.cl"]), "{roto");
+    assert.equal(jsonLdConRedes("[1]", ["https://a.cl"]), "[1]");
+    assert.deepEqual(JSON.parse(jsonLdConRedes(base, [])).sameAs, []);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);
