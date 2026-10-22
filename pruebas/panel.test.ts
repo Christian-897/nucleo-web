@@ -1180,6 +1180,15 @@ async function run() {
     assert.equal(aj.ajustesFicha.miniatura, "acercamiento");
     assert.equal(aj.ajustesFicha.lupa, false);
     assert.equal((await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }))).ajustesFicha.lupa, false);
+    // Cómo se ven en la tienda los productos con colores (v0.37).
+    assert.deepEqual((await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }))).vistaListas, { categorias: "producto", general: "producto" });
+    const vl = await json(await panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "vista-listas", vista: { categorias: "color", general: "basura" } } }) }));
+    assert.deepEqual(vl.vistaListas, { categorias: "color", general: "producto" });
+    assert.deepEqual((await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }))).vistaListas, { categorias: "color", general: "producto" });
+    // Sin sesión o desde otro sitio no se cambia.
+    assert.equal((await panel.productos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "vista-listas", vista: { general: "color" } } }) })).status, 401);
+    const ajeno = await panel.productos.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.cl", cuerpo: { accion: "vista-listas", vista: { general: "color" } } }) });
+    assert.notEqual(ajeno.status, 200);
   });
 
   console.log("Panel — restablecer doble factor:");

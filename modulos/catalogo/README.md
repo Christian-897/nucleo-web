@@ -169,6 +169,37 @@ Y en el navegador: `iniciarColores()` de `nucleo-web/catalogo/colores-ficha`
 colores recibe `data-elegir="/producto/<id>/"`: el sitio debe llevar ahí en
 vez de agregar. Para el despacho, `necesitaDespacho` ya mira el producto base.
 
+### Cómo se ven en las listas los productos con colores (v0.37)
+
+En el panel (Productos → **Cómo se ven en la tienda los productos con
+colores**) se elige, por separado para **las páginas de cada categoría** y
+para **las listas generales** (toda la tienda, destacados, relacionados):
+
+- `producto`: una tarjeta por producto, con **muestras** de sus colores bajo
+  la foto (hasta `coloresEnTarjeta`, 6 por defecto, y «+N»). Al pasar el
+  mouse o tocar una muestra, la foto de la tarjeta cambia y sus enlaces
+  abren la ficha con `?color=`.
+- `color`: **una tarjeta por color** («Producto · Color»), con su foto, su
+  stock (`data-producto="prod~color"`) y el botón de agregar directo.
+
+Lo guardado va en `catalogo:vista-listas` (KV). Mientras no se cambie, rige
+`OpcionesBorde.vistaListas` del sitio (de fábrica, `producto` en todo). El
+sitio pasa **el mismo valor** a `crearPanel({ vistaListas })` para que el
+panel muestre lo que rige. Si el catálogo inicial tiene colores, el borde
+de listas corre siempre (lo estático es la vista `producto`).
+
+Qué pone el sitio en la tarjeta (`[data-cat-slot]`):
+
+```html
+<div class="muestras" data-cat="colores" hidden></div>       <!-- muestras (botones [data-muestra]) -->
+<span data-cat="colores-cuenta" hidden></span>               <!-- "17 colores" -->
+```
+
+Y en el navegador `iniciarColoresLista()` de `nucleo-web/catalogo/colores-lista`.
+La lista recibe `data-vista="producto|color"` (para el CSS). Con `color`,
+la página necesita espacios suficientes (`data-cat-slot`) para todos los
+colores: los que no caben no se muestran.
+
 **Relacionados (arreglo v0.35):** la ficha deja escrito el filtro concreto
 (`relacionados:<cat>:<id>`) en `data-cat-lista`; antes, con el catálogo
 editado, el borde de listas (middleware) volvía a pasar y vaciaba la sección.

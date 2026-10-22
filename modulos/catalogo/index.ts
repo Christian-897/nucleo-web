@@ -63,6 +63,9 @@ export {
   crearPaginaCategoria,
   categoriaDeRuta,
   productosDeLista,
+  itemsDeLista,
+  htmlMuestras,
+  type ItemLista,
   imagenSegura,
   rellenarPlantilla,
   idDeRuta,
@@ -70,4 +73,15 @@ export {
   type EnvBorde,
 } from "./borde";
 export { crearSitemap } from "./sitemap";
+export {
+  CLAVE_VISTA_LISTAS,
+  VISTAS_LISTA,
+  VISTA_LISTAS_POR_DEFECTO,
+  limpiarVistaListas,
+  vistaDeFiltro,
+  obtenerVistaListas,
+  guardarVistaListas,
+  type VistaLista,
+  type VistaListas,
+} from "./vista-listas";
 export { ID_VIDEO, idVideoYoutube, urlInsercionVideo, miniaturaVideo, enlaceVideo } from "./video";

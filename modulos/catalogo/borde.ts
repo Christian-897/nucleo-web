@@ -45,7 +45,8 @@ import { type CatalogoODinamico, esDinamico, resolverCatalogo } from "./almacen"
 import { ID_VALIDO } from "./catalogo";
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 import { ID_VIDEO, miniaturaVideo } from "./video";
-import { idConColor, imagenPrincipal, tieneColores } from "./colores";
+import { type ColorProducto, idConColor, imagenPrincipal, tieneColores } from "./colores";
+import { type VistaLista, type VistaListas, obtenerVistaListas, vistaDeFiltro, VISTA_LISTAS_POR_DEFECTO } from "./vista-listas";
 import { AJUSTES_FICHA_POR_DEFECTO, type AjustesFicha, obtenerAjustesFicha } from "./ficha";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
@@ -80,6 +81,60 @@ export interface OpcionesBorde {
   pagina404?: string;
   /** Datos para el título, el JSON-LD y las direcciones absolutas. */
   sitio: { nombre: string; dominio: string };
+  /**
+   * Cómo se ven en las listas los productos con colores, mientras no se
+   * cambie en el panel (v0.37). Por defecto, una tarjeta por producto.
+   */
+  vistaListas?: Partial<VistaListas>;
+  /** Cuántos colores se muestran bajo la foto de una tarjeta (el resto va como "+N"). Por defecto 6. */
+  coloresEnTarjeta?: number;
+}
+
+/** Un elemento de lista: un producto, o un color de un producto (vista "una tarjeta por color"). */
+export interface ItemLista {
+  p: ProductoCatalogo;
+  color?: ColorProducto;
+}
+
+/**
+ * Elementos de una lista según su filtro y la vista: con "color", cada
+ * producto con colores se abre en un elemento por color (en su orden).
+ */
+export function itemsDeLista(catalogo: Catalogo, filtro: string, vista: VistaLista): ItemLista[] {
+  const productos = productosDeLista(catalogo, filtro);
+  if (vista !== "color") return productos.map((p) => ({ p }));
+  return productos.flatMap((p) => (tieneColores(p) ? (p.colores ?? []).map((color) => ({ p, color })) : [{ p }]));
+}
+
+/** Texto seguro dentro de un atributo o de HTML (nombres de colores). */
+function escaparTexto(t: string): string {
+  return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+/**
+ * Muestras de colores bajo la foto de una tarjeta (vista "producto"). Cada
+ * una lleva la foto grande de su color (la tarjeta la muestra al pasar el
+ * mouse o tocarla) y su id, para abrir la ficha con ese color.
+ */
+export function htmlMuestras(p: ProductoCatalogo, imagenPorDefecto: string, maximo = 6): string {
+  const colores = p.colores ?? [];
+  const tope = Math.max(1, Math.min(maximo, colores.length));
+  const visibles = colores.slice(0, colores.length > tope ? tope : colores.length);
+  const muestras = visibles
+    .map((c) => {
+      const foto = imagenSegura(c.foto ?? c.mini, imagenPorDefecto);
+      const mini = imagenSegura(c.mini ?? c.foto, imagenPorDefecto);
+      const nombre = escaparTexto(c.nombre);
+      return `<button type="button" class="muestra" data-muestra data-muestra-color="${c.id}" data-muestra-foto="${foto}" aria-label="${nombre}" title="${nombre}"><img src="${mini}" alt="" width="40" height="40" loading="lazy" decoding="async"></button>`;
+    })
+    .join("");
+  const resto = colores.length - visibles.length;
+  return muestras + (resto > 0 ? `<span class="muestras__mas">+${resto}</span>` : "");
+}
+
+function pluralColores(p: ProductoCatalogo, n: number): string {
+  const t = (p.tituloColores ?? "Color").toLowerCase();
+  return n === 1 ? `1 ${t}` : `${n} ${t === "color" ? "colores" : `${t}s`}`;
 }
 
 // ───────────────────────────── filtros de listas (puros, probados) ─────────────────────────────
@@ -171,10 +226,30 @@ function plural(titulo: string, n: number): string {
 
 // ───────────────────────────── relleno de campos ─────────────────────────────
 
-function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: OpcionesBorde) {
+function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: OpcionesBorde, color?: ColorProducto) {
+  if (color) return llenarCampoColor(el, campo, p, color, op);
   const url = `/producto/${p.id}/`;
   const imagen = imagenSegura(imagenPrincipal(p), op.imagenPorDefecto);
   switch (campo) {
+    case "colores":
+      // Muestras de colores bajo la foto (solo productos con colores).
+      if (!tieneColores(p)) {
+        el.setInnerContent("", { html: false });
+        el.setAttribute("hidden", "");
+      } else {
+        el.setInnerContent(htmlMuestras(p, op.imagenPorDefecto, op.coloresEnTarjeta ?? 6), { html: true });
+        el.removeAttribute("hidden");
+        const e = p.enfoqueColores ?? { x: 50, y: 50 };
+        el.setAttribute("style", `--enfoque-x:${Math.round(e.x)}%;--enfoque-y:${Math.round(e.y)}%`);
+      }
+      break;
+    case "colores-cuenta":
+      if (!tieneColores(p)) el.setAttribute("hidden", "");
+      else {
+        el.setInnerContent(pluralColores(p, p.colores!.length), { html: false });
+        el.removeAttribute("hidden");
+      }
+      break;
     case "enlace":
       el.setAttribute("href", url);
       break;
@@ -225,18 +300,67 @@ function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: O
   }
 }
 
+/** Tarjeta de UN color (vista "una tarjeta por color"): se agrega directo y abre la ficha con ese color. */
+function llenarCampoColor(el: ElementoHtml, campo: string, p: ProductoCatalogo, c: ColorProducto, op: OpcionesBorde) {
+  const url = `/producto/${p.id}/?color=${c.id}`;
+  const foto = imagenSegura(c.foto ?? c.mini ?? p.imagen, op.imagenPorDefecto);
+  const mini = imagenSegura(c.mini ?? c.foto ?? p.imagen, op.imagenPorDefecto);
+  const nombre = `${p.nombre} · ${c.nombre}`;
+  switch (campo) {
+    case "enlace":
+      el.setAttribute("href", url);
+      break;
+    case "nombre":
+      el.setInnerContent(nombre, { html: false });
+      break;
+    case "imagen":
+      el.setAttribute("src", foto);
+      break;
+    case "imagen-alt":
+      el.setAttribute("src", foto);
+      el.setAttribute("alt", nombre);
+      break;
+    case "colores":
+    case "colores-cuenta":
+      el.setInnerContent("", { html: false });
+      el.setAttribute("hidden", "");
+      break;
+    case "agregar":
+      el.removeAttribute("data-elegir");
+      el.setAttribute("data-id", idConColor(p.id, c.id));
+      el.setAttribute("data-nombre", nombre);
+      el.setAttribute("data-precio", String(p.precio));
+      el.setAttribute("data-imagen", mini);
+      el.setAttribute("aria-label", `Agregar ${nombre} al carrito`);
+      if (c.stock !== undefined) el.setAttribute("max", String(c.stock));
+      else el.removeAttribute("max");
+      break;
+    default:
+      llenarCampo(el, campo, p, op);
+  }
+}
+
 /** Agrega al reescritor el llenado de listas (estado secuencial, en orden del documento). */
-function conListas(r: Reescritor, catalogo: Catalogo, op: OpcionesBorde, filtroExtra?: (f: string) => string): Reescritor {
-  let lista: ProductoCatalogo[] = [];
+function conListas(
+  r: Reescritor,
+  catalogo: Catalogo,
+  op: OpcionesBorde,
+  vista: VistaListas = VISTA_LISTAS_POR_DEFECTO,
+  filtroExtra?: (f: string) => string
+): Reescritor {
+  let lista: ItemLista[] = [];
   let indice = -1;
-  let actual: ProductoCatalogo | null = null;
+  let actual: ItemLista | null = null;
   return r
     .on("[data-cat-lista]", {
       element(el) {
-        const filtro = el.getAttribute("data-cat-lista") ?? "";
-        lista = productosDeLista(catalogo, filtroExtra ? filtroExtra(filtro) : filtro);
+        const filtroBase = el.getAttribute("data-cat-lista") ?? "";
+        const filtro = filtroExtra ? filtroExtra(filtroBase) : filtroBase;
+        const modo = vistaDeFiltro(vista, filtro);
+        lista = itemsDeLista(catalogo, filtro, modo);
         indice = -1;
         actual = null;
+        el.setAttribute("data-vista", modo);
         if (lista.length === 0) el.setAttribute("data-vacia", "");
         else el.removeAttribute("data-vacia");
       },
@@ -249,15 +373,16 @@ function conListas(r: Reescritor, catalogo: Catalogo, op: OpcionesBorde, filtroE
           el.remove();
           return;
         }
+        const { p, color } = actual;
         el.removeAttribute("hidden");
-        el.setAttribute("data-producto", actual.id);
-        el.setAttribute("data-nombre", actual.nombre.toLowerCase());
+        el.setAttribute("data-producto", color ? idConColor(p.id, color.id) : p.id);
+        el.setAttribute("data-nombre", (color ? `${p.nombre} ${color.nombre}` : p.nombre).toLowerCase());
       },
     })
     .on("[data-cat-slot] [data-cat]", {
       element(el) {
         if (!actual) return;
-        for (const campo of (el.getAttribute("data-cat") ?? "").split(/\s+/)) llenarCampo(el, campo, actual, op);
+        for (const campo of (el.getAttribute("data-cat") ?? "").split(/\s+/)) llenarCampo(el, campo, actual.p, op, actual.color);
       },
     });
 }
@@ -393,16 +518,21 @@ export function crearBordeCatalogo(fuente: CatalogoODinamico, opciones: Opciones
       let catalogo: Catalogo;
       let productos: boolean;
       let categorias: boolean;
+      let conColores = false;
+      let vista: VistaListas = VISTA_LISTAS_POR_DEFECTO;
       try {
         productos = await fuente.editado(env);
         categorias = await fuente.categoriasEditadas(env);
-        if (!productos && !categorias) return respuesta; // lo estático ya es correcto
+        // Con colores, las listas dependen de la vista elegida en el panel: siempre pasan por el borde.
+        conColores = fuente.inicial.productos.some(tieneColores);
+        if (!productos && !categorias && !conColores) return respuesta; // lo estático ya es correcto
         catalogo = await fuente.obtener(env);
+        vista = await obtenerVistaListas(env, opciones.vistaListas);
       } catch {
         return respuesta; // si KV falla, se sirve lo estático: nunca un error al visitante
       }
       let r = new HTMLRewriter();
-      if (productos) r = conListas(r, catalogo, opciones);
+      if (productos || conColores || catalogo.productos.some(tieneColores)) r = conListas(r, catalogo, opciones, vista);
       if (categorias) r = conListasCategorias(conCategorias(r, catalogo), catalogo, ruta);
       return r.transform(respuesta);
     },
@@ -568,7 +698,8 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
       // por esta respuesta y, con "relacionados" a secas, la vaciaba.
       const filtroRelacionados = `relacionados:${p.categoria}:${p.id}`;
       r = r.on('[data-cat-lista="relacionados"]', { element: (el) => el.setAttribute("data-cat-lista", filtroRelacionados) });
-      r = conListas(r, catalogo, opciones, (f) => (f === "relacionados" ? filtroRelacionados : f));
+      const vistaRel = await obtenerVistaListas(env, opciones.vistaListas).catch(() => VISTA_LISTAS_POR_DEFECTO);
+      r = conListas(r, catalogo, opciones, vistaRel, (f) => (f === "relacionados" ? filtroRelacionados : f));
       return r.transform(respuesta);
     },
   };
@@ -630,7 +761,8 @@ export function crearPaginaCategoria(fuente: CatalogoODinamico, opciones: Opcion
             if (f === `categoria:${idPlantilla}`) el.setAttribute("data-cat-lista", `categoria:${c.id}`);
           },
         });
-      r = conListas(r, catalogo, opciones, (f) => (f === `categoria:${idPlantilla}` ? `categoria:${c.id}` : f));
+      const vistaCat = await obtenerVistaListas(env, opciones.vistaListas).catch(() => VISTA_LISTAS_POR_DEFECTO);
+      r = conListas(r, catalogo, opciones, vistaCat, (f) => (f === `categoria:${idPlantilla}` ? `categoria:${c.id}` : f));
       r = conListasCategorias(conCategorias(r, catalogo), catalogo, url.pathname);
       return r.transform(respuesta);
     },

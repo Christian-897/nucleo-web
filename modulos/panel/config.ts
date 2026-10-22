@@ -15,6 +15,8 @@ export interface EnvPanel extends EnvBase {
   REVIEWS_KV?: AlmacenBinario;
 }
 
+import type { VistaListas } from "../catalogo/vista-listas";
+
 export interface ConfigPanel {
   /** Aparece en la app autenticadora del teléfono. */
   nombreSitio: string;
@@ -22,6 +24,11 @@ export interface ConfigPanel {
   maximoBytesFoto?: number;
   /** Lado máximo de una foto guardada, en píxeles. Por defecto 4.000. */
   maximoLadoFoto?: number;
+  /**
+   * Cómo se ven en las listas los productos con colores mientras no se cambie
+   * en el panel (v0.37). Debe ser el mismo valor que recibe el borde del catálogo.
+   */
+  vistaListas?: Partial<VistaListas>;
 }
 
 export const MAXIMO_BYTES_FOTO = 900 * 1024;

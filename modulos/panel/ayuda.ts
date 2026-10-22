@@ -273,10 +273,25 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     titulo: "Cómo ve los colores el cliente",
     palabras: ["ver los colores", "ver más colores", "muchos colores", "cuántos colores se ven", "elige tu color", "ficha con colores", "color 1"],
     contenido: [
-      "En la tienda y en las categorías el producto se ve como **una sola tarjeta**. Al tocarla se abre la ficha con **Elige tu color**.",
+      "En la tienda, un producto con colores se ve como **una sola tarjeta con circulitos de colores** o como **una tarjeta por color**, según lo que elijas en **Productos → Cómo se ven en la tienda los productos con colores**. En la ficha aparece **Elige tu color**.",
       "Al tocar una miniatura cambian la foto grande, el nombre del color y la disponibilidad. Con la **lupa** (o tocando la foto) se ve en pantalla completa y se puede acercar.",
       "Si hay muchos colores, se muestran los primeros **24 en computador** y **15 en celular**; el resto aparece con el botón **Ver los N colores**. El número es el total de colores cargados: si ves más de los que esperabas, revisa en **Editar → Colores** si hay fotos repetidas.",
       "No se puede agregar al carrito sin un color elegido.",
+    ],
+  },
+  {
+    id: "colores-vista-tienda",
+    seccion: "productos",
+    titulo: "Elegir cómo se ven los colores en la tienda (una tarjeta o una por color)",
+    palabras: ["tarjeta por color", "una tarjeta por color", "circulitos", "muestras de color", "se ve vacío", "se ve solo", "categoría vacía", "pocos productos", "cómo se ven los colores", "vista de la tienda"],
+    requiere: '[data-tab="productos"]:not([hidden])',
+    contenido: [
+      "Los productos con colores se pueden mostrar de dos formas en la tienda:",
+      { pasos: ["**Una tarjeta por producto**: bajo la foto aparecen circulitos con los colores (y «+N» si hay más). Al pasar el mouse o tocar un circulito, la foto cambia a ese color.", "**Una tarjeta por color**: cada color es su propia tarjeta («Producto · Color»), se puede agregar al carrito directo y abre la ficha con ese color elegido. Sirve para que una categoría con pocos productos no se vea vacía."] },
+      "Para cambiarlo:",
+      { pasos: ["Ve a **Productos**.", "Abre **Cómo se ven en la tienda los productos con colores**.", "Elige una opción para **la página de cada categoría** y otra para **toda la tienda, el inicio y «También te puede gustar»**.", "Toca **Guardar**. La tienda se actualiza en menos de un minuto."] },
+      "Los productos sin colores se ven siempre igual, con una sola tarjeta.",
+      { nota: "En toda la tienda conviene «Una tarjeta por producto»: con muchos colores, «Una tarjeta por color» hace la lista muy larga." },
     ],
   },
   {

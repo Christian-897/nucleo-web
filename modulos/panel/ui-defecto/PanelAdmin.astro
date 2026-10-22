@@ -209,6 +209,24 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <button class="pa-boton" type="submit">Guardar</button>
         </form>
       </details>
+      <details class="pa-caja pa-caja--ancha pa-ficha-ajustes" data-vista-listas>
+        <summary><strong>Cómo se ven en la tienda los productos con colores</strong> <span class="pa-tenue pa-chico">(una tarjeta por producto o una por color)</span></summary>
+        <form data-form="vista-listas" novalidate>
+          <fieldset class="pa-opciones">
+            <legend>En la página de cada categoría</legend>
+            <label class="pa-casilla"><input type="radio" name="categorias" value="producto" /> <span><strong>Una tarjeta por producto</strong> · con sus colores en circulitos bajo la foto</span></label>
+            <label class="pa-casilla"><input type="radio" name="categorias" value="color" /> <span><strong>Una tarjeta por color</strong> · la página se ve llena aunque haya pocos productos</span></label>
+          </fieldset>
+          <fieldset class="pa-opciones">
+            <legend>En toda la tienda, el inicio y «También te puede gustar»</legend>
+            <label class="pa-casilla"><input type="radio" name="general" value="producto" /> <span><strong>Una tarjeta por producto</strong> · con sus colores en circulitos bajo la foto</span></label>
+            <label class="pa-casilla"><input type="radio" name="general" value="color" /> <span><strong>Una tarjeta por color</strong> · ojo: con muchos colores la lista se hace muy larga</span></label>
+          </fieldset>
+          <p class="pa-tenue pa-chico">Los productos sin colores se ven siempre igual. El cambio se ve en la tienda en menos de un minuto.</p>
+          <p class="pa-error" role="alert" data-error></p>
+          <button class="pa-boton" type="submit">Guardar</button>
+        </form>
+      </details>
       <p class="pa-tenue" data-resumen-productos></p>
       <ul class="pa-lista" data-lista-productos aria-live="polite"></ul>
     </section>

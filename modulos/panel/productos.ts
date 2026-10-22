@@ -16,6 +16,7 @@ import { ID_VALIDO, MAXIMO_FOTOS } from "../catalogo/catalogo";
 import { productoDisponible, reponerStock, unidadesVendidas } from "../catalogo/stock";
 import { type ColorProducto, idColorDesdeNombre, idConColor, MAXIMO_COLORES, tieneColores } from "../catalogo/colores";
 import { guardarAjustesFicha, obtenerAjustesFicha } from "../catalogo/ficha";
+import { guardarVistaListas, obtenerVistaListas } from "../catalogo/vista-listas";
 import type { ProductoCatalogo } from "../catalogo/tipos";
 import { idVideoYoutube } from "../catalogo/video";
 import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
@@ -238,6 +239,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       categorias,
       productos,
       ajustesFicha: await obtenerAjustesFicha(ctx.env),
+      vistaListas: await obtenerVistaListas(ctx.env, config.vistaListas),
       maximoColores: MAXIMO_COLORES,
     });
   }
@@ -320,6 +322,13 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     if (cuerpo.accion === "ajustes-ficha") {
       try {
         return jsonResponse(200, { ok: true, ajustesFicha: await guardarAjustesFicha(ctx.env, cuerpo.ajustes) });
+      } catch {
+        return jsonResponse(500, { message: "No se pudo guardar. Intenta de nuevo." });
+      }
+    }
+    if (cuerpo.accion === "vista-listas") {
+      try {
+        return jsonResponse(200, { ok: true, vistaListas: await guardarVistaListas(ctx.env, cuerpo.vista, config.vistaListas) });
       } catch {
         return jsonResponse(500, { message: "No se pudo guardar. Intenta de nuevo." });
       }

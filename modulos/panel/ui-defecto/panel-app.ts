@@ -381,13 +381,14 @@ let productos: Producto[] = [];
 let categorias: { id: string; nombre: string }[] = [];
 
 async function cargarProductos() {
-  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string }[]; ajustesFicha?: AjustesFicha; maximoColores?: number }>(`${API}/productos`);
+  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string }[]; ajustesFicha?: AjustesFicha; vistaListas?: VistaListasPanel; maximoColores?: number }>(`${API}/productos`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar los productos.");
   productos = r.datos.productos;
   categorias = r.datos.categorias;
   if (r.datos.maximoColores) maximoColores = r.datos.maximoColores;
   if (r.datos.ajustesFicha) pintarAjustesFicha(r.datos.ajustesFicha);
+  if (r.datos.vistaListas) pintarVistaListas(r.datos.vistaListas);
   const filtro = $<HTMLSelectElement>("[data-filtro-categoria]");
   const elegida = filtro.value;
   filtro.replaceChildren(new Option("Todas", ""), ...categorias.map((c) => new Option(c.nombre, c.id)));
@@ -933,6 +934,35 @@ $<HTMLFormElement>('[data-form="ficha-ajustes"]').addEventListener("submit", asy
     if (!r.ok) return errorDe(f, r.datos.message || "No se pudo guardar.");
     pintarAjustesFicha(r.datos.ajustesFicha);
     avisar("Guardado. Las fichas se actualizan en unos segundos.");
+  });
+});
+
+// ─── cómo se ven en la tienda los productos con colores (v0.37) ───
+
+interface VistaListasPanel {
+  categorias: "producto" | "color";
+  general: "producto" | "color";
+}
+
+function pintarVistaListas(v: VistaListasPanel) {
+  const f = $<HTMLFormElement>('[data-form="vista-listas"]');
+  for (const k of ["categorias", "general"] as const) {
+    for (const r of $$<HTMLInputElement>(`input[name="${k}"]`, f)) r.checked = r.value === v[k];
+  }
+}
+
+$<HTMLFormElement>('[data-form="vista-listas"]').addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget as HTMLFormElement;
+  errorDe(f);
+  const elegido = (n: string) => f.querySelector<HTMLInputElement>(`input[name="${n}"]:checked`)?.value ?? "producto";
+  const vista = { categorias: elegido("categorias"), general: elegido("general") };
+  await conBoton(f, async () => {
+    const r = await enviar<{ vistaListas: VistaListasPanel }>(`${API}/productos`, { accion: "vista-listas", vista });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) return errorDe(f, r.datos.message || "No se pudo guardar.");
+    pintarVistaListas(r.datos.vistaListas);
+    avisar("Guardado. La tienda se actualiza en menos de un minuto.");
   });
 });
 
