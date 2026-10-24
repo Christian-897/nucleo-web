@@ -280,6 +280,19 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "fotos-preparadas",
+    seccion: "productos",
+    titulo: "Usar las fotos de colores que te preparamos",
+    palabras: ["fotos preparadas", "usar las fotos", "fotos de colores", "no cambia la foto", "la foto no cambia", "foto no cambia al elegir color", "al elegir color no cambia", "fotos nuevas", "fotos del sitio"],
+    requiere: '[data-tab="productos"]:not([hidden])',
+    contenido: [
+      "Cuando te preparamos fotos por color (por ejemplo, una almohada en cada color), aparece un aviso amarillo **«Hay N fotos de colores preparadas»**.",
+      { pasos: ["Ve a **Productos**.", "Toca **Usar las fotos preparadas** en el aviso de arriba (pone las de todos los productos) o, dentro de **Editar → Colores**, el del producto que quieras.", "Listo: en unos segundos, al tocar un color en la tienda se ve su foto."] },
+      "No cambia tus **unidades**, **nombres**, **precios** ni las **fotos que tú subiste**: solo pone las preparadas donde todavía no había una foto tuya.",
+      { nota: "Si estás editando los colores de un producto, primero toca **Guardar cambios** y después usa las fotos preparadas." },
+    ],
+  },
+  {
     id: "colores-vista-tienda",
     seccion: "productos",
     titulo: "Elegir cómo se ven los colores en la tienda (una tarjeta o una por color)",

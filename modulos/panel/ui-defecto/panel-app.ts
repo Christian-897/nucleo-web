@@ -47,6 +47,8 @@ interface Producto {
   colores?: ColorPanel[];
   tituloColores?: "Color" | "Modelo";
   enfoqueColores?: { x: number; y: number };
+  /** Colores que pueden tomar las fotos preparadas en el sitio (v0.38). */
+  fotosSitio?: number;
 }
 interface ColorPanel {
   id: string;
@@ -395,7 +397,53 @@ async function cargarProductos() {
   filtro.value = elegida;
   $<HTMLSelectElement>("[data-editor-categorias]").replaceChildren(...categorias.map((c) => new Option(c.nombre, c.id)));
   pintarProductos();
+  pintarFotosSitioTodos();
 }
+
+// ─── fotos de colores preparadas en el sitio (v0.38) ───
+
+const fraseFotos = (n: number, productosN?: number) =>
+  `Hay ${n} ${n === 1 ? "foto de color preparada" : "fotos de colores preparadas"}${productosN && productosN > 1 ? ` para ${productosN} productos` : productosN === 1 ? " para un producto" : ""}.`;
+
+function pintarFotosSitioTodos() {
+  const conFotos = productos.filter((p) => (p.fotosSitio ?? 0) > 0);
+  const total = conFotos.reduce((n, p) => n + (p.fotosSitio ?? 0), 0);
+  $("[data-fotos-sitio-todos]").hidden = total === 0;
+  $("[data-fotos-sitio-todos-texto]").textContent = fraseFotos(total, conFotos.length);
+}
+
+async function usarFotosSitio(id: string, boton: HTMLButtonElement): Promise<boolean> {
+  boton.disabled = true;
+  try {
+    const r = await enviar<{ cambios: number; productos: number }>(`${API}/productos`, { accion: "fotos-sitio", id });
+    if (siSeCerro(r.status)) return false;
+    if (!r.ok) {
+      avisar(r.datos.message || "No se pudieron poner las fotos.");
+      return false;
+    }
+    avisar(r.datos.cambios ? `Listo: ${r.datos.cambios} ${r.datos.cambios === 1 ? "foto puesta" : "fotos puestas"}. La tienda se actualiza en unos segundos.` : "No había fotos nuevas que poner.");
+    await cargarProductos();
+    return true;
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+$<HTMLButtonElement>("[data-fotos-sitio-todos-usar]").addEventListener("click", (e) => void usarFotosSitio("todos", e.currentTarget as HTMLButtonElement));
+
+$<HTMLButtonElement>("[data-colores-sitio-usar]").addEventListener("click", async (e) => {
+  const id = editando?.id;
+  if (!id) return;
+  if (firmaColores() !== coloresOriginal) {
+    $("[data-error-colores]").textContent = "Primero guarda o cancela los cambios de colores, y después usa las fotos preparadas.";
+    return;
+  }
+  if (await usarFotosSitio(id, e.currentTarget as HTMLButtonElement)) {
+    const p = productos.find((x) => x.id === id) ?? null;
+    editando = p;
+    abrirColores(p);
+  }
+});
 
 function pintarProductos() {
   const texto = $<HTMLInputElement>("[data-buscar-producto]").value.trim().toLowerCase();
@@ -883,6 +931,9 @@ function abrirColores(p: Producto | null) {
   }));
   pintarColores();
   coloresOriginal = firmaColores();
+  const n = p?.fotosSitio ?? 0;
+  $("[data-colores-sitio]").hidden = n === 0;
+  $("[data-colores-sitio-texto]").textContent = fraseFotos(n);
   if (!coloresEditor.length) {
     const campo = formProducto().elements.namedItem("disponible") as HTMLInputElement;
     campo.disabled = false;

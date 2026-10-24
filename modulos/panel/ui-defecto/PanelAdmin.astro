@@ -185,6 +185,10 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <h1>Productos</h1>
         <button class="pa-boton" type="button" data-nuevo-producto>+ Nuevo producto</button>
       </div>
+      <div class="pa-aviso-fotos" data-fotos-sitio-todos hidden>
+        <p><strong data-fotos-sitio-todos-texto></strong> Se usan sin tocar tus unidades, nombres, precios ni las fotos que tú subiste.</p>
+        <button class="pa-boton pa-boton--suave" type="button" data-fotos-sitio-todos-usar>Usar las fotos preparadas</button>
+      </div>
       <div class="pa-filtros">
         <label class="pa-campo pa-campo--fila">Buscar<input type="search" data-buscar-producto placeholder="Nombre…" /></label>
         <label class="pa-campo pa-campo--fila">Categoría<select data-filtro-categoria><option value="">Todas</option></select></label>
@@ -740,6 +744,10 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           </label>
         </div>
         <p class="pa-tenue pa-chico">Puedes agregar <strong>hasta <span data-colores-maximo>100</span> colores</strong> (o modelos) por producto, con <strong>una foto cada uno</strong>. Si el producto viene en un solo color, no agregues ninguno. Al elegir varias fotos a la vez, el nombre de cada archivo se usa como nombre del color (por ejemplo «Azul rey.jpg»). Las unidades son por color; vacío = sin límite.</p>
+        <div class="pa-aviso-fotos" data-colores-sitio hidden>
+          <p><strong data-colores-sitio-texto></strong> Se usan sin tocar tus unidades, nombres ni las fotos que tú subiste.</p>
+          <button class="pa-boton pa-boton--suave" type="button" data-colores-sitio-usar>Usar las fotos preparadas</button>
+        </div>
         <ul class="pa-variantes__lista" data-colores-lista></ul>
         <label class="pa-boton pa-boton--suave pa-archivo" data-colores-agregar>
           + Agregar colores
@@ -1166,6 +1174,9 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-aviso { background: #fff6e0; border: 1px solid #f0d58a; border-radius: 10px; padding: 10px 12px; font-size: .92rem; }
   .pa-fila--correo .pa-fila__nombre { overflow-wrap: anywhere; }
   .pa-fila--diapo img { width: 112px; height: 70px; }
+  .pa-aviso-fotos { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; background: #fdf3e2; border: 1px solid #f1d9a8; border-radius: 12px; padding: 10px 14px; margin: 8px 0 12px; }
+  .pa-aviso-fotos[hidden] { display: none; }
+  .pa-aviso-fotos p { margin: 0; flex: 1 1 280px; }
   .pa-portada-ajustes { display: flex; gap: 8px 24px; align-items: center; flex-wrap: wrap; }
   .pa-portada-ajustes p { flex-basis: 100%; margin: 0; }
   .pa-boton--icono { width: 34px; padding: 6px 0; }

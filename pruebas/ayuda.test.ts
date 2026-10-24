@@ -79,6 +79,8 @@ prueba("encuentra lo que la gente escribe", () => {
     ["transferencia boleta", "boletas"],
     ["cupón", "cambiar-precio"],
     ["una tarjeta por color", "colores-vista-tienda"],
+    ["usar las fotos preparadas", "fotos-preparadas"],
+    ["la foto no cambia al elegir color", "fotos-preparadas"],
     ["la categoría se ve vacía", "colores-vista-tienda"],
     ["circulitos de colores", "colores-vista-tienda"],
     ["foto de portada para celular", "portada-celular"],

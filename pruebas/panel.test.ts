@@ -18,6 +18,7 @@ import { crearCarruselEditable } from "../modulos/carrusel/index";
 import { crearContenidoEditable } from "../modulos/contenido/index";
 import { hmacSha256Hex } from "../core/cripto";
 import { crearDespachoEditable } from "../modulos/despacho/index";
+import { aplicarFotosDelSitio } from "../modulos/panel/productos";
 const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
@@ -1189,6 +1190,59 @@ async function run() {
     assert.equal((await panel.productos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "vista-listas", vista: { general: "color" } } }) })).status, 401);
     const ajeno = await panel.productos.onRequestPost({ env, request: req("/x", { cookie, origen: "https://malo.cl", cuerpo: { accion: "vista-listas", vista: { general: "color" } } }) });
     assert.notEqual(ajeno.status, 200);
+  });
+
+  console.log("Panel — fotos de colores preparadas en el sitio (v0.38):");
+
+  await prueba("fotos preparadas: solo cambia fotos del sitio; nunca las subidas, ni unidades ni nombres", () => {
+    const base = { id: "funda", nombre: "Funda", precio: 1, categoria: "x", tipo: "fisico" as const, imagen: "/img/f.webp" };
+    const guardado = { ...base, colores: [
+      { id: "rosa", nombre: "Rosa claro", foto: "/img/f.webp", mini: "/img/tela/rosa.webp", stock: 4 },
+      { id: "rojo", nombre: "Rojo", foto: "/media/color-funda-aaaaaaaaaaaa", mini: "/media/color-funda-bbbbbbbbbbbb" },
+      { id: "nuevo", nombre: "Nuevo", foto: "/img/f.webp" },
+    ] };
+    const sitio = { ...base, colores: [
+      { id: "rosa", nombre: "Rosa", foto: "/img/colores/funda/rosa.webp", mini: "/img/tela/rosa.webp" },
+      { id: "rojo", nombre: "Rojo", foto: "/img/colores/funda/rojo.webp" },
+      { id: "azul", nombre: "Azul", foto: "/img/colores/funda/azul.webp" },
+    ] };
+    const r = aplicarFotosDelSitio(guardado, sitio);
+    assert.equal(r.cambios, 1);
+    assert.deepEqual(r.producto.colores![0], { id: "rosa", nombre: "Rosa claro", foto: "/img/colores/funda/rosa.webp", mini: "/img/tela/rosa.webp", stock: 4 });
+    assert.equal(r.producto.colores![1].foto, "/media/color-funda-aaaaaaaaaaaa", "la foto subida no se toca");
+    assert.equal(r.producto.colores![2].foto, "/img/f.webp", "un color que el sitio no tiene, igual");
+    assert.equal(r.producto.colores!.length, 3, "no agrega ni quita colores");
+    // Sin colores, sin sitio o con una foto ajena: nada.
+    assert.equal(aplicarFotosDelSitio(base, sitio).cambios, 0);
+    assert.equal(aplicarFotosDelSitio(guardado, undefined).cambios, 0);
+    const ajeno = { ...base, colores: [{ id: "rosa", nombre: "Rosa", foto: "https://malo.cl/x.webp" }, { id: "rojo", nombre: "Rojo", foto: "/img/../secreto" }] };
+    assert.equal(aplicarFotosDelSitio(guardado, ajeno).cambios, 0);
+  });
+
+  await prueba("fotos preparadas: el panel las cuenta y las pone (un producto o todos); sin sesión no", async () => {
+    const delSitio = crearCatalogoEditable(
+      [{ id: "funda", nombre: "Funda", precio: 14990, categoria: "fundas", tipo: "fisico", imagen: "/img/f.webp",
+         colores: [{ id: "rosa", nombre: "Rosa", foto: "/img/colores/funda/rosa.webp" }, { id: "rojo", nombre: "Rojo", foto: "/img/colores/funda/rojo.webp" }] }],
+      [{ id: "fundas", nombre: "Fundas" }]
+    );
+    const p2 = crearPanel({ nombreSitio: "Tienda Prueba", catalogo: delSitio });
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    // Lo que la clienta guardó en el panel (antes de que llegaran las fotos): fotos = la principal, rojo con stock.
+    datos.set("catalogo:productos", { v: JSON.stringify([{ id: "funda", nombre: "Funda", precio: 12990, categoria: "fundas", tipo: "fisico", imagen: "/img/f.webp",
+      colores: [{ id: "rosa", nombre: "Rosa", foto: "/img/f.webp" }, { id: "rojo", nombre: "Rojo", foto: "/img/f.webp", stock: 2 }] }]) });
+    const lista = await json(await p2.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(lista.productos[0].fotosSitio, 2);
+    assert.equal((await p2.productos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "fotos-sitio", id: "funda" } }) })).status, 401);
+    const r = await json(await p2.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "fotos-sitio", id: "funda" } }) }));
+    assert.equal(r.cambios, 2);
+    const guardado = JSON.parse(datos.get("catalogo:productos")!.v as string)[0];
+    assert.deepEqual(guardado.colores.map((c: { foto: string }) => c.foto), ["/img/colores/funda/rosa.webp", "/img/colores/funda/rojo.webp"]);
+    assert.equal(guardado.precio, 12990, "el precio de la clienta se mantiene");
+    assert.equal(guardado.colores[1].stock, 2, "las unidades se mantienen");
+    assert.equal((await json(await p2.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "fotos-sitio", id: "todos" } }) }))).cambios, 0, "segunda vez: nada que poner");
+    assert.equal((await json(await p2.productos.onRequestGet({ env, request: req("/x", { cookie }) }))).productos[0].fotosSitio, 0);
+    assert.equal((await p2.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "fotos-sitio", id: "<x>" } }) })).status, 400);
   });
 
   console.log("Panel — restablecer doble factor:");

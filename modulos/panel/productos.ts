@@ -23,6 +23,41 @@ import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
 import { borrarFoto, direccionMediaValida, guardarFoto, medidasAceptables, nuevoIdentificador, tipoRealDeImagen } from "./imagenes";
 
+/** Solo direcciones de fotos del propio sitio (las que trae su JSON), no subidas. */
+const FOTO_SITIO = /^\/img\/[a-zA-Z0-9/_.-]{1,150}$/;
+const subida = (f?: string) => typeof f === "string" && f.startsWith("/media/");
+
+/**
+ * FOTOS DE COLORES DEL SITIO (v0.38). Cuando la tienda ya se editó en el
+ * panel, lo guardado manda y las fotos nuevas que trae el sitio (su JSON) no
+ * se ven. Esto copia, color por color (mismo id), la foto y la miniatura del
+ * sitio al producto guardado. Nunca toca una foto SUBIDA en el panel
+ * (/media/), ni unidades, nombres, orden, precio u otros datos. Puro.
+ */
+export function aplicarFotosDelSitio(
+  actual: ProductoCatalogo,
+  delSitio: ProductoCatalogo | undefined
+): { producto: ProductoCatalogo; cambios: number } {
+  if (!actual.colores?.length || !delSitio?.colores?.length) return { producto: actual, cambios: 0 };
+  let cambios = 0;
+  const colores = actual.colores.map((c) => {
+    const s = delSitio.colores!.find((x) => x.id === c.id);
+    if (!s) return c;
+    const nuevo = { ...c };
+    let cambio = false;
+    for (const k of ["foto", "mini"] as const) {
+      const delSitioK = s[k];
+      if (delSitioK && FOTO_SITIO.test(delSitioK) && !delSitioK.includes("..") && nuevo[k] !== delSitioK && !subida(nuevo[k])) {
+        nuevo[k] = delSitioK;
+        cambio = true;
+      }
+    }
+    if (cambio) cambios++;
+    return nuevo;
+  });
+  return cambios ? { producto: { ...actual, colores }, cambios } : { producto: actual, cambios: 0 };
+}
+
 const PRECIO_MAXIMO = 100_000_000;
 const STOCK_MAXIMO = 100_000;
 
@@ -224,6 +259,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       productos.push({
         ...p,
         colores,
+        // Cuántos colores pueden tomar las fotos que trae el sitio (botón del panel).
+        fotosSitio: aplicarFotosDelSitio(p, catalogo.inicial.buscar(p.id)).cambios,
         disponible: conColores ? (d?.stock === undefined ? null : Number(d.stock)) : p.stock === undefined ? null : Number(d?.stock ?? 0),
         vendidos: conColores
           ? colores.reduce((n, c) => n + (c.vendidos ?? 0), 0)
@@ -326,6 +363,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
         return jsonResponse(500, { message: "No se pudo guardar. Intenta de nuevo." });
       }
     }
+    if (cuerpo.accion === "fotos-sitio") return fotosSitio(ctx, cuerpo.id);
     if (cuerpo.accion === "vista-listas") {
       try {
         return jsonResponse(200, { ok: true, vistaListas: await guardarVistaListas(ctx.env, cuerpo.vista, config.vistaListas) });
@@ -408,6 +446,27 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       for (const f of [c.foto, c.mini]) if (f && !enUso.has(f)) await borrarFoto(ctx.env, f);
     }
     return jsonResponse(200, { ok: true, producto });
+  }
+
+  /** POST { accion: "fotos-sitio", id: "<producto>" | "todos" }: ver aplicarFotosDelSitio. */
+  async function fotosSitio(ctx: Ctx, id: unknown): Promise<Response> {
+    const todos = id === "todos";
+    if (!todos && (typeof id !== "string" || !ID_VALIDO.test(id))) return jsonResponse(400, { message: "Producto inválido." });
+    const vigente = await catalogo.obtener(ctx.env);
+    let total = 0;
+    let productosCambiados = 0;
+    const lista = vigente.productos.map((p) => {
+      if (!todos && p.id !== id) return p;
+      const r = aplicarFotosDelSitio(p, catalogo.inicial.buscar(p.id));
+      total += r.cambios;
+      if (r.cambios) productosCambiados++;
+      return r.producto;
+    });
+    if (!todos && !vigente.productos.some((p) => p.id === id)) return jsonResponse(404, { message: "Ese producto ya no existe. Recarga la página." });
+    if (total === 0) return jsonResponse(200, { ok: true, cambios: 0, productos: 0 });
+    const r = await catalogo.guardar(ctx.env, lista);
+    if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudieron poner las fotos." });
+    return jsonResponse(200, { ok: true, cambios: total, productos: productosCambiados });
   }
 
   /**
