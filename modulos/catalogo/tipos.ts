@@ -1,5 +1,6 @@
 import type { Producto } from "../carrito/tipos";
 import type { ColorProducto, TituloColores } from "./colores";
+import type { OpcionProducto } from "./opciones";
 
 /**
  * Producto de catálogo. Extiende al del carrito con lo que necesita una
@@ -39,6 +40,13 @@ export interface ProductoCatalogo extends Producto {
    * el mismo encuadre. Por defecto el centro.
    */
   enfoqueColores?: { x: number; y: number };
+  /**
+   * Opciones (v0.40): una segunda elección, por ejemplo el tamaño, con
+   * precio propio, colores propios y unidades por combinación. Ver opciones.ts.
+   */
+  opciones?: OpcionProducto[];
+  /** Cómo se llama la elección en la ficha ("Tamaño", "Material"…). Por defecto "Tamaño". */
+  tituloOpciones?: string;
 }
 
 export interface CategoriaCatalogo {

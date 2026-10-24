@@ -33,20 +33,34 @@ export interface ColorProducto {
 
 export type TituloColores = "Color" | "Modelo";
 
-/** `lana~azul` → { base: "lana", color: "azul" }; `lana` → { base: "lana" }. */
-export function partirId(id: string): { base: string; color?: string } {
-  const i = id.indexOf(SEPARADOR_COLOR);
-  if (i < 0) return { base: id };
-  return { base: id.slice(0, i), color: id.slice(i + 1) };
+/**
+ * `lana~azul` → { base: "lana", color: "azul" }; `lana` → { base: "lana" }.
+ * Con opción (v0.40): `lana~azul~xl` → { …, opcion: "xl" }; `lana~~xl` → { base, opcion }.
+ */
+export function partirId(id: string): { base: string; color?: string; opcion?: string } {
+  const partes = id.split(SEPARADOR_COLOR);
+  if (partes.length === 1) return { base: id };
+  if (partes.length > 3) return { base: partes[0], color: partes.slice(1).join(SEPARADOR_COLOR) };
+  // `prod~` (color vacío) sigue siendo un color inválido, como antes; solo `prod~~opcion` va sin color.
+  if (partes.length === 2) return { base: partes[0], color: partes[1] };
+  const color = partes[1] || undefined;
+  const opcion = partes[2];
+  return { base: partes[0], ...(color !== undefined ? { color } : {}), ...(opcion !== undefined ? { opcion } : {}) };
 }
 
-/** Id del producto sin el color (lo que usan las páginas para tipo, categoría, etc.). */
+/** Id del producto sin el color ni la opción (lo que usan las páginas para tipo, categoría, etc.). */
 export function idBase(id: string): string {
   return partirId(id).base;
 }
 
 export function idConColor(base: string, color: string): string {
   return `${base}${SEPARADOR_COLOR}${color}`;
+}
+
+/** Id de la línea con color y/o opción (v0.40): `prod`, `prod~color`, `prod~color~opcion` o `prod~~opcion`. */
+export function idCompuesto(base: string, color?: string, opcion?: string): string {
+  if (opcion) return `${base}${SEPARADOR_COLOR}${color ?? ""}${SEPARADOR_COLOR}${opcion}`;
+  return color ? idConColor(base, color) : base;
 }
 
 export function tieneColores(p: Pick<ProductoCatalogo, "colores">): boolean {

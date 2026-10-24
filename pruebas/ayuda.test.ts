@@ -81,6 +81,8 @@ prueba("encuentra lo que la gente escribe", () => {
     ["una tarjeta por color", "colores-vista-tienda"],
     ["usar las fotos preparadas", "fotos-preparadas"],
     ["crear subcategoría", "subcategorias"],
+    ["precio por tamaño", "opciones-producto"],
+    ["unidades por talla", "opciones-producto"],
     ["toallas de microfibra y algodón", "subcategorias"],
     ["la foto no cambia al elegir color", "fotos-preparadas"],
     ["la categoría se ve vacía", "colores-vista-tienda"],

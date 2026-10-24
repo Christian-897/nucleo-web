@@ -18,7 +18,7 @@ import { crearCarruselEditable } from "../modulos/carrusel/index";
 import { crearContenidoEditable } from "../modulos/contenido/index";
 import { hmacSha256Hex } from "../core/cripto";
 import { crearDespachoEditable } from "../modulos/despacho/index";
-import { aplicarFotosDelSitio } from "../modulos/panel/productos";
+import { aplicarFotosDelSitio, limpiarOpcionesDeColores } from "../modulos/panel/productos";
 const r0Dia = () => diaLocal(new Date());
 
 let pasaron = 0;
@@ -1225,6 +1225,51 @@ async function run() {
     // Quitar la subcategoría: el producto se puede guardar sin ella.
     assert.equal((await editar("")).status, 200);
     assert.equal((await catalogo.obtener(env)).buscar("gatito")?.subcategoria, undefined);
+  });
+
+  console.log("Panel — opciones de producto (v0.40):");
+
+  await prueba("opciones: precio y unidades por opción; las ventas siguen descontando si no se tocan; cambiar unidades repone", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const guardar = (opciones: unknown[], titulo = "Tamaño") =>
+      panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "opciones", id: "gatito", titulo, opciones } }) });
+    const r1 = await json(await guardar([{ nombre: "Chico", precio: "15000", disponible: 2 }, { nombre: "Grande" }]));
+    assert.deepEqual(r1.producto.opciones, [{ id: "chico", nombre: "Chico", precio: 15000, stock: 2 }, { id: "grande", nombre: "Grande" }]);
+    assert.equal(r1.producto.stock, undefined, "con opciones, el stock vive en cada opción");
+    assert.equal((await productoDisponible(catalogo, env, "gatito~~chico"))?.precio, 15000);
+    await registrarVenta(catalogo, env, [{ productoId: "gatito~~chico", cantidad: 1 }]);
+    let lista = await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    let g = lista.productos.find((p: { id: string }) => p.id === "gatito");
+    assert.equal(g.opciones[0].disponible, 1);
+    assert.equal(g.opciones[0].vendidos, 1);
+    // Guardar sin tocar las unidades (1 disponible): el stock sigue en 2 y la venta sigue contando.
+    await guardar([{ id: "chico", nombre: "Chico S", precio: "15000", disponible: 1 }, { id: "grande", nombre: "Grande" }]);
+    assert.equal((await productoDisponible(catalogo, env, "gatito~~chico"))?.stock, 1);
+    assert.equal((await productoDisponible(catalogo, env, "gatito~~chico"))?.nombre, "Gatito · Chico S", "renombrar mantiene el id");
+    // Cambiar a 5: ese número pasa a ser lo disponible.
+    await guardar([{ id: "chico", nombre: "Chico S", disponible: 5 }, { id: "grande", nombre: "Grande" }]);
+    assert.equal((await productoDisponible(catalogo, env, "gatito~~chico"))?.stock, 5);
+    assert.equal((await productoDisponible(catalogo, env, "gatito~~chico"))?.precio, 18000, "sin precio propio = el del producto");
+    assert.equal((await guardar([{ nombre: "A" }, { nombre: "a" }])).status, 400);
+    // Quitar todas: vuelve a ser un producto simple.
+    const r2 = await json(await guardar([]));
+    assert.equal(r2.producto.opciones, undefined);
+    lista = await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    g = lista.productos.find((p: { id: string }) => p.id === "gatito");
+    assert.deepEqual(g.opciones, []);
+    assert.equal((await panel.productos.onRequestPost({ env, request: req("/x", { cuerpo: { accion: "opciones", id: "gatito", opciones: [] } }) })).status, 401);
+  });
+
+  await prueba("opciones: al quitar un color, las opciones dejan de nombrarlo (y la que solo venía en él se quita)", () => {
+    const p = { id: "s", nombre: "S", precio: 1, categoria: "x", tipo: "fisico" as const, colores: [{ id: "rosa", nombre: "Rosa" }],
+      opciones: [{ id: "mini", nombre: "Mini", colores: ["rosa", "verde"], stockColores: { rosa: 1, verde: 2 } }, { id: "xl", nombre: "XL", colores: ["verde"], stockColores: { verde: 3 } }] };
+    limpiarOpcionesDeColores(p);
+    assert.deepEqual(p.opciones, [{ id: "mini", nombre: "Mini", colores: ["rosa"], stockColores: { rosa: 1 } }]);
+    // Sin colores: las opciones quedan sin lista de colores ni unidades por color.
+    const q = { ...p, colores: undefined, opciones: [{ id: "a", nombre: "A", colores: ["rosa"], stockColores: { rosa: 1 } }] };
+    limpiarOpcionesDeColores(q);
+    assert.deepEqual(q.opciones, [{ id: "a", nombre: "A" }]);
   });
 
   console.log("Panel — fotos de colores preparadas en el sitio (v0.38):");

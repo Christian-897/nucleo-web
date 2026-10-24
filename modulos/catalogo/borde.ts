@@ -45,7 +45,8 @@ import { type CatalogoODinamico, esDinamico, resolverCatalogo } from "./almacen"
 import { ID_VALIDO } from "./catalogo";
 import type { Catalogo, CategoriaCatalogo, ProductoCatalogo } from "./tipos";
 import { ID_VIDEO, miniaturaVideo } from "./video";
-import { type ColorProducto, idConColor, imagenPrincipal, tieneColores } from "./colores";
+import { type ColorProducto, idCompuesto, idConColor, imagenPrincipal, tieneColores } from "./colores";
+import { colorEnOpcion, precioDeOpcion, rangoDePrecios, tieneOpciones } from "./opciones";
 import { type VistaLista, type VistaListas, obtenerVistaListas, vistaDeFiltro, VISTA_LISTAS_POR_DEFECTO } from "./vista-listas";
 import { AJUSTES_FICHA_POR_DEFECTO, type AjustesFicha, obtenerAjustesFicha } from "./ficha";
 
@@ -130,6 +131,24 @@ export function htmlMuestras(p: ProductoCatalogo, imagenPorDefecto: string, maxi
     .join("");
   const resto = colores.length - visibles.length;
   return muestras + (resto > 0 ? `<span class="muestras__mas">+${resto}</span>` : "");
+}
+
+/**
+ * Botones de las opciones de la ficha (v0.40), p. ej. Mini · Mediano · XL.
+ * Cada uno lleva su precio y los colores en que viene (vacío = todos). El
+ * primero queda elegido; el navegador marca las combinaciones agotadas.
+ */
+export function htmlOpciones(p: ProductoCatalogo): string {
+  const { min, max } = rangoDePrecios(p);
+  return (p.opciones ?? [])
+    .map((o, i) => {
+      const nombre = escaparTexto(o.nombre);
+      const precio = precioDeOpcion(p, o);
+      const colores = (o.colores ?? []).filter((c) => /^[a-z0-9-]+$/.test(c)).join(",");
+      const extra = min < max ? `<span class="opciones__precio">${escaparTexto(formatearPrecio(precio))}</span>` : "";
+      return `<li><button type="button" class="opciones__boton" data-opcion="${o.id}" data-opcion-nombre="${nombre}" data-opcion-precio="${precio}" data-opcion-colores="${colores}" aria-pressed="${i === 0}"><span class="opciones__nombre">${nombre}</span>${extra}</button></li>`;
+    })
+    .join("");
 }
 
 function pluralColores(p: ProductoCatalogo, n: number): string {
@@ -257,9 +276,12 @@ function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: O
     case "nombre":
       el.setInnerContent(p.nombre, { html: false });
       break;
-    case "precio":
-      el.setInnerContent(formatearPrecio(p.precio), { html: false });
+    case "precio": {
+      // Con opciones de distinto precio: «Desde $X» (v0.40).
+      const { min, max } = rangoDePrecios(p);
+      el.setInnerContent(min < max ? `Desde ${formatearPrecio(min)}` : formatearPrecio(min), { html: false });
       break;
+    }
     case "imagen":
       el.setAttribute("src", imagen);
       break;
@@ -272,11 +294,12 @@ function llenarCampo(el: ElementoHtml, campo: string, p: ProductoCatalogo, op: O
       else el.setAttribute("hidden", "");
       break;
     case "agregar":
-      if (tieneColores(p)) {
-        // Con colores no se agrega desde la lista: el botón lleva a la ficha para elegir.
+      if (tieneColores(p) || tieneOpciones(p)) {
+        // Con colores u opciones no se agrega desde la lista: el botón lleva a la ficha para elegir.
         el.setAttribute("data-elegir", url);
         el.setAttribute("data-id", p.id);
-        el.setAttribute("aria-label", `Elegir ${(p.tituloColores ?? "Color").toLowerCase()} de ${p.nombre}`);
+        const que = tieneOpciones(p) ? (p.tituloOpciones ?? "Tamaño") : (p.tituloColores ?? "Color");
+        el.setAttribute("aria-label", `Elegir ${que.toLowerCase()} de ${p.nombre}`);
         break;
       }
       el.removeAttribute("data-elegir");
@@ -326,7 +349,17 @@ function llenarCampoColor(el: ElementoHtml, campo: string, p: ProductoCatalogo, 
       el.setInnerContent("", { html: false });
       el.setAttribute("hidden", "");
       break;
+    case "precio":
+      llenarCampo(el, campo, p, op);
+      break;
     case "agregar":
+      if (tieneOpciones(p)) {
+        // Falta elegir la opción (p. ej. el tamaño): lleva a la ficha con el color ya elegido.
+        el.setAttribute("data-elegir", url);
+        el.setAttribute("data-id", idConColor(p.id, c.id));
+        el.setAttribute("aria-label", `Elegir ${(p.tituloOpciones ?? "Tamaño").toLowerCase()} de ${nombre}`);
+        break;
+      }
       el.removeAttribute("data-elegir");
       el.setAttribute("data-id", idConColor(p.id, c.id));
       el.setAttribute("data-nombre", nombre);
@@ -634,9 +667,15 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
       } catch {
         /* si KV falla, rigen los de fábrica */
       }
+      const opcionesP = tieneOpciones(p) ? p.opciones! : [];
+      const opcion0 = opcionesP[0];
       const colores = tieneColores(p) ? p.colores! : [];
-      const primero = colores[0];
+      // Con opciones, el color elegido al abrir es el primero que viene en la primera opción.
+      const primero = opcion0 ? colores.find((c) => colorEnOpcion(opcion0, c.id)) : colores[0];
       const titulo = p.tituloColores ?? "Color";
+      const tituloOp = p.tituloOpciones ?? "Tamaño";
+      const precioInicial = precioDeOpcion(p, opcion0);
+      const rango = rangoDePrecios(p);
       const imagen = imagenSegura(primero?.foto ?? p.imagen, opciones.imagenPorDefecto);
       const imagenAbs = new URL(imagen, opciones.sitio.dominio).href;
       const galeria = fotosSeguras(p);
@@ -650,8 +689,7 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
         sku: p.id,
         brand: { "@type": "Brand", name: opciones.sitio.nombre },
         offers: {
-          "@type": "Offer",
-          price: p.precio,
+          ...(rango.min < rango.max ? { "@type": "AggregateOffer", lowPrice: rango.min, highPrice: rango.max } : { "@type": "Offer", price: rango.min }),
           priceCurrency: "CLP",
           availability: p.stock === 0 ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
           url: canonica,
@@ -729,6 +767,27 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
               } else if (campo === "imagen-alt" && primero) {
                 el.setAttribute("src", imagen);
                 el.setAttribute("alt", `${p.nombre} · ${primero.nombre}`);
+              } else if (campo === "opciones-bloque") {
+                if (!opcionesP.length) el.setAttribute("hidden", "");
+                else el.removeAttribute("hidden");
+              } else if (campo === "opciones") {
+                el.setInnerContent(htmlOpciones(p), { html: true });
+              } else if (campo === "opciones-titulo") {
+                el.setInnerContent(`Elige tu ${tituloOp.toLowerCase()}`, { html: false });
+              } else if (campo === "opciones-etiqueta") {
+                el.setInnerContent(`${tituloOp}:`, { html: false });
+              } else if (campo === "opciones-elegido") {
+                el.setInnerContent(opcion0?.nombre ?? "", { html: false });
+              } else if (campo === "precio" && opcion0) {
+                el.setInnerContent(formatearPrecio(precioInicial), { html: false });
+              } else if (campo === "agregar" && opcion0) {
+                const mini = imagenSegura(primero?.mini ?? primero?.foto ?? p.imagen, opciones.imagenPorDefecto);
+                el.setAttribute("data-id", idCompuesto(p.id, primero?.id, opcion0.id));
+                el.setAttribute("data-nombre", primero ? `${p.nombre} · ${opcion0.nombre} · ${primero.nombre}` : `${p.nombre} · ${opcion0.nombre}`);
+                el.setAttribute("data-precio", String(precioInicial));
+                el.setAttribute("data-imagen", mini);
+                el.setAttribute("data-producto-base", p.id);
+                el.removeAttribute("data-elegir");
               } else if (campo === "agregar" && primero) {
                 const mini = imagenSegura(primero.mini ?? primero.foto ?? p.imagen, opciones.imagenPorDefecto);
                 el.setAttribute("data-id", idConColor(p.id, primero.id));

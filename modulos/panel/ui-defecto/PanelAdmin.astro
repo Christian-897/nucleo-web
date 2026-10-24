@@ -765,6 +765,17 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         </details>
         <p class="pa-error" role="alert" data-error-colores></p>
       </section>
+      <section class="pa-variantes pa-opprod" aria-labelledby="pa-opciones-titulo">
+        <div class="pa-variantes__cabeza">
+          <h3 id="pa-opciones-titulo" class="pa-subtitulo">Tamaños u otras opciones <span class="pa-tenue" data-opciones-cuenta></span></h3>
+          <label class="pa-campo pa-campo--fila">Se llama en la tienda<input data-opciones-titulo maxlength="20" placeholder="Tamaño" /></label>
+        </div>
+        <p class="pa-tenue pa-chico">Opcional. Por ejemplo <strong>Mini · Mediano · XL</strong>. Cada opción puede tener <strong>su propio precio</strong> (vacío = el del producto). Si el producto tiene colores, las unidades van <strong>por color dentro de cada opción</strong> y puedes marcar los colores en que no viene. Vacío = sin límite; 0 = agotado.</p>
+        <ul class="pa-opprod__lista" data-opciones-lista></ul>
+        <button type="button" class="pa-boton pa-boton--suave" data-opciones-agregar>+ Agregar opción</button>
+        <p class="pa-tenue pa-chico" data-opciones-nota hidden>Los colores nuevos aparecen aquí después de guardar.</p>
+        <p class="pa-error" role="alert" data-error-opciones></p>
+      </section>
       <p class="pa-error" role="alert" data-error></p>
       <div class="pa-pie-dialogo">
         <button class="pa-boton pa-boton--suave" type="button" data-cerrar-editor>Cancelar</button>
@@ -1183,6 +1194,17 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-aviso { background: #fff6e0; border: 1px solid #f0d58a; border-radius: 10px; padding: 10px 12px; font-size: .92rem; }
   .pa-fila--correo .pa-fila__nombre { overflow-wrap: anywhere; }
   .pa-fila--diapo img { width: 112px; height: 70px; }
+  .pa-opprod__lista { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 10px; }
+  .pa-opprod__fila { border: 1px solid var(--pa-borde, #eadde3); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
+  .pa-opprod__cabeza { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; }
+  .pa-opprod__cabeza label { display: grid; gap: 2px; font-size: .85rem; flex: 1 1 120px; }
+  .pa-opprod__cabeza input { padding: 7px 10px; border: 1px solid var(--pa-borde, #eadde3); border-radius: 8px; font: inherit; min-width: 0; }
+  .pa-opprod__colores { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; }
+  .pa-opprod__color { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 8px; background: #faf5f7; font-size: .85rem; }
+  .pa-opprod__color img { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; }
+  .pa-opprod__color span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pa-opprod__color input[type="text"] { width: 72px; padding: 4px 6px; border: 1px solid var(--pa-borde, #eadde3); border-radius: 6px; font: inherit; }
+  .pa-opprod__color--no { opacity: .55; }
   .pa-subcats { border: 1px solid var(--pa-borde, #eadde3); border-radius: 12px; padding: 10px 12px; margin: 10px 0 0; display: grid; gap: 8px; }
   .pa-subcats legend { font-weight: 700; padding: 0 4px; }
   .pa-subcats__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }

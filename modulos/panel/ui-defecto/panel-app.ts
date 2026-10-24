@@ -48,8 +48,18 @@ interface Producto {
   tituloColores?: "Color" | "Modelo";
   enfoqueColores?: { x: number; y: number };
   subcategoria?: string;
+  opciones?: OpcionPanel[];
+  tituloOpciones?: string;
   /** Colores que pueden tomar las fotos preparadas en el sitio (v0.38). */
   fotosSitio?: number;
+}
+interface OpcionPanel {
+  id: string;
+  nombre: string;
+  precio: number | null;
+  disponible: number | null;
+  vendidos: number | null;
+  colores: Record<string, { disponible: number | null; vendidos: number | null } | "no">;
 }
 interface ColorPanel {
   id: string;
@@ -495,6 +505,7 @@ function pintarProductos() {
       if (p.destacado) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Destacado"));
       if (p.video) datos.append(crear("span", "pa-etiqueta pa-etiqueta--suave", "Con video"));
       if (p.colores?.length) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", `${p.colores.length} ${p.colores.length === 1 ? (p.tituloColores ?? "Color").toLowerCase() : p.tituloColores === "Modelo" ? "modelos" : "colores"}`));
+      if (p.opciones?.length) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", `${(p.tituloOpciones ?? "Tamaño")}: ${p.opciones.map((o) => o.nombre).join(" · ")}`));
       if (!p.imagen && !p.colores?.length) datos.append(crear("span", "pa-etiqueta pa-etiqueta--alerta", "Sin foto"));
       info.append(nombre, datos);
       const botones = crear("div", "pa-fila__botones");
@@ -612,6 +623,7 @@ function abrirEditor(p: Producto | null) {
   fotosEditor = fotosOriginales.map((url) => ({ url }));
   pintarFotosEditor();
   abrirColores(p);
+  abrirOpciones(p);
   editor().showModal();
   campo("nombre").focus();
 }
@@ -752,6 +764,29 @@ formProducto().addEventListener("submit", async (e) => {
       }
       errorC.textContent = "";
     }
+    // 4) Opciones (tamaños…): solo si algo cambió. Van después de los colores porque usan sus ids.
+    if (firmaOpciones() !== opcionesOriginal) {
+      const errorO = $("[data-error-opciones]");
+      const ro = await enviar<{ producto: Producto }>(`${API}/productos`, {
+        accion: "opciones",
+        id,
+        titulo: $<HTMLInputElement>("[data-opciones-titulo]").value,
+        opciones: opcionesEditor.map((o) => ({
+          id: o.id,
+          nombre: o.nombre.trim(),
+          precio: o.precio.trim() === "" ? null : o.precio.trim(),
+          disponible: o.disponible.trim() === "" ? null : Number(o.disponible),
+          colores: Object.fromEntries(Object.entries(o.colores).map(([c, v]) => [c, v === "no" ? "no" : v.trim() === "" ? null : Number(v)])),
+        })),
+      });
+      if (siSeCerro(ro.status)) return;
+      if (!ro.ok) {
+        errorO.textContent = ro.datos.message || "No se pudieron guardar las opciones.";
+        editando = { ...(editando ?? (r.datos.producto as Producto)), id } as Producto;
+        return;
+      }
+      errorO.textContent = "";
+    }
     fotosEditor = [];
     editor().close();
     avisar("Guardado. La tienda se actualiza en unos segundos.");
@@ -827,6 +862,11 @@ function pintarColores() {
       disp.inputMode = "numeric";
       disp.placeholder = "Sin límite";
       disp.setAttribute("aria-label", `Unidades de ${c.nombre || `color ${i + 1}`}`);
+      // Con opciones (tamaños), las unidades van por combinación en la sección de abajo.
+      if (opcionesEditor.length) {
+        disp.disabled = true;
+        disp.placeholder = "Por opción ↓";
+      }
       disp.addEventListener("input", () => {
         c.disponible = disp.value;
         pintarTotalColores();
@@ -883,17 +923,170 @@ function pintarColores() {
   $("[data-colores-enfoque-caja]").hidden = total === 0;
   pintarEnfoque();
   pintarTotalColores();
+  pintarOpciones();
 }
 
 /** Con colores, las unidades van por color: el "Disponible" del producto muestra la suma. */
 function pintarTotalColores() {
   const campo = formProducto().elements.namedItem("disponible") as HTMLInputElement;
+  if (opcionesEditor.length) {
+    campo.disabled = true;
+    campo.value = "";
+    campo.placeholder = "Por opción (abajo)";
+    $("[data-editor-vendidos]").textContent = "Con opciones, las unidades se escriben en cada opción (abajo).";
+    return;
+  }
   const con = coloresEditor.length > 0;
   campo.disabled = con;
   if (con) campo.value = totalColores();
   campo.placeholder = con ? "Suma de los colores" : "Sin límite";
   if (con) $("[data-editor-vendidos]").textContent = "Con colores, las unidades se escriben en cada color (abajo).";
 }
+
+// ─── opciones del producto (v0.40): tamaños u otras, con precio y unidades por combinación ───
+
+interface OpcionEditor {
+  id?: string;
+  nombre: string;
+  precio: string;
+  disponible: string;
+  /** Por id de color: unidades ("" = sin límite) o "no" (no viene). */
+  colores: Record<string, string>;
+  abierto: boolean;
+}
+let opcionesEditor: OpcionEditor[] = [];
+let opcionesOriginal = "";
+const coloresGuardados = () => coloresEditor.filter((c) => c.id) as (ColorEditor & { id: string })[];
+
+function firmaOpciones(): string {
+  return JSON.stringify({
+    t: $<HTMLInputElement>("[data-opciones-titulo]").value.trim(),
+    o: opcionesEditor.map((o) => [o.id ?? "", o.nombre.trim(), o.precio.trim(), o.disponible.trim(), coloresGuardados().map((c) => o.colores[c.id] ?? "")]),
+  });
+}
+
+function abrirOpciones(p: Producto | null) {
+  $("[data-error-opciones]").textContent = "";
+  $<HTMLInputElement>("[data-opciones-titulo]").value = p?.tituloOpciones ?? "";
+  opcionesEditor = (p?.opciones ?? []).map((o) => ({
+    id: o.id,
+    nombre: o.nombre,
+    precio: o.precio === null ? "" : String(o.precio),
+    disponible: o.disponible === null ? "" : String(o.disponible),
+    colores: Object.fromEntries(Object.entries(o.colores).map(([c, v]) => [c, v === "no" ? "no" : v.disponible === null ? "" : String(v.disponible)])),
+    abierto: false,
+  }));
+  pintarOpciones();
+  pintarColores();
+  opcionesOriginal = firmaOpciones();
+}
+
+function pintarOpciones() {
+  const lista = $("[data-opciones-lista]");
+  const colores = coloresGuardados();
+  const conColores = coloresEditor.length > 0;
+  lista.replaceChildren(
+    ...opcionesEditor.map((o, i) => {
+      const li = crear("li", "pa-opprod__fila");
+      const cabeza = crear("div", "pa-opprod__cabeza");
+      const campo = (etiqueta: string, valor: string, poner: (v: string) => void, extra: Partial<HTMLInputElement> = {}) => {
+        const l = crear("label", "", etiqueta);
+        const inp = crear("input");
+        inp.value = valor;
+        Object.assign(inp, extra);
+        inp.addEventListener("input", () => poner(inp.value));
+        l.append(inp);
+        return l;
+      };
+      cabeza.append(campo("Nombre", o.nombre, (v) => (o.nombre = v), { maxLength: 40, placeholder: "Ej: Mediano" }));
+      cabeza.append(campo("Precio (opcional)", o.precio, (v) => (o.precio = v), { inputMode: "numeric", placeholder: "El del producto" }));
+      if (!conColores) cabeza.append(campo("Unidades", o.disponible, (v) => (o.disponible = v), { inputMode: "numeric", placeholder: "Sin límite" }));
+      const boton = (texto: string, etiqueta: string, accion: () => void, apagado = false) => {
+        const b = crear("button", "pa-boton pa-boton--suave pa-boton--chico", texto);
+        b.type = "button";
+        b.setAttribute("aria-label", etiqueta);
+        b.disabled = apagado;
+        b.addEventListener("click", accion);
+        return b;
+      };
+      const mover = (d: number) => () => {
+        const [x] = opcionesEditor.splice(i, 1);
+        opcionesEditor.splice(i + d, 0, x);
+        pintarOpciones();
+      };
+      if (conColores) {
+        const vienen = colores.filter((c) => (o.colores[c.id] ?? "") !== "no").length;
+        cabeza.append(boton(`${o.abierto ? "▴" : "▾"} Unidades por color (${vienen} de ${colores.length})`, `Unidades por color de ${o.nombre}`, () => {
+          o.abierto = !o.abierto;
+          pintarOpciones();
+        }));
+      }
+      cabeza.append(
+        boton("↑", `Subir ${o.nombre}`, mover(-1), i === 0),
+        boton("↓", `Bajar ${o.nombre}`, mover(1), i === opcionesEditor.length - 1),
+        boton("Quitar", `Quitar ${o.nombre}`, () => {
+          if (o.id && !confirm(`¿Quitar la opción «${o.nombre}»? Deja de verse en la tienda al guardar.`)) return;
+          opcionesEditor.splice(i, 1);
+          pintarOpciones();
+          pintarColores();
+        })
+      );
+      li.append(cabeza);
+      if (conColores && o.abierto) {
+        const grilla = crear("div", "pa-opprod__colores");
+        for (const c of colores) {
+          const valor = o.colores[c.id] ?? "";
+          const no = valor === "no";
+          const fila = crear("label", `pa-opprod__color${no ? " pa-opprod__color--no" : ""}`);
+          const viene = crear("input");
+          viene.type = "checkbox";
+          viene.checked = !no;
+          viene.setAttribute("aria-label", `${c.nombre} viene en ${o.nombre}`);
+          const img = crear("img");
+          img.src = c.vista;
+          img.alt = "";
+          const u = crear("input");
+          u.type = "text";
+          u.inputMode = "numeric";
+          u.placeholder = "Sin límite";
+          u.value = no ? "" : valor;
+          u.disabled = no;
+          u.setAttribute("aria-label", `Unidades de ${o.nombre} en ${c.nombre}`);
+          u.addEventListener("input", () => (o.colores[c.id] = u.value));
+          viene.addEventListener("change", () => {
+            o.colores[c.id] = viene.checked ? "" : "no";
+            pintarOpciones();
+          });
+          fila.append(viene, img, crear("span", "", c.nombre), u);
+          grilla.append(fila);
+        }
+        const todos = crear("div", "pa-opprod__cabeza");
+        todos.append(
+          boton("Viene en todos", `Marcar todos los colores en ${o.nombre}`, () => {
+            for (const c of colores) if (o.colores[c.id] === "no") o.colores[c.id] = "";
+            pintarOpciones();
+          }),
+          boton("Ninguno", `Desmarcar todos los colores en ${o.nombre}`, () => {
+            for (const c of colores) o.colores[c.id] = "no";
+            pintarOpciones();
+          })
+        );
+        li.append(todos, grilla);
+      }
+      return li;
+    })
+  );
+  $("[data-opciones-cuenta]").textContent = opcionesEditor.length ? `(${opcionesEditor.length})` : "";
+  $<HTMLButtonElement>("[data-opciones-agregar]").disabled = opcionesEditor.length >= 12;
+  $("[data-opciones-nota]").hidden = coloresEditor.every((c) => c.id);
+}
+
+$("[data-opciones-agregar]").addEventListener("click", () => {
+  opcionesEditor.push({ nombre: "", precio: "", disponible: "", colores: {}, abierto: false });
+  pintarOpciones();
+  pintarColores();
+  $$<HTMLElement>("[data-opciones-lista] .pa-opprod__fila").at(-1)?.querySelector("input")?.focus();
+});
 
 async function prepararFotoColor(f: File): Promise<Pick<ColorEditor, "archivoFoto" | "archivoMini" | "vista"> | null> {
   try {

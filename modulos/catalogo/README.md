@@ -169,6 +169,38 @@ Y en el navegador: `iniciarColores()` de `nucleo-web/catalogo/colores-ficha`
 colores recibe `data-elegir="/producto/<id>/"`: el sitio debe llevar ahí en
 vez de agregar. Para el despacho, `necesitaDespacho` ya mira el producto base.
 
+### Opciones: tamaños u otras (v0.40)
+
+Un producto puede tener hasta 12 `opciones` (p. ej. *Mini · Mediano · XL*) y
+`tituloOpciones` («Tamaño» por defecto). Pensado para el peor caso:
+
+- `precio` por opción (sin él, el del producto). Las listas muestran
+  «Desde $X» si hay precios distintos; el JSON-LD usa `AggregateOffer`.
+- `colores`: ids de color en que viene (sin la lista = todos).
+- Unidades por **combinación**: `stockColores: { <color>: n }` (con colores) o
+  `stock` (sin colores). Sin número = sin límite.
+- Id de la línea: `prod~color~opcion` o `prod~~opcion`. Stock en
+  `catalogo:vendidos:<id de la línea>`. Sin elegir opción (o color, si tiene)
+  no se vende. `/api/stock?producto=<id>` devuelve todas las combinaciones.
+- Al borrar un color, las opciones dejan de nombrarlo; una opción que solo
+  venía en colores borrados se quita.
+
+Qué pone el sitio en la ficha (además de lo de colores):
+
+```html
+<div data-ficha="opciones-bloque" hidden>
+  <span data-ficha="opciones-titulo"></span>                         <!-- Elige tu tamaño -->
+  <span data-ficha="opciones-etiqueta"></span> <span data-opcion-elegida data-ficha="opciones-elegido"></span>
+  <ul data-ficha="opciones" data-opciones-lista></ul>                <!-- botones [data-opcion] -->
+</div>
+```
+
+`iniciarColores()` maneja las dos elecciones: cambia precio, foto, botón de
+compra (`data-id`), marca los colores que no vienen en la opción
+(`.colores__mini--no-viene`) y las combinaciones agotadas, y escribe
+`?opcion=&color=` en la dirección. Panel: Productos → Editar → **Tamaños u
+otras opciones** (`POST /api/admin/productos { accion: "opciones" }`).
+
 ### Subcategorías (v0.39)
 
 Cada categoría puede tener hasta `MAXIMO_SUBCATEGORIAS` (12) subcategorías

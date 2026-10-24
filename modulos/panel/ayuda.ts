@@ -307,6 +307,20 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "opciones-producto",
+    seccion: "productos",
+    titulo: "Tamaños u otras opciones dentro de un producto (con su precio y sus unidades)",
+    palabras: ["tamaño", "tamaños", "talla", "tallas", "mini", "mediano", "xl", "opciones", "opción", "variante", "medida", "precio por tamaño", "unidades por tamaño", "stock por tamaño"],
+    requiere: '[data-tab="productos"]:not([hidden])',
+    contenido: [
+      "Un producto puede tener **opciones**, por ejemplo **Mini · Mediano · XL**. En la ficha, el cliente elige primero el tamaño (el precio cambia si cada uno cuesta distinto) y después el color.",
+      { pasos: ["Ve a **Productos → Editar**.", "Abajo, en **Tamaños u otras opciones**, toca **+ Agregar opción** y escribe su nombre.", "Si ese tamaño cuesta distinto, escribe su **precio**; vacío = el precio del producto.", "Con colores, toca **Unidades por color** y escribe cuántas quedan de ese tamaño en cada color. Desmarca los colores en que no viene.", "Toca **Guardar cambios**."] },
+      "Las unidades van **por combinación**: «3 XL en verde agua» y «0 Mini en verde agua» son independientes. Vacío = sin límite; **0 = agotado**. Cada venta descuenta solo de esa combinación y, si anulas el pedido, vuelve ahí.",
+      "En **Se llama en la tienda** puedes cambiar «Tamaño» por otra palabra (por ejemplo «Material»). En las listas, si los tamaños tienen distinto precio, se ve «Desde $…».",
+      { nota: "Si agregas colores nuevos, primero toca Guardar cambios y después carga sus unidades en cada opción." },
+    ],
+  },
+  {
     id: "colores-vista-tienda",
     seccion: "productos",
     titulo: "Elegir cómo se ven los colores en la tienda (una tarjeta o una por color)",

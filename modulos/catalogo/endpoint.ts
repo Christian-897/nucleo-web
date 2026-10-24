@@ -7,12 +7,14 @@
 import type { EnvBase } from "../../core/tipos";
 import { ID_VALIDO } from "./catalogo";
 import { ID_COLOR, partirId } from "./colores";
+import { ID_OPCION } from "./opciones";
 import { stockDeColores, stockDisponible } from "./stock";
 import type { CatalogoODinamico } from "./almacen";
 
 function idPermitido(id: string): boolean {
   const { base, color } = partirId(id);
-  return ID_VALIDO.test(base) && (color === undefined || ID_COLOR.test(color));
+  const { opcion } = partirId(id);
+  return ID_VALIDO.test(base) && (color === undefined || ID_COLOR.test(color)) && (opcion === undefined || ID_OPCION.test(opcion));
 }
 
 export function crearEndpointStock(catalogo: CatalogoODinamico) {

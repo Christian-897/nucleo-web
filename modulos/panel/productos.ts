@@ -14,7 +14,8 @@ import { normalizeInput } from "../../core/validar";
 import type { FuenteCatalogo } from "../catalogo/almacen";
 import { ID_VALIDO, MAXIMO_FOTOS } from "../catalogo/catalogo";
 import { productoDisponible, reponerStock, unidadesVendidas } from "../catalogo/stock";
-import { type ColorProducto, idColorDesdeNombre, idConColor, MAXIMO_COLORES, tieneColores } from "../catalogo/colores";
+import { type ColorProducto, idColorDesdeNombre, idCompuesto, idConColor, MAXIMO_COLORES, tieneColores } from "../catalogo/colores";
+import { colorEnOpcion, idOpcionDesdeNombre, LARGO_TITULO_OPCIONES, MAXIMO_OPCIONES, type OpcionProducto, tieneOpciones } from "../catalogo/opciones";
 import { guardarAjustesFicha, obtenerAjustesFicha } from "../catalogo/ficha";
 import { guardarVistaListas, obtenerVistaListas } from "../catalogo/vista-listas";
 import type { ProductoCatalogo } from "../catalogo/tipos";
@@ -153,6 +154,100 @@ export function validarColores(
   return { ok: true, colores: salida, titulo, enfoque };
 }
 
+/** Lo que manda la pantalla por cada opción (v0.40): unidades DISPONIBLES, como en los colores. */
+export interface EntradaOpcion {
+  id?: string;
+  nombre: string;
+  precio: number | null;
+  /** Sin colores: unidades de la opción (null = sin límite). */
+  disponible: number | null;
+  /** Con colores: por cada color, unidades (null = sin límite) o "no" (no viene en esta opción). */
+  colores: Record<string, number | null | "no">;
+}
+
+const unidades = (v: unknown): number | null | false => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "string" ? Number(v) : v;
+  return typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= STOCK_MAXIMO ? n : false;
+};
+
+/** Valida las opciones que manda el panel contra el producto guardado (sus colores reales). */
+export function validarOpciones(
+  crudo: unknown,
+  actual: ProductoCatalogo
+): { ok: true; opciones: EntradaOpcion[]; titulo: string } | { ok: false; motivo: string } {
+  const o = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
+  const lista = o.opciones;
+  if (!Array.isArray(lista)) return { ok: false, motivo: "La lista de opciones no es válida." };
+  if (lista.length > MAXIMO_OPCIONES) return { ok: false, motivo: `Cada producto puede tener hasta ${MAXIMO_OPCIONES} opciones.` };
+  const titulo = (typeof o.titulo === "string" ? normalizeInput(o.titulo).trim() : "").slice(0, LARGO_TITULO_OPCIONES) || "Tamaño";
+  const colores = new Set((actual.colores ?? []).map((c) => c.id));
+  const idsActuales = new Set((actual.opciones ?? []).map((x) => x.id));
+  const nombres = new Set<string>();
+  const salida: EntradaOpcion[] = [];
+  for (const [i, x] of lista.entries()) {
+    const c = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const nombre = typeof c.nombre === "string" ? normalizeInput(c.nombre).trim() : "";
+    if (!nombre) return { ok: false, motivo: `Escribe el nombre de la opción ${i + 1}.` };
+    if (nombre.length > 40) return { ok: false, motivo: `El nombre «${nombre.slice(0, 20)}…» es muy largo (máximo 40).` };
+    if (nombres.has(nombre.toLowerCase())) return { ok: false, motivo: `Hay dos opciones llamadas «${nombre}».` };
+    nombres.add(nombre.toLowerCase());
+    let precio: number | null = null;
+    if (c.precio !== null && c.precio !== undefined && c.precio !== "") {
+      const n = typeof c.precio === "string" ? Number(c.precio.replace(/[.\s$]/g, "")) : c.precio;
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > PRECIO_MAXIMO) return { ok: false, motivo: `Revisa el precio de «${nombre}»: en pesos, sin decimales, o vacío para usar el del producto.` };
+      precio = n;
+    }
+    const disponible = unidades(c.disponible);
+    if (disponible === false) return { ok: false, motivo: `Revisa las unidades de «${nombre}»: un número entero, o vacío para sin límite.` };
+    const porColor: Record<string, number | null | "no"> = {};
+    const crudoColores = (c.colores && typeof c.colores === "object" ? c.colores : {}) as Record<string, unknown>;
+    for (const id of colores) {
+      const v = crudoColores[id];
+      if (v === "no") porColor[id] = "no";
+      else {
+        const u = unidades(v);
+        if (u === false) return { ok: false, motivo: `Revisa las unidades de «${nombre}» en el color «${actual.colores!.find((k) => k.id === id)?.nombre}».` };
+        porColor[id] = u;
+      }
+    }
+    if (colores.size && Object.values(porColor).every((v) => v === "no")) return { ok: false, motivo: `«${nombre}» tiene que venir en al menos un color.` };
+    salida.push({ id: typeof c.id === "string" && idsActuales.has(c.id) ? c.id : undefined, nombre, precio, disponible, colores: porColor });
+  }
+  return { ok: true, opciones: salida, titulo };
+}
+
+/**
+ * Quita de las opciones los colores que el producto ya no tiene (al borrar un
+ * color). Una opción que solo venía en colores borrados ya no se puede vender
+ * en ninguno: se quita (antes que dejarla «en todos los colores» sin querer).
+ */
+export function limpiarOpcionesDeColores(p: ProductoCatalogo): void {
+  if (!p.opciones) return;
+  const colores = new Set((p.colores ?? []).map((c) => c.id));
+  const salida: OpcionProducto[] = [];
+  for (const o of p.opciones) {
+    const n: OpcionProducto = { ...o };
+    if (n.colores) {
+      n.colores = n.colores.filter((c) => colores.has(c));
+      if (!n.colores.length) {
+        if (colores.size) continue;
+        delete n.colores;
+      }
+    }
+    if (n.stockColores) {
+      n.stockColores = Object.fromEntries(Object.entries(n.stockColores).filter(([c]) => colores.has(c)));
+      if (!Object.keys(n.stockColores).length) delete n.stockColores;
+    }
+    salida.push(n);
+  }
+  if (salida.length) p.opciones = salida;
+  else {
+    delete p.opciones;
+    delete p.tituloOpciones;
+  }
+}
+
 /** Deja `fotos` como galería: la primera pasa a ser la principal. */
 function ponerFotos(p: ProductoCatalogo, todas: string[]) {
   if (todas.length) p.imagen = todas[0];
@@ -265,9 +360,33 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
         });
       }
       const conColores = tieneColores(p);
+      // Opciones (v0.40): lo DISPONIBLE de cada combinación ("no" = no viene en ese color).
+      const opciones = [];
+      for (const o of p.opciones ?? []) {
+        const porColor: Record<string, { disponible: number | null; vendidos: number | null } | "no"> = {};
+        for (const c of p.colores ?? []) {
+          if (!colorEnOpcion(o, c.id)) {
+            porColor[c.id] = "no";
+            continue;
+          }
+          const k = idCompuesto(p.id, c.id, o.id);
+          const declarado = o.stockColores?.[c.id];
+          porColor[c.id] = declarado === undefined ? { disponible: null, vendidos: null } : { disponible: Number((await productoDisponible(vigente, ctx.env, k))?.stock ?? 0), vendidos: await unidadesVendidas(ctx.env, k) };
+        }
+        const k = idCompuesto(p.id, undefined, o.id);
+        opciones.push({
+          id: o.id,
+          nombre: o.nombre,
+          precio: o.precio ?? null,
+          disponible: conColores || o.stock === undefined ? null : Number((await productoDisponible(vigente, ctx.env, k))?.stock ?? 0),
+          vendidos: conColores || o.stock === undefined ? null : await unidadesVendidas(ctx.env, k),
+          colores: porColor,
+        });
+      }
       productos.push({
         ...p,
         colores,
+        opciones,
         // Cuántos colores pueden tomar las fotos que trae el sitio (botón del panel).
         fotosSitio: aplicarFotosDelSitio(p, catalogo.inicial.buscar(p.id)).cambios,
         disponible: conColores ? (d?.stock === undefined ? null : Number(d.stock)) : p.stock === undefined ? null : Number(d?.stock ?? 0),
@@ -315,8 +434,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       else delete producto.video;
       if (entrada.subcategoria) producto.subcategoria = entrada.subcategoria;
       else delete producto.subcategoria;
-      // Con colores, el stock vive en cada color (sección Colores).
-      if (!tieneColores(actual) && entrada.disponible !== disponibleAhora) {
+      // Con colores u opciones, el stock vive en cada color o combinación (secciones Colores y Opciones).
+      if (!tieneColores(actual) && !tieneOpciones(actual) && entrada.disponible !== disponibleAhora) {
         reponer = true;
         if (entrada.disponible === null) delete producto.stock;
         else producto.stock = entrada.disponible;
@@ -376,6 +495,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       }
     }
     if (cuerpo.accion === "fotos-sitio") return fotosSitio(ctx, cuerpo.id);
+    if (cuerpo.accion === "opciones") return guardarOpciones(ctx, cuerpo);
     if (cuerpo.accion === "vista-listas") {
       try {
         return jsonResponse(200, { ok: true, vistaListas: await guardarVistaListas(ctx.env, cuerpo.vista, config.vistaListas) });
@@ -443,6 +563,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       delete producto.tituloColores;
       delete producto.enfoqueColores;
     }
+    // Las opciones no pueden nombrar colores que ya no existen.
+    limpiarOpcionesDeColores(producto);
     lista[i] = producto;
     const r = await catalogo.guardar(ctx.env, lista);
     if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudieron guardar los colores." });
@@ -456,6 +578,81 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     for (const c of actual.colores ?? []) {
       if (quitados.includes(c)) continue;
       for (const f of [c.foto, c.mini]) if (f && !enUso.has(f)) await borrarFoto(ctx.env, f);
+    }
+    return jsonResponse(200, { ok: true, producto });
+  }
+
+  /**
+   * POST { accion: "opciones", id, titulo, opciones: EntradaOpcion[] } (v0.40).
+   * Igual que los colores: si las unidades disponibles de una combinación
+   * cambian, ese número pasa a ser su stock y se reinicia su contador de
+   * vendidos; si no se tocan, las ventas siguen descontando.
+   */
+  async function guardarOpciones(ctx: Ctx, cuerpo: Record<string, unknown>): Promise<Response> {
+    const id = cuerpo.id;
+    if (typeof id !== "string" || !ID_VALIDO.test(id)) return jsonResponse(400, { message: "Producto inválido." });
+    const vigente = await catalogo.obtener(ctx.env);
+    const lista = vigente.productos.map((p) => ({ ...p }));
+    const i = lista.findIndex((p) => p.id === id);
+    if (i < 0) return jsonResponse(404, { message: "Ese producto ya no existe. Recarga la página." });
+    const actual = lista[i];
+    const v = validarOpciones(cuerpo, actual);
+    if (!v.ok) return jsonResponse(400, { message: v.motivo });
+    const conColores = tieneColores(actual);
+    const usados = new Set(v.opciones.filter((o) => o.id).map((o) => o.id!));
+    const reponer: string[] = [];
+    const nuevas: OpcionProducto[] = [];
+    const disponibleAhora = async (k: string, declarado: number | undefined) =>
+      declarado === undefined ? null : Number((await productoDisponible(vigente, ctx.env, k))?.stock ?? 0);
+    for (const e of v.opciones) {
+      const previa = e.id ? actual.opciones?.find((x) => x.id === e.id) : undefined;
+      const idOp = e.id ?? idOpcionDesdeNombre(e.nombre, usados);
+      usados.add(idOp);
+      const o: OpcionProducto = { id: idOp, nombre: e.nombre, ...(e.precio !== null ? { precio: e.precio } : {}) };
+      if (conColores) {
+        const vienen = Object.entries(e.colores).filter(([, u]) => u !== "no").map(([c]) => c);
+        if (vienen.length < actual.colores!.length) o.colores = actual.colores!.map((c) => c.id).filter((c) => vienen.includes(c));
+        const stockColores: Record<string, number> = {};
+        for (const c of vienen) {
+          const pedido = e.colores[c] as number | null;
+          const k = idCompuesto(id, c, idOp);
+          const declaradoPrevio = previa && colorEnOpcion(previa, c) ? previa.stockColores?.[c] : undefined;
+          const ahora = previa && colorEnOpcion(previa, c) ? await disponibleAhora(k, declaradoPrevio) : undefined;
+          if (ahora === undefined || pedido !== ahora) {
+            reponer.push(k);
+            if (pedido !== null) stockColores[c] = pedido;
+          } else if (declaradoPrevio !== undefined) stockColores[c] = declaradoPrevio;
+        }
+        if (Object.keys(stockColores).length) o.stockColores = stockColores;
+      } else {
+        const k = idCompuesto(id, undefined, idOp);
+        const ahora = previa ? await disponibleAhora(k, previa.stock) : undefined;
+        if (ahora === undefined || e.disponible !== ahora) {
+          reponer.push(k);
+          if (e.disponible !== null) o.stock = e.disponible;
+        } else if (previa?.stock !== undefined) o.stock = previa.stock;
+      }
+      nuevas.push(o);
+    }
+    const producto: ProductoCatalogo = { ...actual };
+    if (nuevas.length) {
+      producto.opciones = nuevas;
+      producto.tituloOpciones = v.titulo;
+      delete producto.stock;
+    } else {
+      delete producto.opciones;
+      delete producto.tituloOpciones;
+    }
+    lista[i] = producto;
+    const r = await catalogo.guardar(ctx.env, lista);
+    if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudieron guardar las opciones." });
+    for (const k of reponer) await reponerStock(ctx.env, k);
+    // Combinaciones que ya no existen: su contador se borra.
+    for (const o of actual.opciones ?? []) {
+      const sigue = nuevas.find((n) => n.id === o.id);
+      for (const c of conColores ? actual.colores!.map((x) => x.id) : [undefined]) {
+        if (!sigue || (c && !colorEnOpcion(sigue, c))) await reponerStock(ctx.env, idCompuesto(id, c, o.id));
+      }
     }
     return jsonResponse(200, { ok: true, producto });
   }

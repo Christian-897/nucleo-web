@@ -15,8 +15,9 @@ import type { EnvBase } from "../../core/tipos";
 import type { ConfigCarritoServidor } from "../carrito/config";
 import type { Producto } from "../carrito/tipos";
 import { type CatalogoODinamico, resolverCatalogo } from "./almacen";
-import { buscarColor, idConColor, partirId, tieneColores } from "./colores";
-import type { Catalogo } from "./tipos";
+import { buscarColor, idCompuesto, idConColor, partirId, tieneColores } from "./colores";
+import { buscarOpcion, colorEnOpcion, type OpcionProducto, precioDeOpcion, tieneOpciones } from "./opciones";
+import type { Catalogo, ProductoCatalogo } from "./tipos";
 
 export const PREFIJO_VENDIDOS = "catalogo:vendidos:";
 
@@ -26,12 +27,47 @@ async function vendidos(env: EnvBase, id: string): Promise<number> {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** Unidades declaradas de una combinación (undefined = sin límite). */
+function declaradoCombinacion(_p: ProductoCatalogo, o: OpcionProducto, color?: string): number | undefined {
+  return color !== undefined ? o.stockColores?.[color] : o.stock;
+}
+
+/** Todas las combinaciones vendibles de un producto con opciones (filtrando por color u opción si se pide). */
+function combinaciones(p: ProductoCatalogo, filtro: { color?: string; opcion?: string } = {}): { o: OpcionProducto; color?: string }[] {
+  const salida: { o: OpcionProducto; color?: string }[] = [];
+  for (const o of p.opciones ?? []) {
+    if (filtro.opcion && o.id !== filtro.opcion) continue;
+    if (!tieneColores(p)) {
+      salida.push({ o });
+      continue;
+    }
+    for (const c of p.colores!) {
+      if (filtro.color && c.id !== filtro.color) continue;
+      if (colorEnOpcion(o, c.id)) salida.push({ o, color: c.id });
+    }
+  }
+  return salida;
+}
+
+/** Suma de lo disponible en varias combinaciones (undefined si alguna no tiene límite). */
+async function sumaCombinaciones(env: EnvBase, p: ProductoCatalogo, lista: { o: OpcionProducto; color?: string }[]): Promise<number | undefined> {
+  let total = 0;
+  for (const { o, color } of lista) {
+    const d = declaradoCombinacion(p, o, color);
+    if (d === undefined) return undefined;
+    total += Math.max(0, d - (await vendidos(env, idCompuesto(p.id, color, o.id))));
+  }
+  return total;
+}
+
 /**
  * Producto con el stock disponible de verdad (o null si no existe).
  *  - `prod~color`: ese color como producto propio (nombre "Prod · Color",
  *    su foto y su stock). Color inexistente = null.
- *  - Producto con colores pedido sin color: su stock es la suma de los
- *    colores y lleva `requiereColor: true` (sirve para "agotado" en las
+ *  - `prod~color~opcion` / `prod~~opcion` (v0.40): esa combinación, con el
+ *    precio de la opción y sus unidades. Combinación que no existe = null.
+ *  - Producto con colores u opciones pedido sin elegir: su stock es la suma
+ *    y lleva `requiereColor` / `requiereOpcion` (sirve para "agotado" en las
  *    listas, pero el carrito no lo acepta: ver fuenteCarrito).
  */
 export async function productoDisponible(
@@ -40,9 +76,37 @@ export async function productoDisponible(
   id: string
 ): Promise<Producto | null> {
   const vigente: Catalogo = await resolverCatalogo(catalogo, env);
-  const { base, color } = partirId(id);
+  const { base, color, opcion } = partirId(id);
   const p = vigente.buscar(base);
   if (!p) return null;
+
+  if (tieneOpciones(p)) {
+    const o = opcion !== undefined ? buscarOpcion(p, opcion) : undefined;
+    if (opcion !== undefined && !o) return null;
+    const c = color !== undefined ? buscarColor(p, color) : undefined;
+    if (color !== undefined && (!c || (o && !colorEnOpcion(o, c.id)))) return null;
+    // Combinación completa: se vende.
+    if (o && (c || !tieneColores(p))) {
+      const compuesto = idCompuesto(p.id, c?.id, o.id);
+      const declarado = declaradoCombinacion(p, o, c?.id);
+      return {
+        ...p,
+        id: compuesto,
+        nombre: c ? `${p.nombre} · ${o.nombre} · ${c.nombre}` : `${p.nombre} · ${o.nombre}`,
+        precio: precioDeOpcion(p, o),
+        imagen: c ? c.mini ?? c.foto ?? p.imagen : p.imagen,
+        productoBase: p.id,
+        opcion: o.nombre,
+        ...(c ? { color: c.nombre } : {}),
+        stock: declarado === undefined ? undefined : Math.max(0, declarado - (await vendidos(env, compuesto))),
+      };
+    }
+    // Falta elegir: la suma de lo que calza (para "agotado"), pero no se vende.
+    const stock = await sumaCombinaciones(env, p, combinaciones(p, { color: c?.id, opcion: o?.id }));
+    return { ...p, ...(o ? { precio: precioDeOpcion(p, o) } : {}), stock, requiereOpcion: !o, requiereColor: tieneColores(p) && !c };
+  }
+
+  if (opcion !== undefined) return null;
   if (color !== undefined) {
     const c = buscarColor(p, color);
     if (!c) return null;
@@ -72,7 +136,10 @@ export async function productoDisponible(
   return { ...p, stock: Math.max(0, p.stock - (await vendidos(env, id))) };
 }
 
-/** Stock de cada color de un producto (null = sin límite). Para la ficha. */
+/**
+ * Stock de cada combinación de un producto (null = sin límite). Para la ficha.
+ * Con opciones, las claves son `prod~color~opcion` (o `prod~~opcion`); si no, `prod~color`.
+ */
 export async function stockDeColores(
   catalogo: CatalogoODinamico,
   env: EnvBase,
@@ -80,6 +147,14 @@ export async function stockDeColores(
 ): Promise<Record<string, number | null>> {
   const p = (await resolverCatalogo(catalogo, env)).buscar(idProducto);
   const salida: Record<string, number | null> = {};
+  if (p && tieneOpciones(p)) {
+    for (const { o, color } of combinaciones(p)) {
+      const compuesto = idCompuesto(p.id, color, o.id);
+      const d = declaradoCombinacion(p, o, color);
+      salida[compuesto] = d === undefined ? null : Math.max(0, d - (await vendidos(env, compuesto)));
+    }
+    return salida;
+  }
   for (const c of p?.colores ?? []) {
     const compuesto = idConColor(p!.id, c.id);
     salida[compuesto] = c.stock === undefined ? null : Math.max(0, c.stock - (await vendidos(env, compuesto)));
@@ -87,11 +162,23 @@ export async function stockDeColores(
   return salida;
 }
 
-/** El stock declarado (antes de descontar ventas) de un id, con o sin color. */
+/** El stock declarado (antes de descontar ventas) de un id, con o sin color u opción. */
 function stockDeclarado(vigente: Catalogo, id: string): { clave: string; limitado: boolean } | null {
-  const { base, color } = partirId(id);
+  const { base, color, opcion } = partirId(id);
   const p = vigente.buscar(base);
   if (!p) return null;
+  if (tieneOpciones(p)) {
+    const o = opcion !== undefined ? buscarOpcion(p, opcion) : undefined;
+    if (!o) return null; // sin opción no se vende
+    if (tieneColores(p)) {
+      const c = color !== undefined ? buscarColor(p, color) : undefined;
+      if (!c || !colorEnOpcion(o, c.id)) return null;
+      return { clave: idCompuesto(p.id, c.id, o.id), limitado: o.stockColores?.[c.id] !== undefined };
+    }
+    if (color !== undefined) return null;
+    return { clave: idCompuesto(p.id, undefined, o.id), limitado: o.stock !== undefined };
+  }
+  if (opcion !== undefined) return null;
   if (color !== undefined) {
     const c = buscarColor(p, color);
     return c ? { clave: idConColor(p.id, c.id), limitado: c.stock !== undefined } : null;
@@ -106,10 +193,10 @@ export function fuenteCarrito(
   opciones: { maxPorLinea?: number } = {}
 ): (env: EnvBase) => ConfigCarritoServidor {
   return (env) => ({
-    // Un producto con colores solo se vende eligiendo uno (`prod~color`).
+    // Un producto con colores u opciones solo se vende eligiendo (`prod~color`, `prod~color~opcion`).
     obtenerProducto: async (id) => {
       const p = await productoDisponible(catalogo, env, id);
-      return p && p.requiereColor ? null : p;
+      return p && (p.requiereColor || p.requiereOpcion) ? null : p;
     },
     maxPorLinea: opciones.maxPorLinea,
   });
