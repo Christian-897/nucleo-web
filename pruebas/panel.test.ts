@@ -1192,6 +1192,41 @@ async function run() {
     assert.notEqual(ajeno.status, 200);
   });
 
+  console.log("Panel — subcategorías (v0.39):");
+
+  await prueba("subcategorías: se guardan con la categoría, el producto elige una de SU categoría y se pueden quitar", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const guardarCat = (subcategorias: unknown) =>
+      panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches", subcategorias } } }) });
+    assert.equal((await guardarCat([{ nombre: "Chicos" }, { nombre: "chicos" }])).status, 400, "repetidas no");
+    assert.equal((await guardarCat([{ nombre: "Chicos" }, { nombre: "Grandes" }])).status, 200);
+    const g = await json(await panel.categorias.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const pel = g.categorias.find((c: { id: string }) => c.id === "peluches");
+    assert.deepEqual(pel.subcategorias.map((x: { id: string }) => x.id), ["chicos", "grandes"]);
+    // El producto elige subcategoría: de otra categoría o inventada, no.
+    const editar = (sub: string, categoria = "peluches") =>
+      panel.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", producto: { id: "gatito", nombre: "Gatito", precio: 18000, categoria, tipo: "fisico", subcategoria: sub } } }) });
+    assert.equal((await editar("medianos")).status, 400);
+    assert.equal((await editar("chicos", "cursos")).status, 400);
+    assert.equal((await editar("grandes")).status, 200);
+    assert.equal((await catalogo.obtener(env)).buscar("gatito")?.subcategoria, "grandes");
+    const lista = await json(await panel.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.deepEqual(lista.categorias.find((c: { id: string }) => c.id === "peluches").subcategorias.map((x: { id: string }) => x.id), ["chicos", "grandes"]);
+    assert.equal((await json(await panel.categorias.onRequestGet({ env, request: req("/x", { cookie }) }))).categorias.find((c: { id: string }) => c.id === "peluches").subcategorias[1].productos, 1);
+    // Renombrar con el mismo id mantiene la dirección; quitarla deja el producto sin subcategoría en la tienda.
+    assert.equal((await guardarCat([{ id: "grandes", nombre: "XL" }])).status, 200);
+    assert.deepEqual((await catalogo.obtener(env)).categoria("peluches")?.subcategorias, [{ id: "grandes", nombre: "XL" }]);
+    assert.equal((await guardarCat([])).status, 200);
+    assert.deepEqual((await catalogo.obtener(env)).categoria("peluches")?.subcategorias, []);
+    // Sin el campo, no se tocan.
+    assert.equal((await panel.categorias.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches" } } }) })).status, 200);
+    assert.deepEqual((await catalogo.obtener(env)).categoria("peluches")?.subcategorias, []);
+    // Quitar la subcategoría: el producto se puede guardar sin ella.
+    assert.equal((await editar("")).status, 200);
+    assert.equal((await catalogo.obtener(env)).buscar("gatito")?.subcategoria, undefined);
+  });
+
   console.log("Panel — fotos de colores preparadas en el sitio (v0.38):");
 
   await prueba("fotos preparadas: solo cambia fotos del sitio; nunca las subidas, ni unidades ni nombres", () => {

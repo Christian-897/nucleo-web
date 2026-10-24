@@ -280,6 +280,20 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "subcategorias",
+    seccion: "categorias",
+    titulo: "Crear subcategorías (por ejemplo, microfibra y algodón)",
+    palabras: ["subcategoría", "subcategorias", "sub categoría", "dividir categoría", "filtro", "filtros", "botones de filtro", "tipos de producto", "material", "tamaños", "tallas", "microfibra", "algodón"],
+    requiere: '[data-tab="categorias"]:not([hidden])',
+    contenido: [
+      "Una categoría puede tener **subcategorías**. En la tienda aparecen como botones arriba de los productos, por ejemplo **Todos · Microfibra · Algodón**, y cada una tiene su propia dirección para compartir (por ejemplo en Instagram).",
+      { pasos: ["Ve a **Categorías** y toca **Editar** en la categoría.", "Abajo, en **Subcategorías**, toca **+ Agregar subcategoría** y escribe su nombre. Ordénalas con ↑ ↓.", "Toca **Guardar cambios**.", "Ve a **Productos → Editar** en cada producto y elige su **Subcategoría**."] },
+      "Puedes tener hasta **12 subcategorías** por categoría. Las categorías sin subcategorías se ven igual que siempre.",
+      "Si quitas una subcategoría que tiene productos, esos productos quedan **sin subcategoría** y se siguen viendo en «Todos».",
+      { nota: "Cambiar el nombre de una subcategoría no cambia su dirección, así que los enlaces que ya compartiste siguen funcionando." },
+    ],
+  },
+  {
     id: "fotos-preparadas",
     seccion: "productos",
     titulo: "Usar las fotos de colores que te preparamos",

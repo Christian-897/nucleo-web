@@ -141,7 +141,7 @@ function pluralColores(p: ProductoCatalogo, n: number): string {
 
 /**
  * Productos de una lista según su filtro:
- *   "todos" · "destacados" · "categoria:<id>" · "relacionados:<categoria>:<excluirId>"
+ *   "todos" · "destacados" · "categoria:<id>" · "categoria:<id>:<sub>" · "relacionados:<categoria>:<excluirId>"
  * El largo lo pone la cantidad de espacios que trae la página.
  */
 export function productosDeLista(catalogo: Catalogo, filtro: string): ProductoCatalogo[] {
@@ -153,7 +153,8 @@ export function productosDeLista(catalogo: Catalogo, filtro: string): ProductoCa
       // Los más nuevos primero: lo recién destacado en el panel se ve.
       return [...catalogo.destacados()].reverse();
     case "categoria":
-      return catalogo.deCategoria(a);
+      // "categoria:<id>:<sub>" = solo esa subcategoría (v0.39).
+      return b ? catalogo.deCategoria(a).filter((p) => p.subcategoria === b) : catalogo.deCategoria(a);
     case "relacionados":
       return catalogo.deCategoria(a).filter((p) => p.id !== b);
     default:
@@ -409,6 +410,57 @@ export function categoriaDeRuta(ruta: string): string | null {
   return m && ID_VALIDO.test(m[1]) ? m[1] : null;
 }
 
+/** `/tienda/toallas/microfibra/` → { categoria: "toallas", sub: "microfibra" } (o null). */
+export function subcategoriaDeRuta(ruta: string): { categoria: string; sub: string } | null {
+  const m = ruta.match(/^\/tienda\/([^/]+)\/([^/]+)\/?$/);
+  return m && ID_VALIDO.test(m[1]) && ID_VALIDO.test(m[2]) ? { categoria: m[1], sub: m[2] } : null;
+}
+
+/**
+ * Botones de subcategoría de una categoría (v0.39): «Todos» y uno por
+ * subcategoría, como enlaces a /tienda/<cat>/ y /tienda/<cat>/<sub>/. El
+ * elegido lleva aria-current="page". Sin subcategorías, vacío. Nombres
+ * escapados; ids ya validados (letras, números y guiones).
+ */
+export function htmlSubcategorias(
+  c: Pick<CategoriaCatalogo, "id" | "subcategorias">,
+  actual?: string,
+  clase = "chip",
+  textoTodos = "Todos"
+): string {
+  const subs = (c.subcategorias ?? []).filter((x) => ID_VALIDO.test(x.id) && typeof x.nombre === "string");
+  if (!subs.length || !ID_VALIDO.test(c.id)) return "";
+  const k = escaparTexto(clase);
+  const li = (href: string, texto: string, elegido: boolean) =>
+    `<li><a class="${k}" href="${href}"${elegido ? ' aria-current="page"' : ""}>${escaparTexto(texto)}</a></li>`;
+  return (
+    li(`/tienda/${c.id}/`, textoTodos, !actual) + subs.map((x) => li(`/tienda/${c.id}/${x.id}/`, x.nombre, x.id === actual)).join("")
+  );
+}
+
+/**
+ * Llena los `[data-subcats="<categoria>"]` con sus botones; la subcategoría
+ * elegida sale de la dirección. Lista vacía = se oculta (`hidden`).
+ */
+function conSubcategorias(r: Reescritor, catalogo: Catalogo, rutaActual: string, idPlantilla?: string, idReal?: string): Reescritor {
+  const sub = subcategoriaDeRuta(rutaActual);
+  return r
+    .on("[data-subcats]", {
+      element(el) {
+        let id = el.getAttribute("data-subcats") ?? "";
+        if (idPlantilla && idReal && id === idPlantilla) {
+          id = idReal;
+          el.setAttribute("data-subcats", id);
+        }
+        const c = catalogo.categoria(id);
+        const html = c ? htmlSubcategorias(c, sub && sub.categoria === id ? sub.sub : undefined, el.getAttribute("data-subcats-clase") || "chip") : "";
+        el.setInnerContent(html, { html: true });
+        if (html) el.removeAttribute("hidden");
+        else el.setAttribute("hidden", "");
+      },
+    });
+}
+
 function conListasCategorias(r: Reescritor, catalogo: Catalogo, rutaActual: string): Reescritor {
   const vigentes = new Set(catalogo.categorias.map((c) => c.id));
   const nuevas = nuevasDe(catalogo);
@@ -533,7 +585,7 @@ export function crearBordeCatalogo(fuente: CatalogoODinamico, opciones: Opciones
       }
       let r = new HTMLRewriter();
       if (productos || conColores || catalogo.productos.some(tieneColores)) r = conListas(r, catalogo, opciones, vista);
-      if (categorias) r = conListasCategorias(conCategorias(r, catalogo), catalogo, ruta);
+      if (categorias) r = conSubcategorias(conListasCategorias(conCategorias(r, catalogo), catalogo, ruta), catalogo, ruta);
       return r.transform(respuesta);
     },
   };
@@ -731,39 +783,70 @@ export function crearPaginaCategoria(fuente: CatalogoODinamico, opciones: Opcion
   return {
     onRequestGet: async ({ request, env }: { request: Request; env: EnvBorde }) => {
       const url = new URL(request.url);
-      const id = categoriaDeRuta(url.pathname);
+      const ruta = subcategoriaDeRuta(url.pathname);
+      const id = ruta?.categoria ?? categoriaDeRuta(url.pathname);
       if (id && !url.pathname.endsWith("/")) {
-        return Response.redirect(`${url.origin}/tienda/${id}/${url.search}`, 301);
+        return Response.redirect(`${url.origin}${url.pathname}/${url.search}`, 301);
       }
       if (!id || !env.ASSETS) return noEncontrado(request, env);
       const catalogo = await resolverCatalogo(fuente, env);
       const c = catalogo.categoria(id);
       if (!c) return noEncontrado(request, env);
-      if (c.nueva !== true) return env.ASSETS.fetch(request);
+      const sub = ruta ? c.subcategorias?.find((x) => x.id === ruta.sub) : undefined;
+      if (ruta && !sub) return noEncontrado(request, env);
+      const nueva = c.nueva === true;
+      // Categoría del sitio y sin subcategoría: la página estática tal cual.
+      if (!nueva && !sub) return env.ASSETS.fetch(request);
 
-      const base = await env.ASSETS.fetch(new URL(plantilla, request.url).toString());
+      const base = await env.ASSETS.fetch(new URL(nueva ? plantilla : `/tienda/${c.id}/`, request.url).toString());
       if (!base.ok) return noEncontrado(request, env);
       const respuesta = new Response(base.body, base);
       respuesta.headers.set("Cache-Control", "public, max-age=0, must-revalidate");
-      const canonica = new URL(`/tienda/${c.id}/`, opciones.sitio.dominio).href;
-      const titulo = `${c.nombre} | ${opciones.sitio.nombre}`;
-      let r = new HTMLRewriter()
-        .on("title", { element: (el) => el.setInnerContent(titulo, { html: false }) })
-        .on('meta[property="og:title"]', { element: (el) => el.setAttribute("content", titulo) })
+      const camino = sub ? `/tienda/${c.id}/${sub.id}/` : `/tienda/${c.id}/`;
+      const canonica = new URL(camino, opciones.sitio.dominio).href;
+      const titulo = sub ? `${sub.nombre} · ${c.nombre} | ${opciones.sitio.nombre}` : `${c.nombre} | ${opciones.sitio.nombre}`;
+      // Plantilla de título que usa el borde de categorías (si después vuelve a pasar, respeta la subcategoría).
+      const plantillaTitulo = sub ? `${sub.nombre} · {nombre} | ${opciones.sitio.nombre}` : null;
+      const filtroReal = sub ? `categoria:${c.id}:${sub.id}` : `categoria:${c.id}`;
+      let r = new HTMLRewriter();
+      // Primero los nombres de la categoría (data-categoria), después lo propio de esta página.
+      if (nueva) r = r.on(`[data-categoria="${idPlantilla}"]`, { element: (el) => el.setAttribute("data-categoria", c.id) });
+      r = conCategorias(r, catalogo);
+      r = r
+        .on("title", {
+          element: (el) => {
+            el.setInnerContent(titulo, { html: false });
+            if (plantillaTitulo && el.getAttribute("data-categoria-plantilla") !== null) el.setAttribute("data-categoria-plantilla", plantillaTitulo);
+          },
+        })
+        .on('meta[property="og:title"]', {
+          element: (el) => {
+            el.setAttribute("content", titulo);
+            if (plantillaTitulo && el.getAttribute("data-categoria-plantilla") !== null) el.setAttribute("data-categoria-plantilla", plantillaTitulo);
+          },
+        })
         .on('meta[property="og:url"]', { element: (el) => el.setAttribute("content", canonica) })
         .on('link[rel="canonical"]', { element: (el) => el.setAttribute("href", canonica) })
         .on('meta[name="robots"][data-plantilla]', { element: (el) => el.remove() })
-        // Los textos con el nombre los llena el borde de categorías (data-categoria + campo).
-        .on(`[data-categoria="${idPlantilla}"]`, { element: (el) => el.setAttribute("data-categoria", c.id) })
+        // Miga y nombre de la subcategoría (opcionales en el sitio).
+        .on("[data-subcat-miga]", {
+          element: (el) => {
+            if (sub) el.removeAttribute("hidden");
+            else el.setAttribute("hidden", "");
+          },
+        })
+        .on("[data-subcat-nombre]", { element: (el) => el.setInnerContent(sub?.nombre ?? "", { html: false }) })
+        .on("[data-subcat-enlace-categoria]", { element: (el) => el.setAttribute("href", `/tienda/${c.id}/`) })
         .on("[data-cat-lista]", {
           element(el) {
             const f = el.getAttribute("data-cat-lista") ?? "";
-            if (f === `categoria:${idPlantilla}`) el.setAttribute("data-cat-lista", `categoria:${c.id}`);
+            if (f === `categoria:${idPlantilla}` || f === `categoria:${c.id}`) el.setAttribute("data-cat-lista", filtroReal);
           },
         });
       const vistaCat = await obtenerVistaListas(env, opciones.vistaListas).catch(() => VISTA_LISTAS_POR_DEFECTO);
-      r = conListas(r, catalogo, opciones, vistaCat, (f) => (f === `categoria:${idPlantilla}` ? `categoria:${c.id}` : f));
-      r = conListasCategorias(conCategorias(r, catalogo), catalogo, url.pathname);
+      r = conListas(r, catalogo, opciones, vistaCat, (f) => (f === `categoria:${idPlantilla}` || f === `categoria:${c.id}` ? filtroReal : f));
+      r = conListasCategorias(r, catalogo, url.pathname);
+      r = conSubcategorias(r, catalogo, url.pathname, idPlantilla, c.id);
       return r.transform(respuesta);
     },
   };

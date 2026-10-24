@@ -23,6 +23,8 @@ export interface ProductoCatalogo extends Producto {
   /** Código de un video de YouTube (11 caracteres). Opcional. Ver video.ts. */
   video?: string;
   destacado?: boolean;
+  /** Subcategoría dentro de su categoría (v0.39), por id. Vacío o desconocida = sin subcategoría. */
+  subcategoria?: string;
   /**
    * Colores (o modelos), cada uno con su foto y su stock (v0.35). Con
    * colores, el stock del producto es la suma de los colores y para
@@ -47,7 +49,15 @@ export interface CategoriaCatalogo {
   /** Línea chica bajo el nombre en las tarjetas del sitio. Opcional. */
   bajada?: string;
   imagen?: string;
+  /** Subcategorías (v0.39): botones de filtro en su página y su propia dirección /tienda/<cat>/<sub>/. */
+  subcategorias?: Subcategoria[];
   [extra: string]: unknown;
+}
+
+export interface Subcategoria {
+  /** Se crea una vez desde el nombre y no cambia: es la dirección /tienda/<categoria>/<id>/. */
+  id: string;
+  nombre: string;
 }
 
 export interface Catalogo {

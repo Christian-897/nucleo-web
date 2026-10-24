@@ -169,6 +169,27 @@ Y en el navegador: `iniciarColores()` de `nucleo-web/catalogo/colores-ficha`
 colores recibe `data-elegir="/producto/<id>/"`: el sitio debe llevar ahí en
 vez de agregar. Para el despacho, `necesitaDespacho` ya mira el producto base.
 
+### Subcategorías (v0.39)
+
+Cada categoría puede tener hasta `MAXIMO_SUBCATEGORIAS` (12) subcategorías
+`{ id, nombre }` (en `categorias.json` o desde el panel, en
+**Categorías → Editar → Subcategorías**; se guardan con los cambios de la
+categoría). Cada producto puede tener `subcategoria: "<id>"` de SU categoría
+(una desconocida = sin subcategoría).
+
+- Filtro de lista: `categoria:<id>:<sub>`.
+- Dirección propia: `/tienda/<categoria>/<sub>/` la arma `crearPaginaCategoria`
+  (la misma función, montada también en `functions/tienda/[categoria]/[sub].ts`)
+  desde la página de la categoría: título «Sub · Categoría», canónica propia,
+  lista filtrada y botón elegido. Una subcategoría que no existe da 404.
+- Botones: `<ul data-subcats="<categoria>" data-subcats-clase="chip">` con
+  `set:html={htmlSubcategorias(categoria)}` al construir; el borde los pone al
+  día (lo editado y el elegido según la dirección) y los oculta si no hay.
+- Opcionales: `[data-subcat-miga]` (se muestra en la página de una
+  subcategoría), `[data-subcat-nombre]` (su nombre) y
+  `[data-subcat-enlace-categoria]` (href a la categoría).
+- El sitemap incluye cada subcategoría.
+
 ### Cómo se ven en las listas los productos con colores (v0.37)
 
 En el panel (Productos → **Cómo se ven en la tienda los productos con

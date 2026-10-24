@@ -14,7 +14,7 @@ export function crearSitemap(fuente: CatalogoODinamico, opciones: { dominio: str
       const catalogo = await resolverCatalogo(fuente, env);
       const rutas = [
         ...opciones.rutasFijas,
-        ...catalogo.categorias.map((c) => `/tienda/${c.id}/`),
+        ...catalogo.categorias.flatMap((c) => [`/tienda/${c.id}/`, ...(c.subcategorias ?? []).map((x) => `/tienda/${c.id}/${x.id}/`)]),
         ...catalogo.productos.map((p) => `/producto/${p.id}/`),
       ];
       const xml =

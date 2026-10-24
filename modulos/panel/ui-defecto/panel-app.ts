@@ -47,6 +47,7 @@ interface Producto {
   colores?: ColorPanel[];
   tituloColores?: "Color" | "Modelo";
   enfoqueColores?: { x: number; y: number };
+  subcategoria?: string;
   /** Colores que pueden tomar las fotos preparadas en el sitio (v0.38). */
   fotosSitio?: number;
 }
@@ -380,10 +381,10 @@ $("[data-seguir]").addEventListener("click", async () => {
 // ─────────────────────────── productos ───────────────────────────
 
 let productos: Producto[] = [];
-let categorias: { id: string; nombre: string }[] = [];
+let categorias: { id: string; nombre: string; subcategorias?: { id: string; nombre: string }[] }[] = [];
 
 async function cargarProductos() {
-  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string }[]; ajustesFicha?: AjustesFicha; vistaListas?: VistaListasPanel; maximoColores?: number }>(`${API}/productos`);
+  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string; subcategorias?: { id: string; nombre: string }[] }[]; ajustesFicha?: AjustesFicha; vistaListas?: VistaListasPanel; maximoColores?: number }>(`${API}/productos`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar los productos.");
   productos = r.datos.productos;
@@ -399,6 +400,18 @@ async function cargarProductos() {
   pintarProductos();
   pintarFotosSitioTodos();
 }
+
+// ─── subcategoría del producto (v0.39) ───
+
+function pintarSubcategoriasEditor(elegida: string) {
+  const cat = $<HTMLSelectElement>("[data-editor-categorias]").value;
+  const subs = categorias.find((c) => c.id === cat)?.subcategorias ?? [];
+  const sel = $<HTMLSelectElement>("[data-editor-subcategorias]");
+  sel.replaceChildren(new Option("Sin subcategoría", ""), ...subs.map((x) => new Option(x.nombre, x.id)));
+  sel.value = subs.some((x) => x.id === elegida) ? elegida : "";
+  $("[data-editor-subcat-caja]").hidden = subs.length === 0;
+}
+$<HTMLSelectElement>("[data-editor-categorias]").addEventListener("change", () => pintarSubcategoriasEditor(""));
 
 // ─── fotos de colores preparadas en el sitio (v0.38) ───
 
@@ -589,6 +602,7 @@ function abrirEditor(p: Producto | null) {
   campo("disponible").value = p?.disponible === null || !p ? "" : String(p.disponible);
   $("[data-editor-vendidos]").textContent = p ? ayudaVendidos(p.disponible, p.vendidos) : "";
   (f.elements.namedItem("categoria") as HTMLSelectElement).value = p?.categoria ?? categorias[0]?.id ?? "";
+  pintarSubcategoriasEditor(p?.subcategoria ?? "");
   for (const r of $$<HTMLInputElement>('input[name="tipo"]', f)) r.checked = r.value === (p?.tipo ?? "fisico");
   (f.elements.namedItem("descripcion") as HTMLTextAreaElement).value = p?.descripcion ?? "";
   campo("destacado").checked = Boolean(p?.destacado);
@@ -645,6 +659,7 @@ formProducto().addEventListener("submit", async (e) => {
     precio: String(d.get("precio") || "").replace(/[.\s$]/g, ""),
     disponible: String(d.get("disponible") || "").trim(),
     categoria: String(d.get("categoria") || ""),
+    subcategoria: String(d.get("subcategoria") || ""),
     tipo: String(d.get("tipo") || ""),
     descripcion: String(d.get("descripcion") || ""),
     destacado: d.get("destacado") === "on",
@@ -1033,14 +1048,17 @@ interface CategoriaPanel {
   editada: boolean;
   nueva?: boolean;
   original: { nombre: string; corto: string; bajada: string };
+  subcategorias?: { id: string; nombre: string; productos: number }[];
 }
 let listaCategoriasPanel: CategoriaPanel[] = [];
+let maximoSubcategorias = 12;
 
 async function cargarCategorias() {
-  const r = await obtener<{ categorias: CategoriaPanel[]; editadas: boolean; nuevas?: number; maximoNuevas?: number }>(`${API}/categorias`);
+  const r = await obtener<{ categorias: CategoriaPanel[]; editadas: boolean; nuevas?: number; maximoNuevas?: number; maximoSubcategorias?: number }>(`${API}/categorias`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar las categorías.");
   listaCategoriasPanel = r.datos.categorias;
+  if (r.datos.maximoSubcategorias) maximoSubcategorias = r.datos.maximoSubcategorias;
   $("[data-restablecer-categorias]").hidden = !r.datos.editadas;
   const usadas = r.datos.nuevas ?? 0;
   const tope = r.datos.maximoNuevas ?? 0;
@@ -1066,6 +1084,7 @@ async function cargarCategorias() {
       datos.append(crear("span", "", c.productos === 1 ? "1 producto" : `${c.productos} productos`));
       if (c.corto && c.corto !== c.nombre) datos.append(crear("span", "", `Corto: ${c.corto}`));
       if (c.bajada) datos.append(crear("span", "", `Bajada: ${c.bajada}`));
+      if (c.subcategorias?.length) datos.append(crear("span", "", `Subcategorías: ${c.subcategorias.map((x) => x.nombre).join(" · ")}`));
       if (c.nueva) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Nueva"));
       else if (c.editada) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Editada"));
       info.append(datos);
@@ -1120,6 +1139,54 @@ $("[data-restablecer-categorias]").addEventListener("click", async () => {
 const editorCategoria = () => $("[data-editor-categoria]") as HTMLDialogElement;
 const formCategoria = () => $<HTMLFormElement>('[data-form="categoria"]');
 let categoriaEditando: CategoriaPanel | null = null;
+let subcatsEditor: { id?: string; nombre: string; productos: number }[] = [];
+
+function pintarSubcatsEditor() {
+  const lista = $("[data-subcats-lista]");
+  lista.replaceChildren(
+    ...subcatsEditor.map((x, i) => {
+      const li = crear("li");
+      const input = crear("input");
+      input.value = x.nombre;
+      input.maxLength = 40;
+      input.placeholder = "Ej: Microfibra";
+      input.setAttribute("aria-label", `Nombre de la subcategoría ${i + 1}`);
+      input.addEventListener("input", () => (x.nombre = input.value));
+      const boton = (texto: string, etiqueta: string, accion: () => void, apagado = false) => {
+        const b = crear("button", "pa-boton pa-boton--suave pa-boton--chico", texto);
+        b.type = "button";
+        b.setAttribute("aria-label", etiqueta);
+        b.disabled = apagado;
+        b.addEventListener("click", accion);
+        return b;
+      };
+      const mover = (d: number) => () => {
+        const [y] = subcatsEditor.splice(i, 1);
+        subcatsEditor.splice(i + d, 0, y);
+        pintarSubcatsEditor();
+      };
+      li.append(
+        input,
+        boton("↑", "Subir", mover(-1), i === 0),
+        boton("↓", "Bajar", mover(1), i === subcatsEditor.length - 1),
+        boton("Quitar", `Quitar ${x.nombre || "esta subcategoría"}`, () => {
+          if (x.productos > 0 && !confirm(`«${x.nombre}» tiene ${x.productos === 1 ? "1 producto" : `${x.productos} productos`}. Si la quitas, esos productos quedan sin subcategoría (se siguen viendo en «Todos»). ¿Quitarla?`)) return;
+          subcatsEditor.splice(i, 1);
+          pintarSubcatsEditor();
+        })
+      );
+      if (x.productos > 0) li.append(crear("small", "", x.productos === 1 ? "1 producto" : `${x.productos} productos`));
+      return li;
+    })
+  );
+  $("[data-subcats-maximo]").textContent = String(maximoSubcategorias);
+  $<HTMLButtonElement>("[data-subcats-agregar]").disabled = subcatsEditor.length >= maximoSubcategorias;
+}
+$("[data-subcats-agregar]").addEventListener("click", () => {
+  subcatsEditor.push({ nombre: "", productos: 0 });
+  pintarSubcatsEditor();
+  $$<HTMLInputElement>("[data-subcats-lista] input").at(-1)?.focus();
+});
 let fotoPendienteCategoria: File | null = null;
 let vistaPreviaCategoria = "";
 
@@ -1138,6 +1205,8 @@ function abrirEditorCategoria(c: CategoriaPanel | null) {
   (f.elements.namedItem("corto") as HTMLInputElement).value = !c || c.corto === c.nombre ? "" : c.corto;
   (f.elements.namedItem("bajada") as HTMLInputElement).value = c?.bajada ?? "";
   $("[data-categoria-original]").textContent = c?.editada && !c.nueva ? `Nombre original del sitio: ${c.original.nombre}` : "";
+  subcatsEditor = (c?.subcategorias ?? []).map((x) => ({ ...x }));
+  pintarSubcatsEditor();
   if (vistaPreviaCategoria) URL.revokeObjectURL(vistaPreviaCategoria);
   vistaPreviaCategoria = "";
   const img = $<HTMLImageElement>("[data-categoria-foto]");
@@ -1178,7 +1247,13 @@ formCategoria().addEventListener("submit", async (e) => {
   $$("[data-error-categoria]", f).forEach((x) => (x.textContent = ""));
   $$("[aria-invalid]", f).forEach((x) => x.removeAttribute("aria-invalid"));
   await conBoton(f, async () => {
-    const categoria = { nombre: String(d.get("nombre") || ""), corto: String(d.get("corto") || ""), bajada: String(d.get("bajada") || "") };
+    const categoria = {
+      nombre: String(d.get("nombre") || ""),
+      corto: String(d.get("corto") || ""),
+      bajada: String(d.get("bajada") || ""),
+      // Las filas vacías se ignoran; las que tienen nombre se guardan en este orden.
+      subcategorias: subcatsEditor.filter((x) => x.nombre.trim()).map((x) => ({ ...(x.id ? { id: x.id } : {}), nombre: x.nombre.trim() })),
+    };
     const r = await enviar<{ errores?: Record<string, string>; id?: string }>(
       `${API}/categorias`,
       c ? { accion: "guardar", id: c.id, categoria } : { accion: "crear", categoria }

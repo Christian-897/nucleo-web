@@ -173,12 +173,14 @@ export interface EntradaProducto {
   destacado: boolean;
   /** Código del video de YouTube, o null si no tiene. */
   video: string | null;
+  /** Subcategoría (v0.39), o null si no tiene. */
+  subcategoria: string | null;
 }
 
 /** Valida y limpia lo que mandó la pantalla. Devuelve errores por campo. */
 export function validarEntrada(
   crudo: unknown,
-  categorias: { id: string }[]
+  categorias: { id: string; subcategorias?: { id: string }[] }[]
 ): { ok: true; datos: EntradaProducto } | { ok: false; errores: Record<string, string> } {
   const e: Record<string, string> = {};
   const o = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
@@ -207,6 +209,12 @@ export function validarEntrada(
   const categoria = typeof o.categoria === "string" ? o.categoria : "";
   if (!categorias.some((c) => c.id === categoria)) e.categoria = "Elige una categoría.";
 
+  // Subcategoría: vacía = ninguna; si viene, debe existir en ESA categoría.
+  const subcategoria = typeof o.subcategoria === "string" && o.subcategoria ? o.subcategoria : null;
+  if (subcategoria && !e.categoria && !categorias.find((c) => c.id === categoria)?.subcategorias?.some((x) => x.id === subcategoria)) {
+    e.subcategoria = "Esa subcategoría no existe en la categoría elegida. Recarga la página.";
+  }
+
   const tipo = o.tipo === "digital" ? "digital" : o.tipo === "fisico" ? "fisico" : null;
   if (!tipo) e.tipo = "Elige si es físico o digital.";
 
@@ -233,6 +241,7 @@ export function validarEntrada(
       tipo: tipo as "fisico" | "digital",
       destacado: o.destacado === true,
       video,
+      subcategoria,
     },
   };
 }
@@ -270,7 +279,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       });
     }
     // Los nombres de categoría vigentes (pueden haberse cambiado en el panel).
-    const categorias = vigente.categorias.map((c) => ({ id: c.id, nombre: c.nombre }));
+    const categorias = vigente.categorias.map((c) => ({ id: c.id, nombre: c.nombre, subcategorias: (c.subcategorias ?? []).map((x) => ({ id: x.id, nombre: x.nombre })) }));
     return jsonResponse(200, {
       editado: await catalogo.editado(ctx.env),
       categorias,
@@ -304,6 +313,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       };
       if (entrada.video) producto.video = entrada.video;
       else delete producto.video;
+      if (entrada.subcategoria) producto.subcategoria = entrada.subcategoria;
+      else delete producto.subcategoria;
       // Con colores, el stock vive en cada color (sección Colores).
       if (!tieneColores(actual) && entrada.disponible !== disponibleAhora) {
         reponer = true;
@@ -321,6 +332,7 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
         descripcion: entrada.descripcion,
         destacado: entrada.destacado,
         ...(entrada.video ? { video: entrada.video } : {}),
+        ...(entrada.subcategoria ? { subcategoria: entrada.subcategoria } : {}),
         ...(entrada.disponible === null ? {} : { stock: entrada.disponible }),
       };
       reponer = true;

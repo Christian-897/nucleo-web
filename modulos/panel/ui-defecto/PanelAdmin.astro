@@ -722,6 +722,8 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <p class="pa-tenue pa-chico" data-editor-vendidos></p>
           <label class="pa-campo">Categoría<select name="categoria" data-editor-categorias required></select></label>
           <p class="pa-error" data-error-campo="categoria"></p>
+          <label class="pa-campo" data-editor-subcat-caja hidden>Subcategoría<select name="subcategoria" data-editor-subcategorias></select></label>
+          <p class="pa-error" data-error-campo="subcategoria"></p>
           <fieldset class="pa-opciones">
             <legend>Tipo</legend>
             <label class="pa-casilla"><input type="radio" name="tipo" value="fisico" /> Físico (se despacha)</label>
@@ -795,6 +797,13 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <p class="pa-error" data-error-categoria="bajada"></p>
           <p class="pa-tenue pa-chico">Línea chica bajo el nombre en las tarjetas, si el sitio la muestra. Ejemplo: Colección satín.</p>
           <p class="pa-tenue pa-chico" data-categoria-original></p>
+          <fieldset class="pa-subcats">
+            <legend>Subcategorías (opcional)</legend>
+            <p class="pa-tenue pa-chico">Aparecen como botones arriba de los productos de esta categoría, por ejemplo «Todos · Microfibra · Algodón», y cada una tiene su propia dirección. Hasta <span data-subcats-maximo>12</span>. Después eliges la de cada producto en Productos → Editar.</p>
+            <ul class="pa-subcats__lista" data-subcats-lista></ul>
+            <button type="button" class="pa-boton pa-boton--suave pa-boton--chico" data-subcats-agregar>+ Agregar subcategoría</button>
+            <p class="pa-error" data-error-categoria="subcategorias"></p>
+          </fieldset>
         </div>
       </div>
       <p class="pa-error" role="alert" data-error></p>
@@ -1174,6 +1183,12 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-aviso { background: #fff6e0; border: 1px solid #f0d58a; border-radius: 10px; padding: 10px 12px; font-size: .92rem; }
   .pa-fila--correo .pa-fila__nombre { overflow-wrap: anywhere; }
   .pa-fila--diapo img { width: 112px; height: 70px; }
+  .pa-subcats { border: 1px solid var(--pa-borde, #eadde3); border-radius: 12px; padding: 10px 12px; margin: 10px 0 0; display: grid; gap: 8px; }
+  .pa-subcats legend { font-weight: 700; padding: 0 4px; }
+  .pa-subcats__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .pa-subcats__lista li { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .pa-subcats__lista input { flex: 1 1 160px; min-width: 0; padding: 7px 10px; border: 1px solid var(--pa-borde, #eadde3); border-radius: 8px; font: inherit; }
+  .pa-subcats__lista small { flex-basis: 100%; color: #8a6a76; }
   .pa-aviso-fotos { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; background: #fdf3e2; border: 1px solid #f1d9a8; border-radius: 12px; padding: 10px 14px; margin: 8px 0 12px; }
   .pa-aviso-fotos[hidden] { display: none; }
   .pa-aviso-fotos p { margin: 0; flex: 1 1 280px; }

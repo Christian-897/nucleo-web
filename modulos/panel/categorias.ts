@@ -3,7 +3,7 @@
  * nombre corto, bajada y foto.
  *
  *   GET  /api/admin/categorias        lista con lo vigente y lo original del sitio
- *   POST /api/admin/categorias        { accion: "guardar", id, categoria: { nombre, corto, bajada } }
+ *   POST /api/admin/categorias        { accion: "guardar", id, categoria: { nombre, corto, bajada, subcategorias? } }
  *                                     { accion: "crear", categoria: { nombre, corto, bajada } }
  *                                     { accion: "borrar", id }  (solo si no tiene productos)
  *                                     { accion: "restablecer" }  (nombres y fotos vuelven a los del sitio)
@@ -14,7 +14,7 @@
  * eso hay un tope (MAXIMO_NUEVAS): son los espacios que el sitio deja.
  */
 import type { FuenteCatalogo } from "../catalogo/almacen";
-import { LIMITES_CATEGORIA, MAXIMO_NUEVAS, validarCambioCategoria, type CambiosCategorias } from "../catalogo/categorias";
+import { LIMITES_CATEGORIA, MAXIMO_NUEVAS, MAXIMO_SUBCATEGORIAS, validarCambioCategoria, type CambiosCategorias } from "../catalogo/categorias";
 import { idDesdeNombre } from "./productos";
 import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
@@ -41,6 +41,8 @@ export function crearGestionCategorias(catalogo: FuenteCatalogo, config: ConfigP
         bajada: typeof c.bajada === "string" ? c.bajada : "",
         imagen: typeof c.imagen === "string" ? c.imagen : "",
         productos: vigente.deCategoria(c.id).length,
+        // Subcategorías (v0.39) con cuántos productos tiene cada una.
+        subcategorias: (c.subcategorias ?? []).map((x) => ({ id: x.id, nombre: x.nombre, productos: vigente.deCategoria(c.id).filter((p) => p.subcategoria === x.id).length })),
         editada: Boolean(cambios[c.id]),
         nueva: Boolean(nueva),
         original: { nombre: original.nombre, corto: original.corto ?? "", bajada: typeof original.bajada === "string" ? original.bajada : "" },
@@ -50,6 +52,7 @@ export function crearGestionCategorias(catalogo: FuenteCatalogo, config: ConfigP
       editadas: Object.keys(cambios).length > 0,
       categorias,
       limites: LIMITES_CATEGORIA,
+      maximoSubcategorias: MAXIMO_SUBCATEGORIAS,
       nuevas: estructura.nuevas.length,
       maximoNuevas: MAXIMO_NUEVAS,
     });

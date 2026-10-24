@@ -10,7 +10,7 @@
  */
 import { normalizeInput } from "../../core/validar";
 import { ID_VALIDO } from "./catalogo";
-import type { CategoriaCatalogo } from "./tipos";
+import type { CategoriaCatalogo, Subcategoria } from "./tipos";
 
 export const CLAVE_ESTRUCTURA = "catalogo:categorias-estructura";
 /** Tope de categorías nuevas: el sitio deja este número de espacios en sus menús. */
@@ -60,7 +60,78 @@ export function categoriasVigentes(base: CategoriaCatalogo[], estructura: Estruc
 }
 
 export const CLAVE_CATEGORIAS = "catalogo:categorias";
-export const LIMITES_CATEGORIA = { nombre: 60, corto: 40, bajada: 40 } as const;
+export const LIMITES_CATEGORIA = { nombre: 60, corto: 40, bajada: 40, subcategoria: 40 } as const;
+/** Subcategorías por categoría (v0.39). */
+export const MAXIMO_SUBCATEGORIAS = 12;
+
+/** "Microfibra (premium)" → "microfibra-premium", sin repetir los ya usados. */
+export function idSubcategoria(nombre: string, usados: Set<string>): string {
+  const base =
+    normalizeInput(nombre)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "sub";
+  let id = base;
+  for (let n = 2; usados.has(id); n++) id = `${base.slice(0, 36)}-${n}`;
+  return id;
+}
+
+/**
+ * Lista limpia de subcategorías: nombres de 2 a 40 caracteres, sin repetir
+ * nombre ni id, hasta MAXIMO_SUBCATEGORIAS. Un id válido que ya venía se
+ * conserva (es la dirección pública); a los nuevos se les crea desde el nombre.
+ */
+export function limpiarSubcategorias(crudo: unknown): Subcategoria[] {
+  if (!Array.isArray(crudo)) return [];
+  const usados = new Set<string>();
+  const nombres = new Set<string>();
+  const salida: Subcategoria[] = [];
+  // Primero se reservan los ids que ya venían, para que un nombre nuevo no los tome.
+  for (const x of crudo) {
+    const id = x && typeof x === "object" ? (x as Record<string, unknown>).id : undefined;
+    if (typeof id === "string" && ID_VALIDO.test(id)) usados.add(id);
+  }
+  const reservados = new Set<string>();
+  for (const x of crudo) {
+    if (!x || typeof x !== "object") continue;
+    const o = x as Record<string, unknown>;
+    const nombre = typeof o.nombre === "string" ? normalizeInput(o.nombre).trim().slice(0, LIMITES_CATEGORIA.subcategoria) : "";
+    if (nombre.length < 2 || nombres.has(nombre.toLowerCase())) continue;
+    let id = typeof o.id === "string" && ID_VALIDO.test(o.id) && !reservados.has(o.id) ? o.id : "";
+    if (!id) {
+      id = idSubcategoria(nombre, new Set([...usados, ...reservados]));
+    }
+    reservados.add(id);
+    nombres.add(nombre.toLowerCase());
+    salida.push({ id, nombre });
+    if (salida.length >= MAXIMO_SUBCATEGORIAS) break;
+  }
+  return salida;
+}
+
+/** Errores de la lista que manda el panel (para mostrarlos antes de guardar). */
+export function erroresSubcategorias(crudo: unknown): string | null {
+  if (crudo === undefined) return null;
+  if (!Array.isArray(crudo)) return "La lista de subcategorías no es válida.";
+  if (crudo.length > MAXIMO_SUBCATEGORIAS) return `Máximo ${MAXIMO_SUBCATEGORIAS} subcategorías por categoría.`;
+  const vistos = new Set<string>();
+  for (const x of crudo) {
+    const n = x && typeof x === "object" && typeof (x as Record<string, unknown>).nombre === "string" ? normalizeInput((x as Record<string, string>).nombre).trim() : "";
+    if (n.length < 2) return "Cada subcategoría necesita un nombre de al menos 2 caracteres.";
+    if (n.length > LIMITES_CATEGORIA.subcategoria) return `El nombre de una subcategoría puede tener hasta ${LIMITES_CATEGORIA.subcategoria} caracteres.`;
+    if (vistos.has(n.toLowerCase())) return `La subcategoría «${n}» está repetida.`;
+    vistos.add(n.toLowerCase());
+  }
+  return null;
+}
+
+/** La subcategoría de un producto, si existe hoy en su categoría. */
+export function subcategoriaDe(c: Pick<CategoriaCatalogo, "subcategorias"> | undefined, id: unknown): Subcategoria | undefined {
+  return typeof id === "string" && id ? c?.subcategorias?.find((s) => s.id === id) : undefined;
+}
 
 export interface CambioCategoria {
   nombre?: string;
@@ -69,6 +140,8 @@ export interface CambioCategoria {
   /** Línea chica bajo el nombre en las tarjetas ("Colección satín"). Vacío = sin bajada. */
   bajada?: string;
   imagen?: string;
+  /** Lista completa de subcategorías (v0.39). Sin el campo = las del sitio; [] = sin subcategorías. */
+  subcategorias?: Subcategoria[];
 }
 export type CambiosCategorias = Record<string, CambioCategoria>;
 
@@ -91,8 +164,10 @@ export function validarCambioCategoria(
   else if (nombre.length > LIMITES_CATEGORIA.nombre) e.nombre = `Máximo ${LIMITES_CATEGORIA.nombre} caracteres.`;
   if (corto.length > LIMITES_CATEGORIA.corto) e.corto = `Máximo ${LIMITES_CATEGORIA.corto} caracteres.`;
   if (bajada.length > LIMITES_CATEGORIA.bajada) e.bajada = `Máximo ${LIMITES_CATEGORIA.bajada} caracteres.`;
+  const errSub = erroresSubcategorias(o.subcategorias);
+  if (errSub) e.subcategorias = errSub;
   if (Object.keys(e).length) return { ok: false, errores: e };
-  return { ok: true, datos: { nombre, corto, bajada } };
+  return { ok: true, datos: { nombre, corto, bajada, ...(o.subcategorias !== undefined ? { subcategorias: limpiarSubcategorias(o.subcategorias) } : {}) } };
 }
 
 /** Limpia lo guardado en KV: ids que no existen o campos malos se descartan. */
@@ -108,6 +183,7 @@ export function limpiarCambios(crudo: unknown, base: CategoriaCatalogo[]): Cambi
     if (typeof v.corto === "string") c.corto = normalizeInput(v.corto).trim().slice(0, LIMITES_CATEGORIA.corto);
     if (typeof v.bajada === "string") c.bajada = normalizeInput(v.bajada).trim().slice(0, LIMITES_CATEGORIA.bajada);
     if (imagenCategoriaValida(v.imagen)) c.imagen = v.imagen;
+    if (Array.isArray(v.subcategorias)) c.subcategorias = limpiarSubcategorias(v.subcategorias);
     if (Object.keys(c).length) salida[id] = c;
   }
   return salida;
@@ -127,6 +203,7 @@ export function aplicarCambios(base: CategoriaCatalogo[], cambios: CambiosCatego
       // La bajada sí puede quedar vacía a propósito (= sin bajada).
       bajada: k.bajada !== undefined ? k.bajada : c.bajada,
       ...(k.imagen ? { imagen: k.imagen } : {}),
+      ...(k.subcategorias !== undefined ? { subcategorias: k.subcategorias } : {}),
     };
   });
 }

@@ -80,6 +80,8 @@ prueba("encuentra lo que la gente escribe", () => {
     ["cupón", "cambiar-precio"],
     ["una tarjeta por color", "colores-vista-tienda"],
     ["usar las fotos preparadas", "fotos-preparadas"],
+    ["crear subcategoría", "subcategorias"],
+    ["toallas de microfibra y algodón", "subcategorias"],
     ["la foto no cambia al elegir color", "fotos-preparadas"],
     ["la categoría se ve vacía", "colores-vista-tienda"],
     ["circulitos de colores", "colores-vista-tienda"],
