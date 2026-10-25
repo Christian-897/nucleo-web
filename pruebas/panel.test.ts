@@ -1406,14 +1406,102 @@ async function run() {
     assert.equal(await (await visitar()).text(), "REAL");
   });
 
-  await prueba("construcción: si lo fuerza la variable de Cloudflare, el panel no lo apaga; un invitado puede encenderlo", async () => {
-    const { env } = entorno();
+  await prueba("construcción: el dueño sin clave; la invitada con su clave, creada con un código de un solo uso; si lo fuerza Cloudflare, no se apaga", async () => {
+    const { env, datos } = entorno();
     const cookie = await instalarYEntrar(env);
     const inv = await json(await panel.seguridad.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "invitar", horas: 24, derivado: D1 } }) }));
     await panel.instalar.onRequestPost({ env, request: req("/api/admin/instalar", { cuerpo: { invitacion: inv.token, usuario: "ayudante", derivado: "d".repeat(64) } }) });
     const cookieInv = cookieDe(await panel.entrar.onRequestPost({ env, request: req("/x", { cuerpo: { usuario: "ayudante", derivado: "d".repeat(64) } }) }), "mc_sesion");
-    const r = await json(await panel.construccion.onRequestPost({ env, request: req("/x", { cookie: cookieInv, cuerpo: { accion: "cambiar", activo: true } }) }));
+    const cambiar = (e: EnvPanel, ck: string, extra: Record<string, unknown> = {}) =>
+      panel.construccion.onRequestPost({ env: e, request: req("/x", { cookie: ck, cuerpo: { accion: "cambiar", activo: true, ...extra } }) });
+    // El dueño: puede, sin clave.
+    const gd = await json(await panel.construccion.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal(gd.puedeCambiar, true);
+    assert.equal(gd.pideClave, false);
+    const seg = (ck: string, cuerpo: Record<string, unknown>) => panel.seguridad.onRequestPost({ env, request: req("/x", { cookie: ck, cuerpo }) });
+    const activar = (codigo: string, clave: string, ck = cookieInv) =>
+      panel.construccion.onRequestPost({ env, request: req("/x", { cookie: ck, cuerpo: { accion: "activar", codigo, clave } }) });
+    const getInv = async () => json(await panel.construccion.onRequestGet({ env, request: req("/x", { cookie: cookieInv }) }));
+    // Sin clave propia la invitada solo mira (y puede activar un código).
+    const gi = await getInv();
+    assert.equal(gi.puedeCambiar, false);
+    assert.equal(gi.puedeActivar, true);
+    assert.equal(gd.puedeActivar, false, "el dueño no activa nada");
+    assert.equal((await cambiar(env, cookieInv)).status, 403);
+    assert.equal((await cambiar(env, cookieInv, { clave: "lo-que-sea" })).status, 403);
+    // Solo el dueño crea códigos, con su contraseña y una vigencia válida.
+    assert.equal((await seg(cookieInv, { accion: "codigo-construccion", horas: 24, derivado: "d".repeat(64) })).status, 403, "la invitada no se crea códigos");
+    assert.equal((await seg(cookie, { accion: "codigo-construccion", horas: 5, derivado: D1 })).status, 400, "vigencia inventada");
+    assert.equal((await seg(cookie, { accion: "codigo-construccion", horas: 24, derivado: "b".repeat(64) })).status, 400, "contraseña mala");
+    const c1 = await json(await seg(cookie, { accion: "codigo-construccion", horas: 24, derivado: D1 }));
+    assert.match(c1.codigoConstruccion, /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    // En la base no queda el código en claro; el dueño lo ve en "sin usar"; la invitada no.
+    const todo = JSON.stringify([...datos.values()]);
+    assert.ok(!todo.includes(c1.codigoConstruccion.replace(/-/g, "")), "no guarda el código en claro");
+    const vistaDueno = await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }));
+    assert.equal((vistaDueno.codigosConstruccion as unknown[]).length, 1);
+    assert.equal((await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie: cookieInv }) }))).codigosConstruccion, undefined);
+    // Activar: clave corta o código malo, no; bien → crea su clave y el código se gasta.
+    assert.equal((await activar(c1.codigoConstruccion, "corta")).status, 400);
+    assert.equal((await activar("AAAA-BBBB-CCCC", "mi-clave-propia")).status, 400, "código inventado");
+    assert.equal((await activar(c1.codigoConstruccion.toLowerCase().replace(/-/g, " "), "mi-clave-propia")).status, 200, "acepta minúsculas y espacios");
+    const ga = await getInv();
+    assert.equal(ga.puedeCambiar, true);
+    assert.equal(ga.pideClave, true);
+    assert.equal(ga.puedeActivar, false);
+    assert.equal(((await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).codigosConstruccion as unknown[]).length, 0, "el código ya no está");
+    const lista = (await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).usuarios as { usuario: string; abreTienda: boolean; permisoTienda?: { desde: string; dadoPor?: string } }[];
+    assert.deepEqual(lista.map((u) => u.abreTienda), [true, true]);
+    // Queda registrado a quién, quién se lo dio, y el día y la hora.
+    const p = lista[1].permisoTienda!;
+    assert.equal(p.dadoPor, "sasha");
+    assert.ok(Math.abs(Date.parse(p.desde) - Date.now()) < 60_000, "con fecha y hora");
+    assert.equal(lista[0].permisoTienda, undefined, "el dueño no lo necesita");
+    // Con su clave: rechaza la mala (400, no 401) y acepta la buena.
+    assert.equal((await cambiar(env, cookieInv)).status, 400, "sin clave");
+    assert.equal((await cambiar(env, cookieInv, { clave: "otra-cualquiera" })).status, 400, "clave mala (400: un 401 cerraría la sesión en el panel)");
+    const r = await json(await cambiar(env, cookieInv, { clave: "  mi-clave-propia " }));
+    assert.equal(r.activo, true);
     assert.equal(r.por, "ayudante");
+    // El dueño no necesita clave.
+    assert.equal((await cambiar(env, cookie)).status, 200);
+    // El código usado no sirve otra vez, ni para otra persona.
+    const { claveConstruccionCorrecta, activarConCodigo } = await import("../modulos/panel/clave-construccion");
+    assert.equal((await activarConCodigo(env, "otra", c1.codigoConstruccion, "clave-de-otra")).ok, false, "un solo uso");
+    // Códigos sin usar se pueden anular; uno vencido no sirve.
+    const c2 = await json(await seg(cookie, { accion: "codigo-construccion", horas: 1, derivado: D1 }));
+    const id2 = ((await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).codigosConstruccion as { id: string }[])[0].id;
+    assert.equal((await seg(cookie, { accion: "anular-codigo-construccion", id: id2 })).status, 200);
+    assert.equal((await activarConCodigo(env, "otra", c2.codigoConstruccion, "clave-de-otra")).ok, false, "anulado");
+    const c3 = await json(await seg(cookie, { accion: "codigo-construccion", horas: 1, derivado: D1 }));
+    const real = Date.now;
+    Date.now = () => real() + 2 * 3600_000;
+    try {
+      assert.equal((await activarConCodigo(env, "otra", c3.codigoConstruccion, "clave-de-otra")).ok, false, "vencido");
+    } finally {
+      Date.now = real;
+    }
+    // Quitar permiso: su clave deja de servir y vuelve a solo mirar.
+    assert.equal((await seg(cookieInv, { accion: "quitar-clave-construccion", usuario: "ayudante" })).status, 403);
+    assert.equal((await seg(cookie, { accion: "quitar-clave-construccion", usuario: "ayudante" })).status, 200);
+    assert.equal(await claveConstruccionCorrecta(env, "ayudante", "mi-clave-propia"), false);
+    assert.equal((await getInv()).puedeCambiar, false);
+    // Registro: lo más nuevo primero, con día y hora; solo lo ve el dueño.
+    const registro = (await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie }) }))).registroConstruccion as { tipo: string; por: string; para?: string; fecha: string }[];
+    assert.deepEqual(registro.map((e) => e.tipo), [
+      "permiso-quitado", "codigo-creado", "codigo-anulado", "codigo-creado", "tienda-cerrada", "permiso-dado", "codigo-creado",
+    ]);
+    const dado = registro.find((e) => e.tipo === "permiso-dado")!;
+    assert.equal(dado.por, "sasha");
+    assert.equal(dado.para, "ayudante");
+    assert.ok(!Number.isNaN(Date.parse(dado.fecha)));
+    assert.equal(registro.find((e) => e.tipo === "tienda-cerrada")!.por, "ayudante", "el dueño la volvió a cerrar ya cerrada: no se anota dos veces");
+    assert.equal(registro[0].para, "ayudante");
+    assert.equal((await json(await panel.seguridad.onRequestGet({ env, request: req("/x", { cookie: cookieInv }) }))).registroConstruccion, undefined);
+    // Límite: solo cuentan los fallos; tras 5 en 15 minutos (contando el código inventado de arriba y la clave mala), bloquea.
+    const c4 = await json(await seg(cookie, { accion: "codigo-construccion", horas: 24, derivado: D1 }));
+    for (let n = 0; n < 3; n++) assert.equal((await activar("AAAA-BBBB-CCCC", "mi-clave-propia")).status, 400);
+    assert.equal((await activar(c4.codigoConstruccion, "mi-clave-propia")).status, 429);
     const forzado = { ...env, CONSTRUCCION: "1" } as EnvPanel;
     const g = await json(await panel.construccion.onRequestGet({ env: forzado, request: req("/x", { cookie }) }));
     assert.equal(g.forzado, true);

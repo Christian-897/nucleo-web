@@ -39,6 +39,8 @@ Después de cambiarlas: **Deployments → Retry deployment**.
 - Entrar a la vista previa: `https://sitio/?previa=CLAVE` (dura 30 días en ese navegador).
 - Ver lo que ve el público: `https://sitio/?previa=salir`.
 - Quitarle el acceso a todos: cambiar `ACCESO_PREVIA`.
+- Desde v0.41, en el panel lo abre y cierra el dueño sin clave; una persona invitada, solo con su propia clave, que crea con un código de un solo uso que le da el dueño (ver `panel/clave-construccion.ts`).
+- Mientras `CONSTRUCCION=1` está puesta, nadie puede abrir la tienda desde el panel. Al entregar el sitio, bórrala y maneja el aviso desde el panel.
 
 ## Montaje
 

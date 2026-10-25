@@ -44,6 +44,13 @@ import {
 } from "./auth";
 import type { ConfigPanel } from "./config";
 import {
+  anularCodigoConstruccion,
+  crearCodigoConstruccion,
+  leerRegistroConstruccion,
+  listarCodigosConstruccion,
+  quitarClaveConstruccion,
+} from "./clave-construccion";
+import {
   activar,
   CANTIDAD_RESPALDOS,
   comprobarSegundoFactor,
@@ -208,7 +215,13 @@ export async function seguridadGet(ctx: Ctx): Promise<Response> {
     dueno,
     // Solo el dueño ve y maneja a los demás usuarios.
     ...(dueno
-      ? { usuarios: await listarUsuarios(ctx.env), invitaciones: await listarInvitaciones(ctx.env), opcionesVigencia: OPCIONES_VIGENCIA }
+      ? {
+          usuarios: await listarUsuarios(ctx.env),
+          invitaciones: await listarInvitaciones(ctx.env),
+          opcionesVigencia: OPCIONES_VIGENCIA,
+          codigosConstruccion: await listarCodigosConstruccion(ctx.env),
+          registroConstruccion: await leerRegistroConstruccion(ctx.env, 50),
+        }
       : {}),
   });
 }
@@ -264,6 +277,34 @@ export async function seguridadPost(ctx: Ctx, config: ConfigPanel): Promise<Resp
       if (!(await guardarUsuario(env, registro))) return jsonResponse(400, { message: "No se pudo guardar. Intenta de nuevo." });
       return jsonConCookies(200, { ok: true, minutos: cuerpo.minutos }, [await reajustarSesion(env, request)]);
     }
+    case "codigo-construccion":
+    case "anular-codigo-construccion":
+    case "quitar-clave-construccion": {
+      const registro = await obtenerUsuario(env, yo);
+      if (!registro || !esDueno(registro)) return jsonResponse(403, { message: "Solo el dueño del panel puede manejar los usuarios." });
+      if (cuerpo.accion === "quitar-clave-construccion") {
+        return (await quitarClaveConstruccion(env, String(cuerpo.usuario || ""), yo))
+          ? jsonResponse(200, { ok: true })
+          : jsonResponse(400, { message: "Esa persona no tiene permiso para abrir y cerrar la tienda." });
+      }
+      if (cuerpo.accion === "anular-codigo-construccion") {
+        return (await anularCodigoConstruccion(env, String(cuerpo.id || ""), yo))
+          ? jsonResponse(200, { ok: true })
+          : jsonResponse(404, { message: "Ese código ya no existe." });
+      }
+      // Crear un código da poder sobre la tienda: se confirma con la contraseña
+      // (y el código de la app, si hay doble factor), igual que invitar.
+      if (!vigenciaValida(cuerpo.horas)) return jsonResponse(400, { message: "Elige cuánto dura el código." });
+      if (!derivadoValido(cuerpo.derivado) || !(await claveCorrecta(env, cuerpo.derivado, yo))) {
+        return jsonResponse(400, { message: "La contraseña no es correcta." });
+      }
+      if (registro.dosFactores) {
+        const segundo = await comprobarSegundoFactor(env, registro, codigo);
+        if (!segundo.ok) return jsonResponse(400, { message: segundo.motivo });
+      }
+      const r = await crearCodigoConstruccion(env, yo, cuerpo.horas);
+      return jsonResponse(200, { ok: true, codigoConstruccion: r.codigo, vence: r.vence, horas: cuerpo.horas });
+    }
     case "invitar":
     case "anular-invitacion":
     case "quitar-usuario":
@@ -286,7 +327,7 @@ export async function seguridadPost(ctx: Ctx, config: ConfigPanel): Promise<Resp
         return r.ok ? jsonResponse(200, { ok: true }) : jsonResponse(400, { message: r.motivo });
       }
       if (cuerpo.accion === "quitar-usuario") {
-        const r = await quitarUsuario(env, String(cuerpo.usuario || ""));
+        const r = await quitarUsuario(env, String(cuerpo.usuario || ""), yo);
         return r.ok ? jsonResponse(200, { ok: true }) : jsonResponse(400, { message: r.motivo });
       }
       // Invitar da acceso a la tienda: se confirma con la contraseña (y el código, si hay doble factor),

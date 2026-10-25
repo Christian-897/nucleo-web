@@ -162,6 +162,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
       "Los clientes verán el aviso «Sitio en construcción» y no podrán ver productos ni comprar. No se borra nada: productos, pedidos y textos quedan igual.",
       "Mientras está cerrada, una banda amarilla arriba te lo recuerda. Tú sí puedes ver la tienda con **Ver tienda**.",
       "El cambio tarda hasta un minuto en verse para todos.",
+      "Si el panel te muestra el campo **Tu clave para abrir o cerrar la tienda**, escríbela antes de tocar el botón. Si no ves el botón, necesitas un código del dueño del panel (ver «Usar el código para abrir y cerrar la tienda»).",
     ],
   },
   {
@@ -173,6 +174,8 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     contenido: [
       { pasos: ["Ve a **Resumen**.", "En **Estado de la tienda**, toca **Abrir la tienda al público** y confirma."] },
       "Si no aparece el botón y dice que está encendido desde Cloudflare, pídele a quien administra tu sitio que lo abra.",
+      "Si te pide **Tu clave para abrir o cerrar la tienda**, escribe la clave que creaste. Si te equivocas 5 veces, espera 15 minutos.",
+      "Si no aparece el botón ni el enlace **Cambiar**, necesitas un código del dueño del panel.",
     ],
   },
 
@@ -678,6 +681,32 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     palabras: ["permiso", "anular pedidos", "autorizar", "permisos de usuario"],
     soloDueno: true,
     contenido: ["En **Seguridad → Usuarios del panel**, marca **Puede anular y borrar pedidos** en la fila de esa persona. Se guarda solo."],
+  },
+  {
+    id: "clave-construccion",
+    seccion: "seguridad",
+    titulo: "Permitir que otra persona abra y cierre la tienda",
+    palabras: ["clave construcción", "código construcción", "modo construcción", "quién puede abrir", "registro", "historial", "quién cerró la tienda", "abrir tienda", "cerrar tienda", "permiso construcción", "autorizar"],
+    soloDueno: true,
+    contenido: [
+      "Tú, como dueño del panel, abres y cierras la tienda sin clave. Otra persona del panel solo puede hacerlo con su propia clave, que crea usando un código que le das tú.",
+      { pasos: ["Ve a **Seguridad → Abrir y cerrar la tienda**.", "Elige cuánto dura el código, escribe tu contraseña (y el código de tu app, si tienes doble factor) y toca **Crear código**.", "Anota el código y dáselo en persona. Se muestra una sola vez.", "Esa persona lo escribe en **Resumen → Estado de la tienda** y crea su propia clave."] },
+      "El código sirve **una sola vez** y vence solo. Si no lo usó, puedes **Anularlo** en **Códigos sin usar**.",
+      "Para quitarle el permiso: en **Seguridad → Usuarios del panel**, toca **Quitar permiso de abrir la tienda** en su fila. Si olvidó su clave, quítale el permiso y dale un código nuevo.",
+      "En su fila ves desde qué día y hora tiene el permiso y quién se lo dio. En **Seguridad → Abrir y cerrar la tienda → Registro** quedan, con día y hora, los códigos creados y anulados, a quién se le dio o quitó el permiso y quién abrió o cerró la tienda.",
+    ],
+  },
+  {
+    id: "activar-construccion",
+    seccion: "resumen",
+    titulo: "Usar el código para abrir y cerrar la tienda",
+    palabras: ["código", "me dieron un código", "activar", "crear mi clave", "clave construcción", "abrir tienda", "cerrar tienda", "olvidé mi clave"],
+    requiere: "[data-construccion]",
+    contenido: [
+      { pasos: ["Ve a **Resumen → Estado de la tienda**.", "Abre **¿El dueño del panel te dio un código…?**.", "Escribe el código, crea tu clave (mínimo 8 caracteres), repítela y toca **Activar**."] },
+      "Desde ahí, para abrir o cerrar la tienda escribe **tu clave** y toca el botón. El código ya no sirve: era de un solo uso.",
+      "Si te equivocas 5 veces, espera 15 minutos. Si olvidaste tu clave, pídele al dueño del panel un código nuevo.",
+    ],
   },
   {
     id: "restablecer-2fa",

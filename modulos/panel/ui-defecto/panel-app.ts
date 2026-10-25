@@ -2135,10 +2135,18 @@ marcarTipos();
 
 // ─── sitio en construcción (cuadro en Resumen + banda arriba) ───
 
-interface EstadoConstruccion { activo: boolean; forzado: boolean; previa: boolean; por?: string; fecha?: string }
+interface EstadoConstruccion { activo: boolean; forzado: boolean; previa: boolean; por?: string; fecha?: string; puedeCambiar?: boolean; pideClave?: boolean; puedeActivar?: boolean }
 
 function mostrarConstruccion(d: EstadoConstruccion) {
   $("[data-construccion-banda]").hidden = !d.activo;
+  // Invitada sin clave propia: ve el estado, sin botón ni «Cambiar», y puede activar un código del dueño.
+  // Con su clave: botón + campo para escribirla. El dueño: botón sin clave.
+  const puede = d.puedeCambiar !== false;
+  $("[data-construccion-activar]").hidden = !(d.puedeActivar === true && !d.forzado);
+  $("[data-ir-construccion]").hidden = !puede;
+  const cajaClave = $("[data-construccion-clave-caja]");
+  cajaClave.hidden = !(puede && d.pideClave === true && !d.forzado);
+  $<HTMLInputElement>("[data-construccion-clave]").value = "";
   const estado = $("[data-construccion-estado]");
   const titulo = $("[data-construccion-titulo]");
   const detalle = $("[data-construccion-detalle]");
@@ -2152,7 +2160,8 @@ function mostrarConstruccion(d: EstadoConstruccion) {
     detalle.textContent = "Si necesitas cerrarla un tiempo (vacaciones, cambios grandes), puedes mostrar el aviso «Sitio en construcción». Tus datos y pedidos no se borran." + quien;
     boton.textContent = "Mostrar aviso de construcción";
     boton.dataset.activo = "true";
-    boton.hidden = false;
+    boton.hidden = !puede;
+    if (!puede) detalle.textContent = "Para cerrar la tienda necesitas un código del dueño del panel." + quien;
     return;
   }
   titulo.textContent = "Tu tienda muestra el aviso «Sitio en construcción»";
@@ -2162,10 +2171,11 @@ function mostrarConstruccion(d: EstadoConstruccion) {
     boton.hidden = true;
     return;
   }
-  detalle.textContent = "Los clientes no pueden ver productos ni comprar." + quien + tu;
+  detalle.textContent = "Los clientes no pueden ver productos ni comprar." + quien + tu +
+    (puede ? "" : " Para abrirla necesitas un código del dueño del panel.");
   boton.textContent = "Abrir la tienda al público";
   boton.dataset.activo = "false";
-  boton.hidden = false;
+  boton.hidden = !puede;
 }
 
 async function cargarConstruccion() {
@@ -2181,14 +2191,42 @@ $("[data-construccion-boton]").addEventListener("click", async (e) => {
   const pregunta = activo
     ? "¿Mostrar el aviso «Sitio en construcción»? Los clientes no podrán ver productos ni comprar hasta que vuelvas a abrir la tienda."
     : "¿Abrir la tienda al público? Todos podrán ver productos y comprar.";
+  const campoClave = $<HTMLInputElement>("[data-construccion-clave]");
+  const pideClave = !$("[data-construccion-clave-caja]").hidden;
+  const clave = campoClave.value.trim();
+  if (pideClave && !clave) {
+    campoClave.focus();
+    return avisar("Escribe tu clave para abrir o cerrar la tienda.");
+  }
   if (!confirm(pregunta)) return;
   b.disabled = true;
-  const r = await enviar<EstadoConstruccion>(`${API}/construccion`, { accion: "cambiar", activo });
+  const r = await enviar<EstadoConstruccion>(`${API}/construccion`, { accion: "cambiar", activo, ...(pideClave ? { clave } : {}) });
   b.disabled = false;
   if (siSeCerro(r.status)) return;
-  if (!r.ok) return avisar(r.datos.message || "No se pudo cambiar. Intenta de nuevo.");
+  if (!r.ok) {
+    campoClave.value = "";
+    return avisar(r.datos.message || "No se pudo cambiar. Intenta de nuevo.");
+  }
   mostrarConstruccion(r.datos);
   avisar(activo ? "Listo: aviso encendido. Puede tardar hasta un minuto en verse en todos lados." : "Listo: tienda abierta. Puede tardar hasta un minuto en verse en todos lados.");
+});
+
+$<HTMLFormElement>('[data-form="activar-construccion"]').addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.currentTarget as HTMLFormElement;
+  errorDe(f);
+  const d = new FormData(f);
+  const nueva = String(d.get("nueva") || "").trim();
+  if (nueva.length < 8) return errorDe(f, "Tu clave debe tener al menos 8 caracteres.");
+  if (nueva !== String(d.get("repetir") || "").trim()) return errorDe(f, "Las claves no coinciden.");
+  await conBoton(f, async () => {
+    const r = await enviar<EstadoConstruccion>(`${API}/construccion`, { accion: "activar", codigo: String(d.get("codigo") || ""), clave: nueva });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) return errorDe(f, (r.datos as { message?: string }).message || "No se pudo activar.");
+    f.reset();
+    mostrarConstruccion(r.datos);
+    avisar("Listo: ya puedes abrir y cerrar la tienda con tu clave. Guárdala bien.");
+  });
 });
 
 $("[data-ir-construccion]").addEventListener("click", async () => {
@@ -3107,7 +3145,25 @@ interface FichaUsuario {
   dobleFactor: boolean;
   invitadoPor?: string;
   puedeAnularPedidos?: boolean;
+  abreTienda?: boolean;
+  permisoTienda?: { desde: string; dadoPor?: string };
 }
+interface CodigoConstruccion { id: string; creado: string; vence: string; por: string }
+interface EventoConstruccion {
+  tipo: "codigo-creado" | "codigo-anulado" | "permiso-dado" | "permiso-quitado" | "tienda-cerrada" | "tienda-abierta";
+  fecha: string;
+  por: string;
+  para?: string;
+  vence?: string;
+  codigoCreado?: string;
+}
+/** Día y hora completos: 24-10-2026, 23:30. */
+const diaHora = (iso: string) => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+};
 interface InvitacionPendiente {
   id: string;
   creada: string;
@@ -3142,6 +3198,11 @@ function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendie
         c.addEventListener("change", () => permisoPedidosPanel(u.usuario, c));
         l.append(c, document.createTextNode(" Puede anular y borrar pedidos"));
         info.append(l);
+        if (u.abreTienda) {
+          const p = u.permisoTienda;
+          const desde = p ? ` · permiso desde el ${diaHora(p.desde)}${p.dadoPor ? `, dado por ${p.dadoPor}` : ""}` : "";
+          info.append(crear("div", "pa-fila__datos", "Abre y cierra la tienda con su clave" + desde));
+        }
       }
       li.append(info);
       if (!u.dueno) {
@@ -3154,6 +3215,12 @@ function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendie
           restablecer.type = "button";
           restablecer.addEventListener("click", () => restablecerDobleFactorPanel(u.usuario));
           botones.append(restablecer);
+        }
+        if (u.abreTienda) {
+          const sinTienda = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Quitar permiso de abrir la tienda");
+          sinTienda.type = "button";
+          sinTienda.addEventListener("click", () => quitarClaveConstruccionPanel(u.usuario));
+          botones.append(sinTienda);
         }
         botones.append(quitar);
         li.append(botones);
@@ -3210,6 +3277,71 @@ async function permisoPedidosPanel(usuario: string, casilla: HTMLInputElement) {
   avisar(valor ? `${usuario} ya puede anular y borrar pedidos.` : `${usuario} ya no puede anular ni borrar pedidos.`);
 }
 
+async function quitarClaveConstruccionPanel(usuario: string) {
+  if (!confirm(`¿Quitarle a ${usuario} el permiso de abrir y cerrar la tienda? Su clave deja de servir. Para devolvérselo, crea un código nuevo.`)) return;
+  const r = await enviar(`${API}/seguridad`, { accion: "quitar-clave-construccion", usuario });
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) return avisar(r.datos.message || "No se pudo quitar.");
+  avisar(`${usuario} ya no puede abrir ni cerrar la tienda.`);
+  await cargarSeguridad();
+}
+
+function textoEvento(e: EventoConstruccion): string {
+  switch (e.tipo) {
+    case "codigo-creado":
+      return `${e.por} creó un código${e.vence ? ` (vence el ${diaHora(e.vence)})` : ""}`;
+    case "codigo-anulado":
+      return `${e.por} anuló un código${e.codigoCreado ? ` creado el ${diaHora(e.codigoCreado)}` : ""}`;
+    case "permiso-dado":
+      return `${e.para} recibió permiso para abrir y cerrar la tienda (código de ${e.por}${e.codigoCreado ? `, creado el ${diaHora(e.codigoCreado)}` : ""})`;
+    case "permiso-quitado":
+      return `${e.por} le quitó a ${e.para} el permiso para abrir y cerrar la tienda`;
+    case "tienda-cerrada":
+      return `${e.por} cerró la tienda (aviso de construcción)`;
+    case "tienda-abierta":
+      return `${e.por} abrió la tienda al público`;
+  }
+}
+
+function pintarRegistroConstruccion(eventos: EventoConstruccion[]) {
+  $("[data-registro-construccion-caja]").hidden = eventos.length === 0;
+  $("[data-lista-registro-construccion]").replaceChildren(
+    ...eventos.map((e) => {
+      const li = crear("li", "pa-fila pa-fila--correo");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", diaHora(e.fecha)));
+      info.append(crear("div", "pa-fila__datos", textoEvento(e)));
+      li.append(info);
+      return li;
+    })
+  );
+}
+
+function pintarCodigosConstruccion(codigos: CodigoConstruccion[]) {
+  $("[data-codigos-construccion-caja]").hidden = codigos.length === 0;
+  $("[data-lista-codigos-construccion]").replaceChildren(
+    ...codigos.map((c) => {
+      const li = crear("li", "pa-fila pa-fila--correo");
+      const info = crear("div");
+      info.append(crear("div", "pa-fila__nombre", `Código creado el ${fechaHora(c.creado)}`));
+      info.append(crear("div", "pa-fila__datos", `Vence el ${fechaHora(c.vence)} · lo creó ${c.por}`));
+      const anular = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Anular");
+      anular.type = "button";
+      anular.addEventListener("click", async () => {
+        if (!confirm("¿Anular este código? Ya no servirá.")) return;
+        const r = await enviar(`${API}/seguridad`, { accion: "anular-codigo-construccion", id: c.id });
+        if (siSeCerro(r.status)) return;
+        if (!r.ok) return avisar(r.datos.message || "No se pudo anular.");
+        await cargarSeguridad();
+      });
+      const botones = crear("div", "pa-fila__botones");
+      botones.append(anular);
+      li.append(info, botones);
+      return li;
+    })
+  );
+}
+
 async function anularInvitacionPanel(id: string) {
   if (!confirm("¿Anular este enlace? Ya no servirá para crear un usuario.")) return;
   const r = await enviar(`${API}/seguridad`, { accion: "anular-invitacion", id });
@@ -3230,6 +3362,8 @@ async function cargarSeguridad() {
     usuarios?: FichaUsuario[];
     invitaciones?: InvitacionPendiente[];
     opcionesVigencia?: number[];
+    codigosConstruccion?: CodigoConstruccion[];
+    registroConstruccion?: EventoConstruccion[];
   }>(`${API}/seguridad`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudo cargar la seguridad.");
@@ -3248,6 +3382,16 @@ async function cargarSeguridad() {
     vig.replaceChildren(...(r.datos.opcionesVigencia || []).map((h) => new Option(textoVigencia(h), String(h))));
     vig.value = "24";
     pintarUsuarios(r.datos.usuarios || [], r.datos.invitaciones || []);
+  }
+  // Códigos para abrir y cerrar la tienda: solo el dueño, y solo si el sitio montó el interruptor.
+  const conInterruptor = Boolean(r.datos.dueno) && !$("[data-construccion]").hidden;
+  $("[data-clave-construccion-caja]").hidden = !conInterruptor;
+  if (conInterruptor) {
+    const vc = $<HTMLSelectElement>("[data-vigencia-construccion]");
+    vc.replaceChildren(...(r.datos.opcionesVigencia || []).map((h) => new Option(textoVigencia(h), String(h))));
+    vc.value = "24";
+    pintarCodigosConstruccion(r.datos.codigosConstruccion || []);
+    pintarRegistroConstruccion(r.datos.registroConstruccion || []);
   }
   const sel = $<HTMLSelectElement>("[data-inactividad]");
   sel.replaceChildren(...r.datos.opcionesInactividad.map((m) => new Option(`${m} minutos`, String(m))));
@@ -3343,6 +3487,38 @@ formSeguridad(
     await cargarSeguridad();
   }
 );
+formSeguridad(
+  "codigo-construccion",
+  async (d) => ({
+    accion: "codigo-construccion",
+    horas: Number(d.get("horas")),
+    derivado: await derivarClave(String(d.get("clave") || ""), usuarioActual),
+    codigo: dobleFactorActivo ? String(d.get("codigo") || "").trim() : "",
+  }),
+  async (datos) => {
+    $<HTMLInputElement>("[data-codigo-construccion-texto]").value = datos.codigoConstruccion;
+    $("[data-codigo-construccion-vence]").textContent = `en ${textoVigencia(datos.horas)}`;
+    $("[data-codigo-construccion]").hidden = false;
+    $<HTMLFormElement>('[data-form="codigo-construccion"]').hidden = true;
+    await cargarSeguridad();
+  }
+);
+$("[data-codigo-construccion-copiar]").addEventListener("click", async () => {
+  const campo = $<HTMLInputElement>("[data-codigo-construccion-texto]");
+  try {
+    await navigator.clipboard.writeText(campo.value);
+    avisar("Código copiado.");
+  } catch {
+    campo.select();
+    avisar("Selecciónalo y cópialo con Ctrl+C (o mantén presionado en el celular).");
+  }
+});
+$("[data-codigo-construccion-listo]").addEventListener("click", () => {
+  $<HTMLInputElement>("[data-codigo-construccion-texto]").value = "";
+  $("[data-codigo-construccion]").hidden = true;
+  $<HTMLFormElement>('[data-form="codigo-construccion"]').hidden = false;
+});
+
 $("[data-enlace-copiar]").addEventListener("click", async () => {
   const campo = $<HTMLInputElement>("[data-enlace-texto]");
   try {

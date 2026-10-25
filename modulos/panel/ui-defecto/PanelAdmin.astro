@@ -317,7 +317,18 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <div class="pa-revision__estado" data-construccion-estado role="status">
           <p class="pa-revision__titulo" data-construccion-titulo>—</p>
           <p class="pa-tenue pa-chico" data-construccion-detalle></p>
+          <label class="pa-campo" data-construccion-clave-caja hidden>Tu clave para abrir o cerrar la tienda<input type="password" autocomplete="off" maxlength="200" data-construccion-clave /></label>
           <button class="pa-boton pa-boton--suave" type="button" data-construccion-boton hidden></button>
+          <details class="pa-chico" data-construccion-activar hidden>
+            <summary>¿El dueño del panel te dio un código para abrir y cerrar la tienda?</summary>
+            <form data-form="activar-construccion" novalidate>
+              <label class="pa-campo">Código<input name="codigo" autocomplete="off" maxlength="20" autocapitalize="characters" required /></label>
+              <label class="pa-campo">Crea tu clave (mínimo 8 caracteres)<input name="nueva" type="password" autocomplete="new-password" minlength="8" maxlength="200" required /></label>
+              <label class="pa-campo">Repite tu clave<input name="repetir" type="password" autocomplete="new-password" required /></label>
+              <p class="pa-error" role="alert" data-error></p>
+              <button class="pa-boton" type="submit">Activar</button>
+            </form>
+          </details>
         </div>
       </div>
       <div class="pa-revision" data-revision hidden={!revisionPagos}>
@@ -682,6 +693,37 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <div data-invitaciones-caja hidden>
           <h3 class="pa-subtitulo">Enlaces sin usar</h3>
           <ul class="pa-lista" data-lista-invitaciones></ul>
+        </div>
+      </div>
+
+      <div class="pa-caja pa-caja--ancha" data-clave-construccion-caja hidden>
+        <h2>Abrir y cerrar la tienda</h2>
+        <p class="pa-tenue">Tú abres y cierras la tienda sin clave. Para que otra persona del panel pueda hacerlo, crea un código y dáselo: sirve una sola vez y vence solo. Al usarlo, esa persona crea su propia clave y con ella abre y cierra la tienda.</p>
+        <form data-form="codigo-construccion" novalidate>
+          <label class="pa-campo pa-campo--fila">El código vence en
+            <select name="horas" data-vigencia-construccion></select>
+          </label>
+          <label class="pa-campo">Tu contraseña<input name="clave" type="password" autocomplete="current-password" required /></label>
+          <label class="pa-campo" data-si-2fa hidden>Código de tu app<input name="codigo" inputmode="numeric" maxlength="11" /></label>
+          <p class="pa-error" role="alert" data-error></p>
+          <button class="pa-boton" type="submit">Crear código</button>
+        </form>
+        <div class="pa-respaldos" data-codigo-construccion hidden>
+          <p><strong>Anota este código y dáselo en persona.</strong> No se volverá a mostrar. Sirve una sola vez; vence <span data-codigo-construccion-vence></span>.</p>
+          <input class="pa-enlace-copiar" data-codigo-construccion-texto readonly aria-label="Código para abrir y cerrar la tienda" />
+          <div class="pa-fila__botones">
+            <button class="pa-boton" type="button" data-codigo-construccion-copiar>Copiar código</button>
+            <button class="pa-boton pa-boton--suave" type="button" data-codigo-construccion-listo>Listo</button>
+          </div>
+        </div>
+        <div data-codigos-construccion-caja hidden>
+          <h3 class="pa-subtitulo">Códigos sin usar</h3>
+          <ul class="pa-lista" data-lista-codigos-construccion></ul>
+        </div>
+        <div data-registro-construccion-caja hidden>
+          <h3 class="pa-subtitulo">Registro</h3>
+          <p class="pa-tenue pa-chico">A quién se le dio o quitó el permiso, y quién abrió o cerró la tienda, con día y hora. Últimos 50 movimientos.</p>
+          <ul class="pa-lista" data-lista-registro-construccion></ul>
         </div>
       </div>
 

@@ -23,6 +23,7 @@ import { compararSeguro, hmacSha256Hex } from "../../core/cripto";
 import { getCookie } from "../../core/seguridad";
 import { limpiarVariable } from "../../core/correo";
 import type { EnvPanel } from "./config";
+import { type PermisoTienda, permisoTiendaDe, quitarClaveConstruccion } from "./clave-construccion";
 
 /** Repeticiones que aplica el NAVEGADOR. Se le sirve desde /parametros. */
 export const REPETICIONES = 600_000;
@@ -193,21 +194,30 @@ export interface FichaUsuario {
   invitadoPor?: string;
   /** Puede anular y borrar pedidos (el dueño siempre). */
   puedeAnularPedidos: boolean;
+  /** Puede abrir y cerrar la tienda (el dueño siempre; una invitada si activó su clave). */
+  abreTienda: boolean;
+  /** Invitada con permiso: desde cuándo (día y hora) y quién se lo dio. */
+  permisoTienda?: PermisoTienda;
 }
 
 /** Todos los usuarios del panel, el dueño primero. Sin datos secretos. */
 export async function listarUsuarios(env: EnvPanel): Promise<FichaUsuario[]> {
-  const ficha = (r: UsuarioAdmin): FichaUsuario => ({
-    usuario: r.usuario,
-    creado: r.creado,
-    dueno: esDueno(r),
-    dobleFactor: Boolean(r.dosFactores),
-    ...(r.invitadoPor ? { invitadoPor: r.invitadoPor } : {}),
-    puedeAnularPedidos: puedeAnularPedidos(r),
-  });
+  const ficha = async (r: UsuarioAdmin): Promise<FichaUsuario> => {
+    const permiso = esDueno(r) ? null : await permisoTiendaDe(env, r.usuario);
+    return {
+      usuario: r.usuario,
+      creado: r.creado,
+      dueno: esDueno(r),
+      dobleFactor: Boolean(r.dosFactores),
+      ...(r.invitadoPor ? { invitadoPor: r.invitadoPor } : {}),
+      puedeAnularPedidos: puedeAnularPedidos(r),
+      abreTienda: esDueno(r) || permiso !== null,
+      ...(permiso ? { permisoTienda: permiso } : {}),
+    };
+  };
   const lista: FichaUsuario[] = [];
   const dueno = await leerRegistro(env, K_USUARIO);
-  if (dueno) lista.push(ficha(dueno));
+  if (dueno) lista.push(await ficha(dueno));
   const kv = env.REVIEWS_KV;
   if (!kv) return lista;
   const { keys } = await kv.list({ prefix: P_INVITADO, limit: 100 });
@@ -217,17 +227,18 @@ export async function listarUsuarios(env: EnvPanel): Promise<FichaUsuario[]> {
     if (r) invitados.push(r);
   }
   invitados.sort((a, b) => a.creado.localeCompare(b.creado));
-  return lista.concat(invitados.map(ficha));
+  return lista.concat(await Promise.all(invitados.map(ficha)));
 }
 
 /** Quita a un invitado y le cierra las sesiones. Al dueño no se le puede quitar. */
-export async function quitarUsuario(env: EnvPanel, usuario: string): Promise<{ ok: boolean; motivo?: string }> {
+export async function quitarUsuario(env: EnvPanel, usuario: string, por = ""): Promise<{ ok: boolean; motivo?: string }> {
   const kv = env.REVIEWS_KV;
   if (!kv) return { ok: false, motivo: "Falta la base de datos." };
   const registro = await obtenerUsuario(env, usuario);
   if (!registro) return { ok: false, motivo: "Ese usuario no existe." };
   if (esDueno(registro)) return { ok: false, motivo: "Al dueño del panel no se le puede quitar el acceso." };
   await kv.delete(K_INVITADO(usuario));
+  await quitarClaveConstruccion(env, usuario, por || "(se le quitó el acceso al panel)");
   await cerrarSesionesDe(env, usuario);
   return { ok: true };
 }
