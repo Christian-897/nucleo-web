@@ -4,11 +4,13 @@
  * REGLA: todo con textContent / createElement; nunca innerHTML.
  */
 import { buscarAyuda, SECCIONES_AYUDA, TEMAS_AYUDA, type BloqueAyuda, type SeccionAyuda, type TemaAyuda } from "../ayuda";
+import { GUIAS_AYUDA } from "../guias";
+import { crearGuia } from "./guia-vista";
 
 interface OpcionesVista {
   raiz: HTMLElement;
   /** Abre una pestaña del panel ("Ir a Productos"). */
-  irA: (pestana: string) => void;
+  irA: (pestana: string) => void | Promise<void>;
 }
 
 /** Qué secciones muestra el "?" de cada pestaña. */
@@ -67,6 +69,7 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
   const filtro = dialogo.querySelector<HTMLElement>("[data-ayuda-filtro]")!;
   const filtroTexto = dialogo.querySelector<HTMLElement>("[data-ayuda-filtro-texto]")!;
   let secciones: SeccionAyuda[] | null = null;
+  const guia = crearGuia({ raiz, irA });
 
   /** Solo los temas de lo que este sitio tiene activo. */
   function temasDelSitio(): TemaAyuda[] {
@@ -94,6 +97,22 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
       cuerpo.append(p);
     }
     for (const b of t.contenido) cuerpo.append(bloque(b));
+    const acciones = document.createElement("div");
+    acciones.className = "pa-ayuda__acciones";
+    const pasosGuia = GUIAS_AYUDA[t.id];
+    if (pasosGuia?.length) {
+      // «Muéstrame cómo»: recorre el panel real encerrando en rojo cada paso (v0.43).
+      const ver = document.createElement("button");
+      ver.type = "button";
+      ver.className = "pa-boton pa-boton--chico";
+      ver.textContent = "Muéstrame cómo";
+      ver.addEventListener("click", () => {
+        dialogo.close();
+        guia.iniciar(t.titulo, pasosGuia);
+      });
+      acciones.append(ver);
+    }
+    cuerpo.append(acciones);
     const pestana = SECCIONES_AYUDA[t.seccion].pestana;
     if (pestana) {
       const ir = document.createElement("button");
@@ -102,9 +121,9 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
       ir.textContent = `Ir a ${SECCIONES_AYUDA[t.seccion].nombre}`;
       ir.addEventListener("click", () => {
         dialogo.close();
-        irA(pestana);
+        void irA(pestana);
       });
-      cuerpo.append(ir);
+      acciones.append(ir);
     }
     d.append(cuerpo);
     return d;
@@ -179,5 +198,5 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
     h1.append(b);
   }
 
-  return { abrir, cerrar: () => dialogo.close() };
+  return { abrir, cerrar: () => dialogo.close(), guia };
 }

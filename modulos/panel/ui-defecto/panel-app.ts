@@ -328,7 +328,7 @@ async function abrirPestana(v: Vista) {
 }
 
 // ─── ayuda (botón "? Ayuda" arriba y "?" en cada sección) ───
-const ayuda = crearVistaAyuda({ raiz, irA: (p) => void abrirPestana(p as Vista) });
+const ayuda = crearVistaAyuda({ raiz, irA: async (p) => { await abrirPestana(p as Vista); } });
 $("[data-ayuda-abrir]").addEventListener("click", () => ayuda.abrir());
 
 async function entrarAlPanel(segundos: number) {
@@ -545,6 +545,7 @@ function pintarProductos() {
       const botones = crear("div", "pa-fila__botones");
       const editar = crear("button", "pa-boton pa-boton--chico", "Editar");
       editar.type = "button";
+      editar.dataset.guia = "editar-producto";
       editar.addEventListener("click", () => abrirEditor(p));
       const ver = crear("a", "pa-boton pa-boton--suave pa-boton--chico", "Ver");
       ver.href = `/producto/${encodeURIComponent(p.id)}/`;
@@ -552,6 +553,7 @@ function pintarProductos() {
       ver.rel = "noopener";
       const borrar = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Eliminar");
       borrar.type = "button";
+      borrar.dataset.guia = "eliminar-producto";
       borrar.addEventListener("click", () => eliminarProducto(p));
       botones.append(editar, ver, borrar);
       li.append(img, info, botones);
@@ -1319,6 +1321,7 @@ async function cargarCategorias() {
       const editar = crear("button", "pa-boton pa-boton--chico", "Editar");
       editar.type = "button";
       editar.setAttribute("aria-label", `Editar la categoría ${c.nombre}`);
+      editar.dataset.guia = "editar-categoria";
       editar.addEventListener("click", () => abrirEditorCategoria(c));
       const ver = crear("a", "pa-boton pa-boton--suave pa-boton--chico", "Ver");
       ver.href = `/tienda/${encodeURIComponent(c.id)}/`;
@@ -1904,6 +1907,7 @@ async function cargarPedidos() {
       if (p.estado === "pagada" && !p.anulado) {
         const b = crear("button", p.enviado ? "pa-boton pa-boton--suave pa-boton--chico" : "pa-boton pa-boton--chico", p.enviado ? (esRetiroP ? "Desmarcar entregado" : "Desmarcar enviado") : esRetiroP ? "Marcar como entregado" : "Marcar como enviado");
         b.type = "button";
+        b.dataset.guia = "marcar-enviado";
         b.addEventListener("click", async () => {
           b.disabled = true;
           const r2 = await enviar(`${API}/pedidos`, { accion: "marcar-enviado", orden: p.orden, enviado: !p.enviado });
@@ -1919,6 +1923,7 @@ async function cargarPedidos() {
       if (puedeAnular && !p.anulado) {
         const anular = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Anular pedido");
         anular.type = "button";
+        anular.dataset.guia = "anular-pedido";
         anular.addEventListener("click", async () => {
           const ok = confirm(
             `¿Anular el pedido ${p.orden} por ${formatearPrecio(p.monto)}?\n\n` +

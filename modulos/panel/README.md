@@ -108,3 +108,7 @@ neutra ya validada.
 ### Productos nuevos preparados (v0.42)
 
 Si el catálogo ya se editó en el panel (manda KV), los productos que se agregan después al JSON del sitio no aparecen solos. El panel los ofrece en un aviso en **Productos**: «Agregar a la tienda» los suma al final tal como vienen del sitio (`accion: "productos-sitio"`, `ids`), y «No agregar» los descarta (`descartar-productos-sitio`; quedan en `catalogo:productos-sitio-descartados`). Solo se ofrecen los de categorías vigentes. Nunca cambia los productos que ya existen.
+
+### Guías «Muéstrame cómo» de la Ayuda (v0.43)
+
+Los temas de la Ayuda que tienen guía (`modulos/panel/guias.ts`) muestran el botón **Muéstrame cómo**: abre la pestaña y encierra en rojo el botón o campo real de cada paso, con Siguiente / Anterior / Salir (Esc también sale). Solo abre pestañas y, si hace falta para mostrar un paso, un editor (`clic`); nunca guarda ni borra. Los selectores son `data-*` o `name=` del panel; `data-guia` marca botones de listas (editar/eliminar producto, editar categoría, marcar enviado, anular pedido). La prueba de ayuda comprueba que cada selector exista. Si un paso no está en la pantalla (sección apagada o lista vacía), la tarjeta lo dice y se puede seguir.

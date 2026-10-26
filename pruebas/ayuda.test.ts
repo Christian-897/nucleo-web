@@ -5,6 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buscarAyuda, normalizarAyuda, SECCIONES_AYUDA, TEMAS_AYUDA } from "../modulos/panel/ayuda";
+import { GUIAS_AYUDA } from "../modulos/panel/guias";
 
 let pasaron = 0;
 function prueba(nombre: string, fn: () => void) {
@@ -107,6 +108,33 @@ prueba("consulta vacía = todos; solo palabras vacías o sin sentido = nada", ()
   assert.equal(buscarAyuda(TEMAS_AYUDA, "xqzwv").length, 0);
   assert.ok(!entre("factura", 3).includes("doble-factor"), "factura no es doble factor");
   assert.ok(buscarAyuda(TEMAS_AYUDA, "como cambio el precio").length <= 6, "pocas respuestas, no ruido");
+});
+
+prueba("guías «Muéstrame cómo»: temas que existen, pestañas válidas, textos limpios y selectores que el panel tiene", () => {
+  const ids = new Set(TEMAS_AYUDA.map((t) => t.id));
+  const astro = readFileSync(new URL("../modulos/panel/ui-defecto/PanelAdmin.astro", import.meta.url), "utf8");
+  const app = readFileSync(new URL("../modulos/panel/ui-defecto/panel-app.ts", import.meta.url), "utf8");
+  const pestanas = new Set(Object.values(SECCIONES_AYUDA).map((x) => x.pestana).filter(Boolean));
+  const existe = (sel: string) => {
+    for (const [, attr, valor] of sel.matchAll(/\[data-([a-z0-9-]+)(?:="([^"]+)")?\]/g)) {
+      if (attr === "guia") assert.ok(app.includes(`dataset.guia = "${valor}"`), `data-guia="${valor}" no está en panel-app`);
+      else if (attr === "form") assert.ok(astro.includes(`data-form="${valor}"`), `data-form="${valor}"`);
+      else assert.ok(astro.includes(`data-${attr}`) || app.includes(`data-${attr}`), `data-${attr} no está en el panel`);
+    }
+    for (const [, n] of sel.matchAll(/\[name="([a-z]+)"/g)) assert.ok(astro.includes(`name="${n}"`), `name="${n}"`);
+  };
+  assert.ok(Object.keys(GUIAS_AYUDA).length >= 25, "hay guías para los temas más usados");
+  for (const [id, pasos] of Object.entries(GUIAS_AYUDA)) {
+    assert.ok(ids.has(id), `guía de un tema que no existe: ${id}`);
+    assert.ok(pasos.length > 0, id);
+    assert.ok(pasos[0].pestana, `el primer paso abre una pestaña: ${id}`);
+    for (const p of pasos) {
+      if (p.pestana) assert.ok(pestanas.has(p.pestana), `pestaña ${p.pestana} (${id})`);
+      assert.ok(!/[<>]/.test(p.texto) && p.texto.split("**").length % 2 === 1, `texto limpio: ${id}`);
+      existe(p.selector);
+      if (p.clic) existe(p.clic);
+    }
+  }
 });
 
 console.log(`\n${pasaron} pruebas pasaron.`);

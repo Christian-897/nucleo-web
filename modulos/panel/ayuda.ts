@@ -217,10 +217,11 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     id: "fotos-producto",
     seccion: "productos",
     titulo: "Cambiar, agregar u ordenar las fotos de un producto",
-    palabras: ["foto", "imagen", "fotos", "cambiar foto", "foto principal", "ordenar fotos", "borrar foto"],
+    palabras: ["foto", "imagen", "fotos", "cambiar foto", "foto principal", "ordenar fotos", "borrar foto", "quitar foto", "sacar foto", "eliminar foto", "quitar una foto"],
     contenido: [
       "En **Productos → Editar**, en el recuadro **Fotos** (hasta 20 por producto):",
       { pasos: ["**Agregar fotos**: puedes elegir varias a la vez. Se recortan cuadradas y se achican solas.", "La primera es la **Principal**: la que se ve en la tienda y en el carrito.", "Con las flechas ◀ ▶ cambias el orden y con ✕ quitas la foto que está seleccionada.", "Toca **Guardar cambios**."] },
+      "Estas fotos son la galería del producto. Las de **cada color** están más abajo, en **Colores**: quitar una foto de arriba no cambia las de los colores.",
       "Consejo: fotos con buena luz natural y fondo simple se ven mejor.",
     ],
   },
