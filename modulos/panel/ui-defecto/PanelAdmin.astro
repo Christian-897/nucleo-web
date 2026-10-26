@@ -185,6 +185,13 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
         <h1>Productos</h1>
         <button class="pa-boton" type="button" data-nuevo-producto>+ Nuevo producto</button>
       </div>
+      <div class="pa-aviso-fotos" data-productos-sitio hidden>
+        <p><strong data-productos-sitio-texto></strong> <span data-productos-sitio-nombres></span> Se agregan tal como vienen preparados; tus productos no cambian.</p>
+        <span class="pa-fila__botones">
+          <button class="pa-boton" type="button" data-productos-sitio-agregar>Agregar a la tienda</button>
+          <button class="pa-boton pa-boton--suave" type="button" data-productos-sitio-descartar>No agregar</button>
+        </span>
+      </div>
       <div class="pa-aviso-fotos" data-fotos-sitio-todos hidden>
         <p><strong data-fotos-sitio-todos-texto></strong> Se usan sin tocar tus unidades, nombres, precios ni las fotos que tú subiste.</p>
         <button class="pa-boton pa-boton--suave" type="button" data-fotos-sitio-todos-usar>Usar las fotos preparadas</button>

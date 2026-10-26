@@ -394,7 +394,7 @@ let productos: Producto[] = [];
 let categorias: { id: string; nombre: string; subcategorias?: { id: string; nombre: string }[] }[] = [];
 
 async function cargarProductos() {
-  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string; subcategorias?: { id: string; nombre: string }[] }[]; ajustesFicha?: AjustesFicha; vistaListas?: VistaListasPanel; maximoColores?: number }>(`${API}/productos`);
+  const r = await obtener<{ productos: Producto[]; categorias: { id: string; nombre: string; subcategorias?: { id: string; nombre: string }[] }[]; ajustesFicha?: AjustesFicha; vistaListas?: VistaListasPanel; maximoColores?: number; productosSitio?: ProductoSitio[] }>(`${API}/productos`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudieron cargar los productos.");
   productos = r.datos.productos;
@@ -409,7 +409,41 @@ async function cargarProductos() {
   $<HTMLSelectElement>("[data-editor-categorias]").replaceChildren(...categorias.map((c) => new Option(c.nombre, c.id)));
   pintarProductos();
   pintarFotosSitioTodos();
+  pintarProductosSitio(r.datos.productosSitio ?? []);
 }
+
+// ─── productos nuevos preparados en el sitio (v0.42) ───
+
+interface ProductoSitio { id: string; nombre: string; categoria: string }
+let productosSitio: ProductoSitio[] = [];
+
+function pintarProductosSitio(lista: ProductoSitio[]) {
+  productosSitio = lista;
+  $("[data-productos-sitio]").hidden = lista.length === 0;
+  const n = lista.length;
+  $("[data-productos-sitio-texto]").textContent = n === 1 ? "Hay un producto nuevo preparado:" : `Hay ${n} productos nuevos preparados:`;
+  $("[data-productos-sitio-nombres]").textContent = lista.map((p) => `«${p.nombre}»`).join(", ") + ".";
+}
+
+async function accionProductosSitio(accion: "productos-sitio" | "descartar-productos-sitio", boton: HTMLButtonElement) {
+  const ids = productosSitio.map((p) => p.id);
+  if (!ids.length) return;
+  if (accion === "descartar-productos-sitio" && !confirm("¿No agregar estos productos? El aviso no volverá a aparecer para ellos.")) return;
+  boton.disabled = true;
+  try {
+    const r = await enviar<{ agregados?: number }>(`${API}/productos`, { accion, ids });
+    if (siSeCerro(r.status)) return;
+    if (!r.ok) return avisar((r.datos as { message?: string }).message || "No se pudo completar.");
+    avisar(accion === "productos-sitio"
+      ? `Listo: ${r.datos.agregados ?? 0} ${(r.datos.agregados ?? 0) === 1 ? "producto agregado" : "productos agregados"}. Revisa su precio y unidades.`
+      : "Listo: no se agregarán.");
+    await cargarProductos();
+  } finally {
+    boton.disabled = false;
+  }
+}
+$<HTMLButtonElement>("[data-productos-sitio-agregar]").addEventListener("click", (e) => void accionProductosSitio("productos-sitio", e.currentTarget as HTMLButtonElement));
+$<HTMLButtonElement>("[data-productos-sitio-descartar]").addEventListener("click", (e) => void accionProductosSitio("descartar-productos-sitio", e.currentTarget as HTMLButtonElement));
 
 // ─── subcategoría del producto (v0.39) ───
 

@@ -59,6 +59,28 @@ export function aplicarFotosDelSitio(
   return cambios ? { producto: { ...actual, colores }, cambios } : { producto: actual, cambios: 0 };
 }
 
+/**
+ * PRODUCTOS NUEVOS PREPARADOS EN EL SITIO (v0.42). Cuando la clienta ya
+ * editó el catálogo en el panel, manda lo guardado en KV y los productos que
+ * se agregan después al JSON del sitio no aparecen solos. El panel los
+ * ofrece en un aviso: "Agregar" los suma tal cual vienen del sitio (al final
+ * de la lista) y "No agregar" los descarta para que el aviso no vuelva.
+ * Nunca toca los productos que ya tiene: solo suma los que faltan.
+ */
+export const CLAVE_PRODUCTOS_DESCARTADOS = "catalogo:productos-sitio-descartados";
+
+export function productosNuevosDelSitio(
+  vigentes: ProductoCatalogo[],
+  delSitio: ProductoCatalogo[],
+  categorias: string[],
+  descartados: string[]
+): ProductoCatalogo[] {
+  const ya = new Set(vigentes.map((p) => p.id));
+  const fuera = new Set(descartados);
+  const cats = new Set(categorias);
+  return delSitio.filter((p) => !ya.has(p.id) && !fuera.has(p.id) && cats.has(p.categoria));
+}
+
 const PRECIO_MAXIMO = 100_000_000;
 const STOCK_MAXIMO = 100_000;
 
@@ -399,10 +421,16 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
     }
     // Los nombres de categoría vigentes (pueden haberse cambiado en el panel).
     const categorias = vigente.categorias.map((c) => ({ id: c.id, nombre: c.nombre, subcategorias: (c.subcategorias ?? []).map((x) => ({ id: x.id, nombre: x.nombre })) }));
+    const editado = await catalogo.editado(ctx.env);
+    const nuevos = editado
+      ? productosNuevosDelSitio(vigente.productos, catalogo.inicial.productos, vigente.categorias.map((c) => c.id), await descartados(ctx))
+      : [];
     return jsonResponse(200, {
-      editado: await catalogo.editado(ctx.env),
+      editado,
       categorias,
       productos,
+      // Productos que trae el sitio y la clienta todavía no tiene (v0.42).
+      productosSitio: nuevos.map((p) => ({ id: p.id, nombre: p.nombre, categoria: p.categoria })),
       ajustesFicha: await obtenerAjustesFicha(ctx.env),
       vistaListas: await obtenerVistaListas(ctx.env, config.vistaListas),
       maximoColores: MAXIMO_COLORES,
@@ -495,6 +523,8 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       }
     }
     if (cuerpo.accion === "fotos-sitio") return fotosSitio(ctx, cuerpo.id);
+    if (cuerpo.accion === "productos-sitio") return productosSitio(ctx, cuerpo.ids);
+    if (cuerpo.accion === "descartar-productos-sitio") return descartarProductosSitio(ctx, cuerpo.ids);
     if (cuerpo.accion === "opciones") return guardarOpciones(ctx, cuerpo);
     if (cuerpo.accion === "vista-listas") {
       try {
@@ -655,6 +685,45 @@ export function crearGestionProductos(catalogo: FuenteCatalogo, config: ConfigPa
       }
     }
     return jsonResponse(200, { ok: true, producto });
+  }
+
+  async function descartados(ctx: Ctx): Promise<string[]> {
+    try {
+      const v = JSON.parse((await ctx.env.REVIEWS_KV?.get(CLAVE_PRODUCTOS_DESCARTADOS)) || "[]");
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && ID_VALIDO.test(x)).slice(0, 500) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function idsPedidos(ids: unknown): string[] | "todos" | null {
+    if (ids === "todos") return "todos";
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some((x) => typeof x !== "string" || !ID_VALIDO.test(x))) return null;
+    return [...new Set(ids as string[])];
+  }
+
+  /** POST { accion: "productos-sitio", ids: string[] | "todos" }: suma los productos nuevos del sitio (v0.42). */
+  async function productosSitio(ctx: Ctx, ids: unknown): Promise<Response> {
+    const pedidos = idsPedidos(ids);
+    if (!pedidos) return jsonResponse(400, { message: "Lista de productos inválida." });
+    const vigente = await catalogo.obtener(ctx.env);
+    const nuevos = productosNuevosDelSitio(vigente.productos, catalogo.inicial.productos, vigente.categorias.map((c) => c.id), await descartados(ctx))
+      .filter((p) => pedidos === "todos" || pedidos.includes(p.id));
+    if (!nuevos.length) return jsonResponse(200, { ok: true, agregados: 0 });
+    const lista = [...vigente.productos.map((p) => ({ ...p })), ...nuevos.map((p) => structuredClone(p))];
+    const r = await catalogo.guardar(ctx.env, lista);
+    if (!r.ok) return jsonResponse(400, { message: r.motivo || "No se pudieron agregar los productos." });
+    return jsonResponse(200, { ok: true, agregados: nuevos.length });
+  }
+
+  /** POST { accion: "descartar-productos-sitio", ids: string[] }: no volver a ofrecerlos (v0.42). */
+  async function descartarProductosSitio(ctx: Ctx, ids: unknown): Promise<Response> {
+    const pedidos = idsPedidos(ids);
+    if (!pedidos || pedidos === "todos") return jsonResponse(400, { message: "Lista de productos inválida." });
+    if (!ctx.env.REVIEWS_KV) return jsonResponse(503, { message: "El almacén del sitio no está disponible." });
+    const lista = [...new Set([...(await descartados(ctx)), ...pedidos])].slice(-500);
+    await ctx.env.REVIEWS_KV.put(CLAVE_PRODUCTOS_DESCARTADOS, JSON.stringify(lista));
+    return jsonResponse(200, { ok: true });
   }
 
   /** POST { accion: "fotos-sitio", id: "<producto>" | "todos" }: ver aplicarFotosDelSitio. */

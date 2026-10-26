@@ -310,6 +310,18 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "productos-preparados",
+    seccion: "productos",
+    titulo: "Agregar productos nuevos que te preparamos",
+    palabras: ["productos preparados", "productos nuevos", "agregar a la tienda", "no aparece el producto nuevo", "producto nuevo no aparece", "aviso amarillo productos"],
+    requiere: '[data-tab="productos"]:not([hidden])',
+    contenido: [
+      "Cuando te preparamos productos nuevos (con sus fotos y colores), aparece un aviso amarillo **«Hay N productos nuevos preparados»** con sus nombres.",
+      { pasos: ["Ve a **Productos**.", "Toca **Agregar a la tienda** en el aviso.", "Revisa el **precio** y las **unidades** de cada producto nuevo y ajústalos con **Editar** si hace falta."] },
+      "Tus otros productos no cambian. Si no los quieres, toca **No agregar** y el aviso no vuelve a aparecer para esos productos.",
+    ],
+  },
+  {
     id: "opciones-producto",
     seccion: "productos",
     titulo: "Tamaños u otras opciones dentro de un producto (con su precio y sus unidades)",

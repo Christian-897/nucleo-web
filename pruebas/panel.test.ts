@@ -1325,6 +1325,50 @@ async function run() {
     assert.equal((await p2.productos.onRequestPost({ env, request: req("/x", { cookie, cuerpo: { accion: "fotos-sitio", id: "<x>" } }) })).status, 400);
   });
 
+  await prueba("productos preparados: el panel ofrece los nuevos del sitio, los agrega sin tocar los demás y recuerda los descartados", async () => {
+    const delSitio = crearCatalogoEditable(
+      [
+        { id: "funda", nombre: "Funda", precio: 14990, categoria: "fundas", tipo: "fisico", imagen: "/img/f.webp" },
+        { id: "gorro-premium", nombre: "Gorro premium", precio: 12990, categoria: "gorros", tipo: "fisico", imagen: "/img/g.webp",
+          colores: [{ id: "negro-champagne", nombre: "Negro + Champagne", foto: "/img/colores/g/negro-champagne.webp" }] },
+        { id: "gorro-raso", nombre: "Gorro raso", precio: 9990, categoria: "gorros", tipo: "fisico", imagen: "/img/r.webp" },
+        { id: "huerfano", nombre: "Sin categoría vigente", precio: 1000, categoria: "borrada", tipo: "fisico", imagen: "/img/h.webp" },
+      ],
+      [{ id: "fundas", nombre: "Fundas" }, { id: "gorros", nombre: "Gorros" }, { id: "borrada", nombre: "Borrada" }]
+    );
+    const p2 = crearPanel({ nombreSitio: "Tienda Prueba", catalogo: delSitio });
+    const { env, datos } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const get = async () => json(await p2.productos.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const post = (cuerpo: Record<string, unknown>, ck: string | undefined = cookie) => p2.productos.onRequestPost({ env, request: req("/x", { cookie: ck, cuerpo }) });
+    // Sin editar el catálogo: rige el sitio entero, no hay nada que ofrecer (otra tienda, sin caché compartida).
+    {
+      const otro = entorno();
+      const ck = await instalarYEntrar(otro.env);
+      assert.deepEqual((await json(await p2.productos.onRequestGet({ env: otro.env, request: req("/x", { cookie: ck }) }))).productosSitio, []);
+    }
+    // La clienta ya guardó su catálogo (solo la funda, con su precio) y borró la categoría "borrada".
+    datos.set("catalogo:productos", { v: JSON.stringify([{ id: "funda", nombre: "Funda", precio: 12990, categoria: "fundas", tipo: "fisico", imagen: "/img/f.webp", stock: 3 }]) });
+    datos.set("catalogo:categorias-estructura", { v: JSON.stringify({ nuevas: [], ocultas: ["borrada"] }) });
+    const ofrecidos = (await get()).productosSitio as { id: string }[];
+    assert.deepEqual(ofrecidos.map((p) => p.id), ["gorro-premium", "gorro-raso"], "sin el que ya tiene ni el de una categoría que no existe");
+    // Sin sesión, ids malos.
+    assert.equal((await post({ accion: "productos-sitio", ids: ["gorro-premium"] }, "")).status, 401);
+    for (const ids of [[], ["<x>"], "todo", null]) assert.equal((await post({ accion: "productos-sitio", ids })).status, 400, JSON.stringify(ids));
+    // Agregar uno: se suma al final, tal cual del sitio; la funda no cambia.
+    assert.equal((await json(await post({ accion: "productos-sitio", ids: ["gorro-premium"] }))).agregados, 1);
+    const guardados = JSON.parse(datos.get("catalogo:productos")!.v as string);
+    assert.deepEqual(guardados.map((p: { id: string }) => p.id), ["funda", "gorro-premium"]);
+    assert.equal(guardados[0].precio, 12990, "la funda de la clienta se mantiene");
+    assert.equal(guardados[0].stock, 3);
+    assert.equal(guardados[1].colores[0].foto, "/img/colores/g/negro-champagne.webp");
+    // Descartar el otro: el aviso ya no lo ofrece, y "todos" no lo agrega.
+    assert.equal((await post({ accion: "descartar-productos-sitio", ids: "todos" })).status, 400);
+    assert.equal((await post({ accion: "descartar-productos-sitio", ids: ["gorro-raso"] })).status, 200);
+    assert.deepEqual((await get()).productosSitio, []);
+    assert.equal((await json(await post({ accion: "productos-sitio", ids: "todos" }))).agregados, 0);
+  });
+
   console.log("Panel — restablecer doble factor:");
 
   await prueba("restablecer doble factor: solo el dueño, solo a invitados; cierra sesiones y deja entrar solo con contraseña", async () => {

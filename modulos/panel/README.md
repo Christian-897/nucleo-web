@@ -104,3 +104,7 @@ neutra ya validada.
 <PanelAdmin nombre="Mi Tienda" colores={{ acento: "#D81B72" }}
   coloresGraficos={["#D81B72", "#7B46B0", "#1A9A86", "#D9772F", "#4A7BD0"]} />
 ```
+
+### Productos nuevos preparados (v0.42)
+
+Si el catálogo ya se editó en el panel (manda KV), los productos que se agregan después al JSON del sitio no aparecen solos. El panel los ofrece en un aviso en **Productos**: «Agregar a la tienda» los suma al final tal como vienen del sitio (`accion: "productos-sitio"`, `ids`), y «No agregar» los descarta (`descartar-productos-sitio`; quedan en `catalogo:productos-sitio-descartados`). Solo se ofrecen los de categorías vigentes. Nunca cambia los productos que ya existen.
