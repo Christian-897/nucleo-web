@@ -4,6 +4,7 @@
  * Solo lectura y solo con sesión: incluye correos de quienes pagaron.
  */
 import { checkRateLimit } from "../../core/seguridad";
+import { CLAVE_ERROR_INICIO, type ErrorInicioPago } from "../pago/explicar-error";
 import { revisarPagosFlow } from "../pago/revision";
 import type { EnvPago } from "../pago/config";
 import { type Ctx, exigirSesion, jsonResponse } from "./http";
@@ -24,6 +25,17 @@ export function crearRevisionPagos(config: ConfigRevisionPagos = {}) {
       forzar = await checkRateLimit(ctx.env.REVIEWS_KV, "pago:revision:forzar", 1, 60);
     }
     const r = await revisarPagosFlow(ctx.env as EnvPago, { dias: config.dias, forzar, zona: config.zonaHoraria });
-    return jsonResponse(200, { ...r });
+    // Últimos errores al iniciar un pago (v0.43.1): el motivo en palabras simples.
+    const erroresInicio: ErrorInicioPago[] = [];
+    for (const p of ["flow", "mercadopago"] as const) {
+      try {
+        const crudo = await ctx.env.REVIEWS_KV?.get(CLAVE_ERROR_INICIO(p));
+        if (crudo) erroresInicio.push(JSON.parse(crudo) as ErrorInicioPago);
+      } catch {
+        /* ilegible: se ignora */
+      }
+    }
+    const { huella: _h, ...publico } = r;
+    return jsonResponse(200, { ...publico, erroresInicio });
   };
 }

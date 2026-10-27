@@ -21,6 +21,7 @@ import {
   jsonResponse,
 } from "../../core/seguridad";
 import { generarId } from "../../core/cripto";
+import { CLAVE_ERROR_INICIO, explicarErrorPago } from "./explicar-error";
 import {
   type ConfigPago,
   type EnvPago,
@@ -232,9 +233,25 @@ export async function iniciarPago(
     });
     registro.idProveedor = cobro.idProveedor;
     await guardarRegistro(env, registro, config);
+    // Si antes había fallado, el aviso del panel ya no corresponde.
+    try {
+      if (env.REVIEWS_KV && (await env.REVIEWS_KV.get(CLAVE_ERROR_INICIO(proveedor)))) await env.REVIEWS_KV.delete(CLAVE_ERROR_INICIO(proveedor));
+    } catch {
+      /* no importa */
+    }
     return jsonResponse(200, { redirectUrl: cobro.redirectUrl, orden });
   } catch (e) {
     console.error(`[pago] no se pudo crear el cobro en ${proveedor}`, e);
+    // El motivo, en palabras simples, para el panel (v0.43.1). Al comprador, algo genérico.
+    try {
+      await env.REVIEWS_KV?.put(
+        CLAVE_ERROR_INICIO(proveedor),
+        JSON.stringify({ proveedor, fecha: new Date().toISOString(), motivo: explicarErrorPago(proveedor, e) }),
+        { expirationTtl: 7 * 24 * 3600 }
+      );
+    } catch {
+      /* sin KV: queda solo en el registro */
+    }
     return jsonResponse(502, { message: "No se pudo iniciar el pago. Intenta nuevamente." });
   }
 }

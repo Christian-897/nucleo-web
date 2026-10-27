@@ -109,6 +109,23 @@ async function run() {
     assert.ok(a.llamadas.length > n);
   });
 
+  await prueba("al cambiar las claves (o pasar de prueba a real) no se usa la revisión guardada; el error dice el motivo", async () => {
+    const { kv } = kvMemoria();
+    const prueba1: EnvPago = { REVIEWS_KV: kv, FLOW_API_KEY: "k", FLOW_SECRET_KEY: SECRETO, FLOW_SANDBOX: "1" };
+    const a = flowFalso({});
+    await revisarPagosFlow(prueba1, { fetch: a.f, ahora: AHORA });
+    const n = a.llamadas.length;
+    // Otras claves: aunque haya caché, consulta de nuevo.
+    const otras: EnvPago = { ...prueba1, FLOW_API_KEY: "k2" };
+    await revisarPagosFlow(otras, { fetch: a.f, ahora: AHORA });
+    assert.ok(a.llamadas.length > n, "con otras claves no sirve la guardada");
+    assert.ok(!JSON.stringify(await kv.get("pago:revision")).includes("k2"), "la caché guarda una huella, no la clave");
+    // Flow rechaza la API Key: el motivo en palabras simples.
+    const rechazo = (async () => new Response('{"code":108,"message":"Invalid apiKey"}', { status: 400 })) as typeof fetch;
+    const r = await revisarPagosFlow({ ...prueba1, FLOW_API_KEY: "mala" }, { fetch: rechazo, ahora: AHORA });
+    assert.match(r.error!, /no reconoce la API Key/);
+  });
+
   await prueba("sin claves no está conectado; si Flow falla, avisa sin romper", async () => {
     const { kv } = kvMemoria();
     assert.deepEqual(await revisarPagosFlow({ REVIEWS_KV: kv }), { conectado: false });

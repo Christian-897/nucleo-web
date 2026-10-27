@@ -133,9 +133,10 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     id: "revision-pagos",
     seccion: "resumen",
     titulo: "«Hay cosas que revisar» en la Revisión de pagos",
-    palabras: ["flow no reconoce", "pago no reconocido", "alerta", "cuadra", "cobro", "revisar pago", "pago dudoso"],
+    palabras: ["flow no reconoce", "pago no reconocido", "alerta", "cuadra", "cobro", "revisar pago", "pago dudoso", "no se pudo iniciar el pago", "falla el pago", "no puedo pagar", "error al pagar"],
     requiere: "[data-revision]",
     contenido: [
+      "Si un cliente intentó pagar y **no se pudo iniciar el pago**, aquí aparece un aviso rojo con el motivo en palabras simples (por ejemplo, «Flow no reconoce la API Key» o «Mercado Pago no autoriza a esta cuenta a cobrar todavía»). Muéstraselo a quien mantiene tu sitio. El aviso se borra solo cuando un pago con ese medio funcione.",
       "La **Revisión de pagos** compara lo que cobró Flow con los pedidos de la tienda. Si algo no cuadra, te muestra el pedido y por qué.",
       { nota: "No despaches un pedido marcado aquí hasta confirmar el pago en tu cuenta de Flow." },
       "Si era una compra de prueba, anúlala en **Pedidos**. Las devoluciones no aparecen aquí: revísalas en tu cuenta de Flow → Reembolsos.",

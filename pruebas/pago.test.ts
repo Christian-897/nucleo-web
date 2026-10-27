@@ -47,6 +47,7 @@ const pagosMP: Record<string, Record<string, unknown>> = {};
 const pagosFlow: Record<string, Record<string, unknown>> = {};
 let ultimaPreferenciaMP: Record<string, any> | null = null;
 let ultimoCobroFlow: URLSearchParams | null = null;
+let mpResponde403 = false;
 
 const fetchOriginal = globalThis.fetch;
 globalThis.fetch = (async (entrada: string | URL | Request, init?: RequestInit) => {
@@ -55,6 +56,7 @@ globalThis.fetch = (async (entrada: string | URL | Request, init?: RequestInit) 
     new Response(JSON.stringify(o), { status: 200, headers: { "Content-Type": "application/json" } });
 
   if (url === "https://api.mercadopago.com/checkout/preferences") {
+    if (mpResponde403) return new Response('{"code":"PA_UNAUTHORIZED_RESULT_FROM_POLICIES","blocked_by":"PolicyAgent","status":403}', { status: 403 });
     ultimaPreferenciaMP = JSON.parse(String(init?.body));
     return json({ id: "PREF1", init_point: "https://www.mercadopago.cl/checkout/v1/redirect?pref_id=PREF1" });
   }
@@ -196,6 +198,21 @@ async function run() {
     assert.equal(ultimaPreferenciaMP?.items[0].unit_price, 39980);
     assert.equal(registro(ordenMP).monto, 39980);
     assert.equal(registro(ordenMP).estado, "pendiente");
+  });
+
+  await prueba("si el proveedor rechaza el cobro, el comprador ve algo genérico y el panel guarda el motivo; un pago bueno lo borra", async () => {
+    mpResponde403 = true;
+    const malo = await pedirPago({ proveedor: "mercadopago", email: "cliente@example.com", items: [{ productoId: "silla", cantidad: 1 }] });
+    mpResponde403 = false;
+    assert.equal(malo.status, 502);
+    assert.equal(((await malo.json()) as { message: string }).message, "No se pudo iniciar el pago. Intenta nuevamente.");
+    const guardado = JSON.parse(String(datos.get("pago:error-inicio:mercadopago")));
+    assert.equal(guardado.proveedor, "mercadopago");
+    assert.match(guardado.motivo, /no autoriza a esta cuenta a cobrar/);
+    assert.ok(!JSON.stringify(guardado).includes("TEST-token"), "nunca guarda el token");
+    const bueno = await pedirPago({ proveedor: "mercadopago", email: "cliente@example.com", items: [{ productoId: "silla", cantidad: 1 }] });
+    assert.equal(bueno.status, 200);
+    assert.equal(datos.get("pago:error-inicio:mercadopago"), undefined, "el aviso se borra cuando un pago funciona");
   });
 
   await prueba("rechaza un proveedor no habilitado", async () => {

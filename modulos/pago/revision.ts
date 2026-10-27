@@ -19,6 +19,7 @@
  * Guarda el resultado 30 minutos en KV para no consultar a Flow en cada
  * visita al panel.
  */
+import { explicarErrorPago } from "./explicar-error";
 import { limpiarVariable } from "../../core/correo";
 import type { EnvPago, PedidoGuardado } from "./config";
 import { type CredencialesFlow, baseUrlFlow, firmarFlow } from "./proveedores/flow";
@@ -51,6 +52,15 @@ export interface RevisionPagos {
   alertas?: AlertaPago[];
   /** Flow no respondió bien: el panel lo muestra como aviso, no como alarma. */
   error?: string;
+  /** Con qué claves se hizo (huella, no la clave): si cambian, la revisión guardada no sirve. */
+  huella?: string;
+}
+
+/** Huella corta de las claves y el modo: cambia si se cambian las claves o se pasa de prueba a real. */
+async function huellaClaves(cred: CredencialesFlow): Promise<string> {
+  const datos = new TextEncoder().encode(`${cred.sandbox ? "s" : "p"}|${cred.apiKey}|${cred.secretKey}`);
+  const h = new Uint8Array(await crypto.subtle.digest("SHA-256", datos));
+  return [...h.slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export interface PagoFlowListado {
@@ -116,7 +126,7 @@ async function getFlow(cred: CredencialesFlow, ruta: string, params: Record<stri
   const todos = { apiKey: cred.apiKey, ...params };
   const s = await firmarFlow(todos, cred.secretKey);
   const res = await fetcher(`${baseUrlFlow(cred.sandbox)}/${ruta}?${new URLSearchParams({ ...todos, s })}`, { method: "GET" });
-  if (!res.ok) throw new Error(`Flow ${ruta} respondió ${res.status}`);
+  if (!res.ok) throw new Error(`Flow ${ruta} respondió ${res.status}: ${(await res.text()).slice(0, 300)}`);
   return (await res.json()) as Record<string, unknown>;
 }
 
@@ -192,10 +202,15 @@ export async function revisarPagosFlow(
   const cred = credencialesRevision(env);
   if (!cred) return { conectado: false };
   const kv = env.REVIEWS_KV;
+  const huella = await huellaClaves(cred);
   if (!opciones.forzar && kv) {
     try {
       const guardada = await kv.get(CLAVE_CACHE);
-      if (guardada) return JSON.parse(guardada) as RevisionPagos;
+      if (guardada) {
+        const r = JSON.parse(guardada) as RevisionPagos;
+        // Revisión hecha con otras claves (o en modo de prueba): no sirve; se consulta de nuevo.
+        if (r.huella === huella) return r;
+      }
     } catch {
       /* sin caché: se consulta */
     }
@@ -205,7 +220,7 @@ export async function revisarPagosFlow(
   const ahora = opciones.ahora ?? new Date();
   const dias = Math.max(1, Math.min(opciones.dias ?? 7, 14));
   const fechas = diasLocales(dias, ahora, opciones.zona);
-  const base: RevisionPagos = { conectado: true, sandbox: cred.sandbox, revisado: ahora.toISOString(), dias };
+  const base: RevisionPagos = { conectado: true, sandbox: cred.sandbox, revisado: ahora.toISOString(), dias, huella };
 
   let resultado: RevisionPagos;
   try {
@@ -230,7 +245,7 @@ export async function revisarPagosFlow(
     resultado = { ...base, pagosFlow: pagados, pedidosTienda: pedidos, alertas };
   } catch (e) {
     console.error("[revision-pagos]", e instanceof Error ? e.message : e);
-    resultado = { ...base, error: "Flow no respondió. Se intentará de nuevo más tarde." };
+    resultado = { ...base, error: explicarErrorPago("flow", e) };
   }
 
   if (kv) {

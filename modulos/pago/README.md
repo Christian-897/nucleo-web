@@ -134,3 +134,7 @@ revisan en Flow → Reembolsos y liquidaciones.
 `pruebas/pago.test.ts` intenta romperlo: precio manipulado, monto distinto,
 firma falsa, aviso repetido, orden inventada, otro origen, proveedor no
 habilitado, redirección a dominio falso.
+
+## Motivos en palabras simples (v0.43.1)
+
+Si Flow o Mercado Pago rechazan crear un cobro, el comprador ve un mensaje genérico, y el panel guarda el motivo traducido (`explicar-error.ts`) en `pago:error-inicio:<proveedor>` por 7 días. **Resumen → Revisión de pagos** lo muestra en rojo ("Flow no reconoce la API Key (FLOW_API_KEY)…", "Mercado Pago no autoriza a esta cuenta a cobrar…"). Se borra solo cuando un pago con ese medio funciona. La revisión de Flow también explica su error así, y guarda una huella de las claves: si se cambian (o se pasa de prueba a real), la revisión guardada se descarta.

@@ -2372,6 +2372,28 @@ interface RevisionPanel {
   pedidosTienda?: number;
   alertas?: AlertaPagoPanel[];
   error?: string;
+  /** Últimos pagos que no se pudieron iniciar, con el motivo en palabras simples (v0.43.1). */
+  erroresInicio?: { proveedor: "flow" | "mercadopago"; fecha: string; motivo: string }[];
+}
+
+/** Avisos de pagos que no se pudieron iniciar (Flow o Mercado Pago), arriba de la revisión. */
+function pintarErroresInicio(errores: RevisionPanel["erroresInicio"]) {
+  const ul = $("[data-revision-errores]");
+  const lista = errores ?? [];
+  ul.hidden = lista.length === 0;
+  ul.replaceChildren(
+    ...lista.map((e) => {
+      const li = crear("li", "pa-fila pa-fila--correo pa-fila--boletin pa-fila--alerta");
+      const info = crear("div");
+      const nombre = e.proveedor === "flow" ? "Flow" : "Mercado Pago";
+      const cuando = new Date(e.fecha).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+      info.append(crear("div", "pa-fila__nombre", `${nombre}: un pago no se pudo iniciar (${cuando})`));
+      info.append(crear("p", "pa-chico", e.motivo));
+      info.append(crear("p", "pa-tenue pa-chico", "El cliente vio «No se pudo iniciar el pago». El aviso se borra solo cuando un pago con este medio funcione."));
+      li.append(info);
+      return li;
+    })
+  );
 }
 
 const TEXTO_ALERTA: Record<AlertaPagoPanel["tipo"], { titulo: string; ayuda: string }> = {
@@ -2417,6 +2439,7 @@ async function cargarRevision(forzar = false) {
     return;
   }
   const d = r.datos;
+  pintarErroresInicio(d.erroresInicio);
   if (!d.conectado) {
     estado.classList.add("pa-revision--neutro");
     titulo.textContent = "Flow todavía no está conectado.";

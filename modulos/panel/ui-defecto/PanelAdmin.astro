@@ -347,6 +347,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <p class="pa-revision__titulo" data-revision-titulo>—</p>
           <p class="pa-tenue pa-chico" data-revision-detalle></p>
         </div>
+        <ul class="pa-lista" data-revision-errores hidden></ul>
         <ul class="pa-lista" data-revision-alertas></ul>
         <p class="pa-tenue pa-chico">Compara lo que cobró Flow en los últimos días con los pedidos de la tienda. Las devoluciones no aparecen aquí: revísalas una vez por semana en tu cuenta de Flow → Reembolsos.</p>
       </div>
@@ -1209,6 +1210,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   @media (max-width: 640px) { .pa-variante { grid-template-columns: 56px minmax(0, 1fr); } .pa-variante__botones { grid-column: 1 / -1; justify-content: flex-start; } }
   .pa-ayuda { width: min(100% - 24px, 720px); height: min(100vh - 24px, 820px); }
   .pa-ayuda__acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .pa-fila--alerta { border-left: 4px solid #b91c1c; background: #fff5f5; }
   .pa-ayuda__acciones:empty { display: none; }
   /* «Muéstrame cómo» (v0.43): marco rojo sobre el botón real y una tarjeta con el paso. */
   .pa-guia__marco { position: fixed; z-index: 2147483646; border: 3px solid #e11d48; border-radius: 10px; box-shadow: 0 0 0 4px rgba(225, 29, 72, .25), 0 0 0 9999px rgba(20, 12, 16, .42); pointer-events: none; transition: left .2s, top .2s, width .2s, height .2s; }
