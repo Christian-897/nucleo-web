@@ -1,9 +1,9 @@
 /**
  * CATEGORÍAS DESDE EL PANEL: crear, borrar (solo vacías) y cambiar nombre,
- * nombre corto, bajada y foto.
+ * nombre corto, bajada, texto de la página (descripcion, v0.44) y foto.
  *
  *   GET  /api/admin/categorias        lista con lo vigente y lo original del sitio
- *   POST /api/admin/categorias        { accion: "guardar", id, categoria: { nombre, corto, bajada, subcategorias? } }
+ *   POST /api/admin/categorias        { accion: "guardar", id, categoria: { nombre, corto, bajada, descripcion?, subcategorias? } }
  *                                     { accion: "crear", categoria: { nombre, corto, bajada } }
  *                                     { accion: "borrar", id }  (solo si no tiene productos)
  *                                     { accion: "restablecer" }  (nombres y fotos vuelven a los del sitio)
@@ -14,7 +14,7 @@
  * eso hay un tope (MAXIMO_NUEVAS): son los espacios que el sitio deja.
  */
 import type { FuenteCatalogo } from "../catalogo/almacen";
-import { LIMITES_CATEGORIA, MAXIMO_NUEVAS, MAXIMO_SUBCATEGORIAS, validarCambioCategoria, type CambiosCategorias } from "../catalogo/categorias";
+import { LIMITES_CATEGORIA, limpiarTextoLargo, MAXIMO_NUEVAS, MAXIMO_SUBCATEGORIAS, validarCambioCategoria, type CambiosCategorias } from "../catalogo/categorias";
 import { idDesdeNombre } from "./productos";
 import { MAXIMO_BYTES_FOTO, type ConfigPanel } from "./config";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
@@ -33,19 +33,25 @@ export function crearGestionCategorias(catalogo: FuenteCatalogo, config: ConfigP
     const estructura = await catalogo.estructuraCategorias(ctx.env);
     const categorias = vigente.categorias.map((c) => {
       const nueva = estructura.nuevas.find((n) => n.id === c.id);
-      const original = catalogo.categorias.find((o) => o.id === c.id) ?? { nombre: nueva?.nombre ?? c.nombre, corto: nueva?.nombre ?? "", bajada: "" };
+      const original = catalogo.categorias.find((o) => o.id === c.id) ?? { nombre: nueva?.nombre ?? c.nombre, corto: nueva?.nombre ?? "", bajada: "", descripcion: "" };
       return {
         id: c.id,
         nombre: c.nombre,
         corto: c.corto ?? "",
         bajada: typeof c.bajada === "string" ? c.bajada : "",
+        descripcion: typeof c.descripcion === "string" ? c.descripcion : "",
         imagen: typeof c.imagen === "string" ? c.imagen : "",
         productos: vigente.deCategoria(c.id).length,
         // Subcategorías (v0.39) con cuántos productos tiene cada una.
         subcategorias: (c.subcategorias ?? []).map((x) => ({ id: x.id, nombre: x.nombre, productos: vigente.deCategoria(c.id).filter((p) => p.subcategoria === x.id).length })),
         editada: Boolean(cambios[c.id]),
         nueva: Boolean(nueva),
-        original: { nombre: original.nombre, corto: original.corto ?? "", bajada: typeof original.bajada === "string" ? original.bajada : "" },
+        original: {
+          nombre: original.nombre,
+          corto: original.corto ?? "",
+          bajada: typeof original.bajada === "string" ? original.bajada : "",
+          descripcion: typeof original.descripcion === "string" ? original.descripcion : "",
+        },
       };
     });
     return jsonResponse(200, {
@@ -124,7 +130,13 @@ export function crearGestionCategorias(catalogo: FuenteCatalogo, config: ConfigP
       if (!(await existe(ctx, cuerpo.id))) return jsonResponse(404, { message: "Esa categoría no existe. Recarga la página." });
       const v = validarCambioCategoria(cuerpo.categoria);
       if (!v.ok) return jsonResponse(400, { message: "Revisa los campos marcados.", errores: v.errores });
-      const cambios = { ...antes, [cuerpo.id as string]: { ...antes[cuerpo.id as string], ...v.datos } };
+      const id = cuerpo.id as string;
+      const cambio = { ...antes[id], ...v.datos };
+      // Si el texto queda igual al que trae el sitio, no se guarda: así un texto
+      // nuevo que se prepare en el sitio llega solo, mientras nadie lo cambie.
+      const delSitio = catalogo.categorias.find((o) => o.id === id)?.descripcion;
+      if (cambio.descripcion !== undefined && cambio.descripcion === (typeof delSitio === "string" ? limpiarTextoLargo(delSitio, LIMITES_CATEGORIA.descripcion) : "")) delete cambio.descripcion;
+      const cambios = { ...antes, [id]: cambio };
       const error = await guardarCambios(ctx, cambios, antes);
       return error ?? jsonResponse(200, { ok: true });
     }

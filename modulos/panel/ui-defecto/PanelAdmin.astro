@@ -857,6 +857,9 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <label class="pa-campo">Bajada (opcional)<input name="bajada" maxlength={LIMITES_CATEGORIA.bajada} /></label>
           <p class="pa-error" data-error-categoria="bajada"></p>
           <p class="pa-tenue pa-chico">Línea chica bajo el nombre en las tarjetas, si el sitio la muestra. Ejemplo: Colección satín.</p>
+          <label class="pa-campo">Texto de la categoría (opcional)<textarea name="descripcion" rows="6" maxlength={LIMITES_CATEGORIA.descripcion} data-categoria-descripcion></textarea></label>
+          <p class="pa-error" data-error-categoria="descripcion"></p>
+          <p class="pa-tenue pa-chico">Se muestra en la página de la categoría, junto a los productos. Google usa el comienzo para describirla: parte con qué es y para qué sirve (por ejemplo «Fundas de almohada de satín que reducen el frizz mientras duermes»). Vacío = sin texto.</p>
           <p class="pa-tenue pa-chico" data-categoria-original></p>
           <fieldset class="pa-subcats">
             <legend>Subcategorías (opcional)</legend>

@@ -42,6 +42,25 @@ Campos: `nombre` (por defecto), `corto`, `bajada`, `imagen` (src), `alt`, `texto
 escapado. Panel: `functions/api/admin/categorias.ts` (`panel.categorias`) y
 `functions/api/admin/categoria-foto.ts` (`panel.categoriaFoto`).
 
+### Texto de la categoría (v0.44)
+
+Cada categoría puede tener un texto largo (`descripcion`, hasta 2000
+caracteres, con párrafos), en el sitio (JSON) o desde el panel (Categorías →
+Editar → **Texto de la categoría**). Si el panel lo deja igual al del sitio,
+no se guarda: un texto nuevo del sitio llega solo mientras nadie lo cambie.
+Vacío a propósito = sin texto. El sitio lo pone así:
+
+```astro
+<div class="cat-texto" data-categoria={c.id} data-categoria-campo="descripcion">{c.descripcion}</div>  <!-- vacío: esconder con .cat-texto:empty; usar white-space: pre-line -->
+<meta name="description" content="…" data-categoria={c.id} data-categoria-campo="content descripcion-meta" data-categoria-plantilla="{nombre} de satín." />
+```
+
+`descripcion-meta` pone en `content` el **resumen para Google** del texto
+(`resumenParaGoogle`: sin emojis ni saltos, hasta 155 caracteres cortados en
+una palabra completa, con «…») y, si no hay texto, la plantilla. La ficha de
+producto usa el mismo resumen para su `<meta name="description">` y
+`og:description`; el JSON-LD lleva el texto plano hasta 500 caracteres.
+
 ### Categorías nuevas y borradas: qué pone el sitio
 
 Lo creado/borrado va en KV (`catalogo:categorias-estructura`). Para que una

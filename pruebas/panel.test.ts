@@ -1021,6 +1021,24 @@ async function run() {
     assert.equal((await cat(env, cookie, { accion: "borrar", id: "peluches" })).status, 409, "la última nunca se borra (y tiene productos)");
   });
 
+  await prueba("texto de la categoría (v0.44): se guarda, se ve en la lista y en el catálogo; vacío lo quita", async () => {
+    const { env } = entorno();
+    const cookie = await instalarYEntrar(env);
+    const texto = "Peluches tejidos a mano.\n\nSuaves y seguros para regalar.";
+    assert.equal((await cat(env, cookie, { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches", descripcion: "x".repeat(2001) } })).status, 400, "muy largo");
+    assert.equal((await cat(env, cookie, { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches", descripcion: texto } })).status, 200);
+    const lista = await json(await panel.categorias.onRequestGet({ env, request: req("/x", { cookie }) }));
+    const p = lista.categorias.find((c: any) => c.id === "peluches");
+    assert.equal(p.descripcion, texto);
+    assert.equal(p.original.descripcion, "", "el sitio no traía texto");
+    assert.equal((await catalogo.obtener(env)).categoria("peluches")!.descripcion, texto, "la tienda lo recibe");
+    // Guardar sin cambiar el nombre no borra el texto si no viene; vaciarlo (igual al del sitio, que no tiene) lo quita.
+    assert.equal((await cat(env, cookie, { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches" } })).status, 200);
+    assert.equal((await catalogo.obtener(env)).categoria("peluches")!.descripcion, texto);
+    assert.equal((await cat(env, cookie, { accion: "guardar", id: "peluches", categoria: { nombre: "Peluches", descripcion: "" } })).status, 200);
+    assert.ok(!(await catalogo.obtener(env)).categoria("peluches")!.descripcion);
+  });
+
   await prueba("crear: tope de categorías nuevas", async () => {
     const { env } = entorno();
     const cookie = await instalarYEntrar(env);

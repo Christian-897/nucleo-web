@@ -111,6 +111,11 @@ export const GUIAS_AYUDA: Record<string, PasoGuia[]> = {
     { selector: "label:has([data-categoria-archivo])", texto: "Con este botón cambias la **foto** de la categoría." },
     { selector: '[data-form="categoria"] button[type="submit"]', texto: "Toca **Guardar cambios**." },
   ],
+  "texto-categoria": [
+    { pestana: "categorias", selector: '[data-guia="editar-categoria"]', texto: "Toca **Editar** en la categoría." },
+    { clic: '[data-guia="editar-categoria"]', selector: '[data-form="categoria"] [name="descripcion"]', texto: "Escribe aquí el **Texto de la categoría**. Parte con qué es y para qué sirve: Google usa ese comienzo para describirla." },
+    { selector: '[data-form="categoria"] button[type="submit"]', texto: "Toca **Guardar cambios**." },
+  ],
   "nueva-categoria": [
     { pestana: "categorias", selector: "[data-nueva-categoria]", texto: "Toca **+ Nueva categoría**, escribe el nombre, elige la foto y guarda." },
   ],

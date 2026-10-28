@@ -1,5 +1,5 @@
 /**
- * Prueba de las categorías editables (nombre, nombre corto, bajada y foto).
+ * Prueba de las categorías editables (nombre, nombre corto, bajada, texto y foto).
  * Se corre con `npm test`.
  */
 import assert from "node:assert/strict";
@@ -12,6 +12,8 @@ import {
   MAXIMO_NUEVAS,
   limpiarCambios,
   rellenarPlantilla,
+  resumenParaGoogle,
+  textoPlano,
   validarCambioCategoria,
 } from "../modulos/catalogo/index";
 
@@ -85,6 +87,36 @@ async function run() {
     assert.equal(aplicarCambios(base, { b: { nombre: "Gorros", bajada: "de satín" } })[1].bajada, "de satín");
     const limpios = limpiarCambios({ a: { bajada: "x".repeat(80) } }, base);
     assert.equal(limpios.a.bajada?.length, 40);
+  });
+
+  await prueba("texto de la categoría (v0.44): párrafos, límite, vacío a propósito y el del sitio se respeta", () => {
+    assert.ok(!validarCambioCategoria({ nombre: "Bien", descripcion: "x".repeat(2001) }).ok, "más de 2000 no");
+    const v = validarCambioCategoria({ nombre: "Fundas", descripcion: "  Primer párrafo.\r\n\r\n\r\n\r\nSegundo\u0000 párrafo 💗  \n" });
+    assert.ok(v.ok);
+    assert.equal(v.ok && v.datos.descripcion, "Primer párrafo.\n\nSegundo párrafo 💗", "mantiene párrafos y emojis; quita líneas de más y caracteres raros");
+    const sinCampo = validarCambioCategoria({ nombre: "Fundas" });
+    assert.ok(sinCampo.ok && !("descripcion" in sinCampo.datos), "si no viene, no se toca");
+    const base = [{ id: "a", nombre: "Fundas", descripcion: "Del sitio" }, { id: "b", nombre: "Gorros" }];
+    assert.equal(aplicarCambios(base, { a: { nombre: "Fundas" } })[0].descripcion, "Del sitio", "sin tocarlo, queda el del sitio");
+    assert.equal(aplicarCambios(base, { a: { nombre: "Fundas", descripcion: "" } })[0].descripcion, "", "vaciarlo lo quita");
+    assert.equal(aplicarCambios(base, { b: { nombre: "Gorros", descripcion: "Nuevo" } })[1].descripcion, "Nuevo");
+    const limpios = limpiarCambios({ a: { descripcion: "x".repeat(3000) }, b: { descripcion: 5 } }, base);
+    assert.equal(limpios.a.descripcion?.length, 2000);
+    assert.equal(limpios.b, undefined, "un valor que no es texto se descarta");
+  });
+
+  await prueba("resumen para Google: sin emojis ni saltos, corta en una palabra completa", () => {
+    assert.equal(resumenParaGoogle(""), "");
+    assert.equal(resumenParaGoogle(undefined), "");
+    assert.equal(resumenParaGoogle("💗 Funda de satín.\n\nMenos frizz ✨ ."), "Funda de satín. Menos frizz.");
+    assert.equal(resumenParaGoogle("Ñandú con tilde: canción"), "Ñandú con tilde: canción", "letras con tilde y ñ intactas");
+    const largo = "Nuestras fundas están diseñadas para brindar a tu cabello un cuidado delicado, entregando a tu rutina nocturna suavidad, comodidad y elegancia. Su textura ayuda a reducir la fricción.";
+    const r = resumenParaGoogle(largo);
+    assert.ok(r.length <= 155, `máximo 155 (${r.length})`);
+    assert.ok(r.endsWith("…"));
+    assert.ok(largo.startsWith(r.slice(0, -1)), "corta en una palabra completa, sin partirla");
+    assert.ok(!/[ ,]…$/.test(r), "sin espacio ni coma antes de los puntos suspensivos");
+    assert.equal(textoPlano("a\n\n b 👍🏽  c"), "a b c");
   });
 
   await prueba("plantillas de título y descripción: {nombre} y {corto}", () => {

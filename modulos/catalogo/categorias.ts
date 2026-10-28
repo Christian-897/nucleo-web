@@ -1,6 +1,6 @@
 /**
  * CATEGORÍAS EDITABLES desde el panel:
- *  - nombre, nombre corto, bajada y foto de cada una (KV "catalogo:categorias",
+ *  - nombre, nombre corto, bajada, texto (descripcion, v0.44) y foto de cada una (KV "catalogo:categorias",
  *    cambios por id encima de las del sitio);
  *  - categorías NUEVAS y categorías del sitio BORRADAS (KV
  *    "catalogo:categorias-estructura"). Las nuevas no tienen página
@@ -60,7 +60,19 @@ export function categoriasVigentes(base: CategoriaCatalogo[], estructura: Estruc
 }
 
 export const CLAVE_CATEGORIAS = "catalogo:categorias";
-export const LIMITES_CATEGORIA = { nombre: 60, corto: 40, bajada: 40, subcategoria: 40 } as const;
+export const LIMITES_CATEGORIA = { nombre: 60, corto: 40, bajada: 40, subcategoria: 40, descripcion: 2000 } as const;
+
+/** Texto largo (v0.44): con saltos de línea, sin líneas en blanco de más. */
+export function limpiarTextoLargo(v: string, max: number): string {
+  return normalizeInput(v, { allowNewlines: true })
+    .replace(/\r\n?/g, "\n")
+    .replace(/\t/g, " ")
+    .replace(/[ ]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, max)
+    .trim();
+}
 /** Subcategorías por categoría (v0.39). */
 export const MAXIMO_SUBCATEGORIAS = 12;
 
@@ -142,6 +154,8 @@ export interface CambioCategoria {
   imagen?: string;
   /** Lista completa de subcategorías (v0.39). Sin el campo = las del sitio; [] = sin subcategorías. */
   subcategorias?: Subcategoria[];
+  /** Texto de la página de la categoría (v0.44). Vacío = sin texto. Google lo usa para describirla. */
+  descripcion?: string;
 }
 export type CambiosCategorias = Record<string, CambioCategoria>;
 
@@ -160,14 +174,25 @@ export function validarCambioCategoria(
   const nombre = texto(o.nombre);
   const corto = texto(o.corto);
   const bajada = texto(o.bajada);
+  const descripcionCruda = typeof o.descripcion === "string" ? limpiarTextoLargo(o.descripcion, LIMITES_CATEGORIA.descripcion + 1) : undefined;
   if (nombre.length < 2) e.nombre = "Escribe al menos 2 caracteres.";
   else if (nombre.length > LIMITES_CATEGORIA.nombre) e.nombre = `Máximo ${LIMITES_CATEGORIA.nombre} caracteres.`;
   if (corto.length > LIMITES_CATEGORIA.corto) e.corto = `Máximo ${LIMITES_CATEGORIA.corto} caracteres.`;
   if (bajada.length > LIMITES_CATEGORIA.bajada) e.bajada = `Máximo ${LIMITES_CATEGORIA.bajada} caracteres.`;
+  if (descripcionCruda !== undefined && descripcionCruda.length > LIMITES_CATEGORIA.descripcion) e.descripcion = `Máximo ${LIMITES_CATEGORIA.descripcion} caracteres.`;
   const errSub = erroresSubcategorias(o.subcategorias);
   if (errSub) e.subcategorias = errSub;
   if (Object.keys(e).length) return { ok: false, errores: e };
-  return { ok: true, datos: { nombre, corto, bajada, ...(o.subcategorias !== undefined ? { subcategorias: limpiarSubcategorias(o.subcategorias) } : {}) } };
+  return {
+    ok: true,
+    datos: {
+      nombre,
+      corto,
+      bajada,
+      ...(o.subcategorias !== undefined ? { subcategorias: limpiarSubcategorias(o.subcategorias) } : {}),
+      ...(descripcionCruda !== undefined ? { descripcion: descripcionCruda } : {}),
+    },
+  };
 }
 
 /** Limpia lo guardado en KV: ids que no existen o campos malos se descartan. */
@@ -184,6 +209,7 @@ export function limpiarCambios(crudo: unknown, base: CategoriaCatalogo[]): Cambi
     if (typeof v.bajada === "string") c.bajada = normalizeInput(v.bajada).trim().slice(0, LIMITES_CATEGORIA.bajada);
     if (imagenCategoriaValida(v.imagen)) c.imagen = v.imagen;
     if (Array.isArray(v.subcategorias)) c.subcategorias = limpiarSubcategorias(v.subcategorias);
+    if (typeof v.descripcion === "string") c.descripcion = limpiarTextoLargo(v.descripcion, LIMITES_CATEGORIA.descripcion);
     if (Object.keys(c).length) salida[id] = c;
   }
   return salida;
@@ -204,6 +230,8 @@ export function aplicarCambios(base: CategoriaCatalogo[], cambios: CambiosCatego
       bajada: k.bajada !== undefined ? k.bajada : c.bajada,
       ...(k.imagen ? { imagen: k.imagen } : {}),
       ...(k.subcategorias !== undefined ? { subcategorias: k.subcategorias } : {}),
+      // Igual que la bajada: sin tocarla queda la del sitio; vacía = sin texto.
+      ...(k.descripcion !== undefined ? { descripcion: k.descripcion } : {}),
     };
   });
 }

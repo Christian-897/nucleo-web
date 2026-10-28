@@ -406,11 +406,24 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "editar-categoria",
     seccion: "categorias",
-    titulo: "Cambiar el nombre o la foto de una categoría",
+    titulo: "Cambiar el nombre, la foto o el texto de una categoría",
     palabras: ["categoría", "renombrar", "foto categoría", "menú", "nombre corto"],
     contenido: [
-      { pasos: ["Ve a **Categorías** y toca **Editar**.", "Cambia el nombre, el nombre corto del menú, la bajada o la foto.", "Guarda."] },
+      { pasos: ["Ve a **Categorías** y toca **Editar**.", "Cambia el nombre, el nombre corto del menú, la bajada, el texto o la foto.", "Guarda."] },
       "Se actualiza en el menú, el inicio y la tienda en unos segundos.",
+    ],
+  },
+  {
+    id: "texto-categoria",
+    seccion: "categorias",
+    titulo: "Escribir el texto de una categoría (y cómo la describe Google)",
+    palabras: ["texto categoría", "descripción categoría", "seo", "google", "posicionamiento", "aparecer en google", "espacio en blanco", "se ve vacío", "texto largo", "descripción larga"],
+    contenido: [
+      "Cada categoría puede tener un texto propio. Se muestra en su página, junto a los productos (o debajo, si son muchos), y Google usa el comienzo para describirla en los resultados de búsqueda.",
+      { pasos: ["Ve a **Categorías** y toca **Editar** en la categoría.", "Escribe en **Texto de la categoría**. Puedes usar varios párrafos.", "Toca **Guardar cambios**. Se ve en la tienda en unos segundos."] },
+      "Consejos para que ayude a vender y a aparecer en Google:",
+      { pasos: ["Parte con qué es y para qué sirve, con las palabras que la gente busca. Ejemplo: «Fundas de almohada de satín que reducen el frizz y el quiebre mientras duermes».", "Después cuenta los beneficios, los cuidados y los tamaños.", "Escribe para personas, no repitas palabras de más. Los emojis se ven en la página, pero Google no los muestra."] },
+      { nota: "La ficha de cada producto sigue teniendo su propia descripción: ahí va lo de ese producto. El texto general (por qué satín, cuidados) va mejor en la categoría, para no repetirlo en cada ficha." },
     ],
   },
   {

@@ -56,9 +56,11 @@ export {
   limpiarCambios,
   aplicarCambios,
   imagenCategoriaValida,
+  limpiarTextoLargo,
   type CambioCategoria,
   type CambiosCategorias,
 } from "./categorias";
+export { resumenParaGoogle, textoPlano } from "./resumen";
 export { crearEndpointCatalogoPublico, type ProductoPublico } from "./publico";
 export { crearEndpointStock } from "./endpoint";
 export { consultarStock, consultarStockColores } from "./cliente";

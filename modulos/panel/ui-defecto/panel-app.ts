@@ -1272,11 +1272,13 @@ interface CategoriaPanel {
   nombre: string;
   corto: string;
   bajada: string;
+  /** Texto de la página de la categoría (v0.44). */
+  descripcion?: string;
   imagen: string;
   productos: number;
   editada: boolean;
   nueva?: boolean;
-  original: { nombre: string; corto: string; bajada: string };
+  original: { nombre: string; corto: string; bajada: string; descripcion?: string };
   subcategorias?: { id: string; nombre: string; productos: number }[];
 }
 let listaCategoriasPanel: CategoriaPanel[] = [];
@@ -1313,6 +1315,7 @@ async function cargarCategorias() {
       datos.append(crear("span", "", c.productos === 1 ? "1 producto" : `${c.productos} productos`));
       if (c.corto && c.corto !== c.nombre) datos.append(crear("span", "", `Corto: ${c.corto}`));
       if (c.bajada) datos.append(crear("span", "", `Bajada: ${c.bajada}`));
+      if (c.descripcion) datos.append(crear("span", "", "Con texto"));
       if (c.subcategorias?.length) datos.append(crear("span", "", `Subcategorías: ${c.subcategorias.map((x) => x.nombre).join(" · ")}`));
       if (c.nueva) datos.append(crear("span", "pa-etiqueta pa-etiqueta--ok", "Nueva"));
       else if (c.editada) datos.append(crear("span", "pa-etiqueta pa-etiqueta--acento", "Editada"));
@@ -1434,6 +1437,7 @@ function abrirEditorCategoria(c: CategoriaPanel | null) {
   (f.elements.namedItem("nombre") as HTMLInputElement).value = c?.nombre ?? "";
   (f.elements.namedItem("corto") as HTMLInputElement).value = !c || c.corto === c.nombre ? "" : c.corto;
   (f.elements.namedItem("bajada") as HTMLInputElement).value = c?.bajada ?? "";
+  (f.elements.namedItem("descripcion") as HTMLTextAreaElement).value = c?.descripcion ?? "";
   $("[data-categoria-original]").textContent = c?.editada && !c.nueva ? `Nombre original del sitio: ${c.original.nombre}` : "";
   subcatsEditor = (c?.subcategorias ?? []).map((x) => ({ ...x }));
   pintarSubcatsEditor();
@@ -1481,6 +1485,7 @@ formCategoria().addEventListener("submit", async (e) => {
       nombre: String(d.get("nombre") || ""),
       corto: String(d.get("corto") || ""),
       bajada: String(d.get("bajada") || ""),
+      descripcion: String(d.get("descripcion") || ""),
       // Las filas vacías se ignoran; las que tienen nombre se guardan en este orden.
       subcategorias: subcatsEditor.filter((x) => x.nombre.trim()).map((x) => ({ ...(x.id ? { id: x.id } : {}), nombre: x.nombre.trim() })),
     };

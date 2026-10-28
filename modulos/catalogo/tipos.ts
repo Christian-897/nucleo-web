@@ -56,6 +56,8 @@ export interface CategoriaCatalogo {
   corto?: string;
   /** Línea chica bajo el nombre en las tarjetas del sitio. Opcional. */
   bajada?: string;
+  /** Texto de la página de la categoría (v0.44): se muestra allí y Google lo usa para describirla. */
+  descripcion?: string;
   imagen?: string;
   /** Subcategorías (v0.39): botones de filtro en su página y su propia dirección /tienda/<cat>/<sub>/. */
   subcategorias?: Subcategoria[];

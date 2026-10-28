@@ -17,9 +17,13 @@
  *  - CATEGORÍAS: si se cambió el nombre o la foto de una categoría en el
  *    panel, todo elemento `data-categoria="<id>"` se pone al día según
  *    `data-categoria-campo` (uno o varios, separados por espacio):
- *      nombre · corto · bajada · imagen (src) · alt · texto · content
+ *      nombre · corto · bajada · imagen (src) · alt · texto · content ·
+ *      descripcion · descripcion-meta
  *    "texto" y "content" (atributo de <meta>) usan la plantilla de
  *    `data-categoria-plantilla`, con {nombre} y {corto}.
+ *    "descripcion" (v0.44) pone el texto de la categoría (vacío = elemento
+ *    vacío; el sitio lo esconde con :empty). "descripcion-meta" pone en
+ *    `content` el resumen para Google de ese texto, o la plantilla si no hay.
  *  - CATEGORÍAS CREADAS O BORRADAS en el panel: en cada lista de categorías
  *    del sitio (menú, pie, filtros, tarjetas de portada), un contenedor
  *    `data-cats-lista` trae un elemento `data-cats-item="<id>"` por cada
@@ -49,6 +53,7 @@ import { type ColorProducto, idCompuesto, idConColor, imagenPrincipal, tieneColo
 import { colorEnOpcion, precioDeOpcion, rangoDePrecios, tieneOpciones } from "./opciones";
 import { type VistaLista, type VistaListas, obtenerVistaListas, vistaDeFiltro, VISTA_LISTAS_POR_DEFECTO } from "./vista-listas";
 import { AJUSTES_FICHA_POR_DEFECTO, type AjustesFicha, obtenerAjustesFicha } from "./ficha";
+import { resumenParaGoogle, textoPlano } from "./resumen";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
 interface ElementoHtml {
@@ -585,6 +590,14 @@ function conCategorias(r: Reescritor, catalogo: Catalogo): Reescritor {
           case "content":
             el.setAttribute("content", rellenarPlantilla(plantilla, c));
             break;
+          case "descripcion":
+            el.setInnerContent(typeof c.descripcion === "string" ? c.descripcion : "", { html: false });
+            break;
+          case "descripcion-meta": {
+            const resumen = resumenParaGoogle(typeof c.descripcion === "string" ? c.descripcion : "");
+            el.setAttribute("content", resumen || rellenarPlantilla(plantilla, c));
+            break;
+          }
         }
       }
     },
@@ -679,12 +692,14 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
       const imagen = imagenSegura(primero?.foto ?? p.imagen, opciones.imagenPorDefecto);
       const imagenAbs = new URL(imagen, opciones.sitio.dominio).href;
       const galeria = fotosSeguras(p);
-      const descripcion = (p.descripcion || p.nombre).slice(0, 300);
+      // Google muestra unos 155 caracteres: sin emojis ni saltos, cortado en una palabra (v0.44).
+      const descripcion = resumenParaGoogle(p.descripcion) || p.nombre;
+      const descripcionLarga = textoPlano(p.descripcion || p.nombre).slice(0, 500);
       const jsonLd = {
         "@context": "https://schema.org",
         "@type": "Product",
         name: p.nombre,
-        description: descripcion,
+        description: descripcionLarga,
         image: galeria.length > 1 ? galeria.map((f) => new URL(f, opciones.sitio.dominio).href) : imagenAbs,
         sku: p.id,
         brand: { "@type": "Brand", name: opciones.sitio.nombre },
