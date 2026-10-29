@@ -760,21 +760,23 @@ formProducto().addEventListener("submit", async (e) => {
     // 3) Colores: sube las fotos nuevas (grande y miniatura) y guarda la lista, solo si algo cambió.
     if (firmaColores() !== coloresOriginal) {
       const errorC = $("[data-error-colores]");
-      const pendientes = coloresEditor.filter((c) => c.archivoFoto && c.archivoMini);
+      // Puede cambiar la foto grande, la miniatura (el cuadrito) o las dos (v0.44.1).
+      const pendientes = coloresEditor.filter((c) => c.archivoFoto || c.archivoMini);
       for (const [n, c] of pendientes.entries()) {
         errorC.textContent = `Subiendo ${n + 1} de ${pendientes.length}…`;
-        const a = await subirFotoColor(id, c.archivoFoto!);
-        if (siSeCerro(a.status)) return;
-        const b = a.ok ? await subirFotoColor(id, c.archivoMini!) : a;
-        if (siSeCerro(b.status)) return;
-        if (!a.ok || !b.ok) {
-          errorC.textContent = `${b.datos.message || "Una foto no se pudo subir."} Revisa y vuelve a Guardar cambios.`;
+        const a = c.archivoFoto ? await subirFotoColor(id, c.archivoFoto) : null;
+        if (a && siSeCerro(a.status)) return;
+        const b = c.archivoMini && (!a || a.ok) ? await subirFotoColor(id, c.archivoMini) : null;
+        if (b && siSeCerro(b.status)) return;
+        const fallo = [a, b].find((x) => x && !x.ok);
+        if (fallo) {
+          errorC.textContent = `${fallo.datos.message || "Una foto no se pudo subir."} Revisa y vuelve a Guardar cambios.`;
           return;
         }
-        URL.revokeObjectURL(c.vista);
-        c.foto = a.datos.imagen;
-        c.mini = b.datos.imagen;
-        c.vista = c.mini;
+        if (c.vista.startsWith("blob:")) URL.revokeObjectURL(c.vista);
+        if (a) c.foto = a.datos.imagen;
+        if (b) c.mini = b.datos.imagen;
+        c.vista = c.mini ?? c.foto ?? "";
         delete c.archivoFoto;
         delete c.archivoMini;
       }
@@ -853,12 +855,12 @@ function firmaColores(): string {
   return JSON.stringify({
     t: $<HTMLSelectElement>("[data-colores-titulo]").value,
     e: enfoqueColores,
-    c: coloresEditor.map((c) => [c.id ?? "", c.nombre.trim(), c.disponible.trim(), c.foto ?? "", c.mini ?? "", c.archivoFoto ? "nuevo" : ""]),
+    c: coloresEditor.map((c) => [c.id ?? "", c.nombre.trim(), c.disponible.trim(), c.foto ?? "", c.mini ?? "", c.archivoFoto ? "nuevo" : "", c.archivoMini ? "nueva-mini" : ""]),
   });
 }
 
 function soltarVistasColores() {
-  for (const c of coloresEditor) if (c.archivoMini) URL.revokeObjectURL(c.vista);
+  for (const c of coloresEditor) if (c.vista.startsWith("blob:")) URL.revokeObjectURL(c.vista);
 }
 
 /** "Azul rey.jpg" → "Azul rey"; las fotos de WhatsApp o cámara (IMG-2026…) → "Color 3". */
@@ -931,25 +933,54 @@ function pintarColores() {
         if (!f) return;
         const listo = await prepararFotoColor(f);
         if (!listo) return;
-        if (c.archivoMini) URL.revokeObjectURL(c.vista);
-        Object.assign(c, listo);
+        if (c.vista.startsWith("blob:")) URL.revokeObjectURL(c.vista);
+        // Si el cuadrito es una muestra de tela del sitio (/img/), se mantiene: solo cambia la foto grande.
+        if (!c.archivoMini && c.mini?.startsWith("/img/")) {
+          URL.revokeObjectURL(listo.vista);
+          c.archivoFoto = listo.archivoFoto;
+          c.vista = c.mini;
+        } else Object.assign(c, listo);
         pintarColores();
       });
       cambiar.append(archivo);
+      // Solo el cuadrito de color (v0.44.1): por ejemplo, una foto de la tela.
+      const cambiarMini = crear("label", "pa-boton pa-boton--suave pa-boton--chico pa-archivo", "Cambiar cuadrito");
+      cambiarMini.title = `Cambiar solo el cuadrito de ${c.nombre || "este color"} (la foto grande no cambia)`;
+      const archivoMini = crear("input");
+      archivoMini.type = "file";
+      archivoMini.accept = "image/jpeg,image/png,image/webp";
+      archivoMini.setAttribute("data-color-mini", "");
+      archivoMini.addEventListener("change", async () => {
+        const f = archivoMini.files?.[0];
+        archivoMini.value = "";
+        if (!f) return;
+        try {
+          const mini = await reducirFoto(f, 320, 60 * 1024, "cuadrado");
+          if (c.vista.startsWith("blob:") && !c.archivoFoto) URL.revokeObjectURL(c.vista);
+          c.archivoMini = mini;
+          c.vista = URL.createObjectURL(mini);
+          pintarColores();
+        } catch {
+          $("[data-error-colores]").textContent = `No pudimos usar «${f.name}». Usa fotos JPG, PNG o WebP.`;
+        }
+      });
+      cambiarMini.append(archivoMini);
       botones.append(
         boton("↑", `Subir ${c.nombre}`, () => mover(i, i - 1), i === 0),
         boton("↓", `Bajar ${c.nombre}`, () => mover(i, i + 1), i === total - 1),
         cambiar,
+        cambiarMini,
         boton("Quitar", `Quitar ${c.nombre}`, () => {
           if (c.id && !confirm(`¿Quitar el color «${c.nombre}»? Deja de verse en la tienda al guardar.`)) return;
           const [q] = coloresEditor.splice(i, 1);
-          if (q.archivoMini) URL.revokeObjectURL(q.vista);
+          if (q.vista.startsWith("blob:")) URL.revokeObjectURL(q.vista);
           pintarColores();
         })
       );
       li.append(img, nombre, disp, botones);
       if (c.vendidos) li.append(crear("p", "pa-tenue pa-chico pa-variante__vendidos", `Vendidos desde el último ajuste: ${c.vendidos}`));
       else if (!c.id) li.append(crear("p", "pa-variante__nuevo pa-variante__vendidos", "Nuevo: se sube al guardar"));
+      else if (c.archivoFoto || c.archivoMini) li.append(crear("p", "pa-variante__nuevo pa-variante__vendidos", c.archivoFoto && c.archivoMini ? "Foto y cuadrito nuevos: se suben al guardar" : c.archivoFoto ? "Foto nueva: se sube al guardar" : "Cuadrito nuevo: se sube al guardar"));
       return li;
     })
   );

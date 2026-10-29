@@ -75,6 +75,7 @@ export const GUIAS_AYUDA: Record<string, PasoGuia[]> = {
     ...abrirEditor(),
     { clic: EDITAR, selector: "[data-editor-colores]", texto: "En **Colores** está cada color con su foto y su nombre." },
     { selector: "label:has([data-colores-archivo])", texto: "Toca **Agregar colores** y elige una foto por color. Después escribe el nombre de cada uno." },
+    { selector: "label:has([data-color-mini])", texto: "Con **Cambiar foto** cambias la foto grande de un color, y con **Cambiar cuadrito** solo el cuadrito que se toca en la tienda (por ejemplo, la tela de cerca)." },
     { selector: GUARDAR, texto: "Toca **Guardar cambios**." },
   ],
   "colores-stock": [
