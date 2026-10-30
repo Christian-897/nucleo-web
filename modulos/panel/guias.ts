@@ -154,6 +154,19 @@ export const GUIAS_AYUDA: Record<string, PasoGuia[]> = {
   "activar-construccion": [
     { pestana: "resumen", selector: "[data-construccion-activar]", texto: "Abre **¿El dueño del panel te dio un código…?**, escribe el código y crea tu clave." },
   ],
+  "resenas-como-funcionan": [
+    { pestana: "resenas", selector: "[data-lista-resenas]", texto: "Aquí llegan las reseñas de tus compradores. Las nuevas aparecen como **Por revisar** y no se publican hasta que las apruebas." },
+  ],
+  "aprobar-resena": [
+    { pestana: "resenas", selector: '[data-guia="aprobar-resena"]', texto: "Toca **Aprobar y publicar** para que se vea en la tienda." },
+    { selector: '[data-guia="eliminar-resena"]', texto: "O toca **Eliminar** si es un insulto, odio o spam. No se puede deshacer." },
+  ],
+  "responder-resena": [
+    { pestana: "resenas", selector: '[data-guia="responder-resena"]', texto: "Toca **Responder**, escribe tu respuesta y toca **Guardar respuesta**." },
+  ],
+  "pedir-resena": [
+    { pestana: "pedidos", selector: '[data-guia="pedir-resena"]', texto: "En un pedido ya enviado, toca **Pedir reseña** para mandarle el correo al comprador." },
+  ],
   mensajes: [
     { pestana: "mensajes", selector: "[data-lista-mensajes]", texto: "Aquí llegan los mensajes del formulario de contacto. Para responder, usa el correo o el teléfono que dejó la persona." },
   ],

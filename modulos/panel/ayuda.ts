@@ -21,6 +21,7 @@ export type SeccionAyuda =
   | "pedidos"
   | "despacho"
   | "mensajes"
+  | "resenas"
   | "suscriptores"
   | "seguridad";
 
@@ -35,6 +36,7 @@ export const SECCIONES_AYUDA: Record<SeccionAyuda, { nombre: string; pestana?: s
   pedidos: { nombre: "Pedidos", pestana: "pedidos" },
   despacho: { nombre: "Despacho y retiro", pestana: "pedidos" },
   mensajes: { nombre: "Mensajes", pestana: "mensajes" },
+  resenas: { nombre: "Reseñas", pestana: "resenas" },
   suscriptores: { nombre: "Suscriptores y boletines", pestana: "suscriptores" },
   seguridad: { nombre: "Seguridad y usuarios", pestana: "seguridad" },
 };
@@ -624,6 +626,55 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     contenido: [
       "En **Mensajes** está lo que te escriben desde el formulario de contacto. La burbuja con número en la pestaña indica los que faltan por responder.",
       { pasos: ["**Responder por correo** abre tu correo con la respuesta lista.", "Cuando contestes, toca **Marcar como respondido**.", "**Borrar** elimina el mensaje (no se puede deshacer)."] },
+    ],
+  },
+
+  // ───────────── reseñas (v0.45) ─────────────
+  {
+    id: "resenas-como-funcionan",
+    seccion: "resenas",
+    titulo: "Cómo funcionan las reseñas",
+    palabras: ["reseñas", "reseña", "opiniones", "opinión", "comentarios", "estrellas", "calificación", "valoración", "google estrellas", "compra verificada"],
+    requiere: '[data-tab="resenas"]:not([hidden])',
+    contenido: [
+      "Las reseñas son de **compradores verificados**: solo puede opinar quien compró, con un enlace propio que le llega por correo.",
+      { pasos: ["En **Pedidos**, cuando despachas un pedido y tocas **Marcar como enviado**, al comprador le llega un correo: «¿Qué te pareció tu compra?».", "La persona elige de 1 a 5 estrellas y escribe su opinión de cada producto que compró.", "Te llega un aviso por correo y la reseña aparece en **Reseñas** como **Por revisar**.", "**No se publica nada hasta que tú la apruebes.**"] },
+      "Las aprobadas se ven en la ficha del producto, con las estrellas junto al precio y la lista de opiniones abajo. Google puede mostrar esas estrellas en los resultados de búsqueda.",
+      { nota: "En la tienda se publica solo el nombre que la persona eligió (por ejemplo «Ana P.»), nunca su correo ni su pedido." },
+    ],
+  },
+  {
+    id: "aprobar-resena",
+    seccion: "resenas",
+    titulo: "Aprobar, rechazar o eliminar una reseña",
+    palabras: ["aprobar reseña", "publicar reseña", "rechazar reseña", "eliminar reseña", "borrar reseña", "despublicar", "hate", "insulto", "comentario ofensivo", "spam", "reseña mala", "reseña negativa"],
+    requiere: '[data-tab="resenas"]:not([hidden])',
+    contenido: [
+      { pasos: ["Ve a **Reseñas**. La burbuja con número en la pestaña indica las que faltan por revisar.", "**Aprobar y publicar**: la reseña aparece en la ficha del producto en unos segundos.", "**Rechazar**: no se publica (queda guardada; la ves marcando «Ver también las aprobadas y rechazadas»).", "**Despublicar**: saca de la tienda una que ya estaba publicada.", "**Eliminar**: la borra para siempre."] },
+      "Elimina o rechaza los insultos, el odio, el spam y las que traen datos personales (teléfonos, direcciones).",
+      { nota: "Una queja real es mejor responderla que borrarla: una tienda con solo opiniones perfectas genera desconfianza, y una buena respuesta muestra que te importan tus clientes." },
+    ],
+  },
+  {
+    id: "responder-resena",
+    seccion: "resenas",
+    titulo: "Responder una reseña",
+    palabras: ["responder reseña", "contestar reseña", "respuesta", "queja", "reclamo"],
+    requiere: '[data-tab="resenas"]:not([hidden])',
+    contenido: [
+      { pasos: ["En **Reseñas**, toca **Responder** en la reseña.", "Escribe tu respuesta y toca **Guardar respuesta**.", "Se publica bajo la reseña como «Respuesta de» tu tienda (si la reseña está aprobada).", "Para quitarla, toca **Cambiar respuesta**, deja el texto vacío y guarda."] },
+    ],
+  },
+  {
+    id: "pedir-resena",
+    seccion: "resenas",
+    titulo: "Pedir una reseña a mano (o volver a pedirla)",
+    palabras: ["pedir reseña", "enviar reseña", "correo reseña", "no llegó el correo de reseña", "volver a pedir"],
+    requiere: '[data-tab="resenas"]:not([hidden])',
+    contenido: [
+      "El correo para opinar sale solo, una vez, al marcar el pedido como enviado. Si el pedido se marcó antes de activar las reseñas, o la persona no encuentra el correo, puedes pedirla de nuevo:",
+      { pasos: ["Ve a **Pedidos**.", "En el pedido (ya marcado como enviado), toca **Pedir reseña** o **Volver a pedir reseña**."] },
+      { nota: "Pídela con moderación: un solo recordatorio basta. Que revise también la carpeta de spam o promociones." },
     ],
   },
 

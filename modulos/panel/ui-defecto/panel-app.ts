@@ -27,8 +27,8 @@ import { crearVistaSitio } from "./sitio-vista";
 import { crearVistaAyuda } from "./ayuda-vista";
 import { IDS_ZONAS, NOMBRES_RETIRO, nombreZona, textoRetiro, textosDespacho, type TarifasDespacho, type ZonaDespacho } from "../../despacho/calculo";
 
-type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "mensajes" | "suscriptores" | "seguridad";
-const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "mensajes", "suscriptores", "seguridad"];
+type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "mensajes" | "resenas" | "suscriptores" | "seguridad";
+const PESTANAS: Vista[] = ["resumen", "productos", "categorias", "portada", "sitio", "pedidos", "mensajes", "resenas", "suscriptores", "seguridad"];
 const API = "/api/admin";
 
 interface Producto {
@@ -90,6 +90,8 @@ interface Pedido {
   despacho?: { forma: string; costo: number; zona?: string; gratisPorMonto?: boolean; retiro?: { nombre: string; comuna: string } };
   enviado: string | null;
   anulado: { fecha: string; por: string; stockDevuelto: boolean } | null;
+  /** Cuándo se le pidió la reseña (v0.45). */
+  resenaPedida?: string | null;
 }
 
 const raiz = document.querySelector<HTMLElement>("[data-panel]")!;
@@ -323,6 +325,7 @@ async function abrirPestana(v: Vista) {
     await cargarPedidos();
   }
   if (v === "mensajes") await cargarMensajes();
+  if (v === "resenas") await cargarResenas();
   if (v === "suscriptores") await cargarSuscriptores();
   if (v === "seguridad") await cargarSeguridad();
 }
@@ -337,6 +340,7 @@ async function entrarAlPanel(segundos: number) {
   void cargarConstruccion();
   // La burbuja de "Mensajes" se ve desde que entra, sin abrir la pestaña.
   if (!$('[data-tab="mensajes"]').hidden) void cargarMensajes(true);
+  if (!$('[data-tab="resenas"]').hidden) void cargarResenas(true);
   await abrirPestana("resumen");
 }
 
@@ -1932,6 +1936,8 @@ async function cargarPedidos() {
       }
       if (p.tieneDigitales) dato("Incluye cursos o patrones: envía el material al correo del comprador.");
       dato(`Pedido ${p.orden}`);
+      const conResenas = !$('[data-tab="resenas"]').hidden;
+      if (conResenas && p.resenaPedida) dato(`Se le pidió su opinión: ${fecha(p.resenaPedida)}`);
       if (p.anulado) {
         dato(
           `Anulado el ${fecha(p.anulado.fecha)} por ${p.anulado.por}. ` +
@@ -1946,15 +1952,35 @@ async function cargarPedidos() {
         b.dataset.guia = "marcar-enviado";
         b.addEventListener("click", async () => {
           b.disabled = true;
-          const r2 = await enviar(`${API}/pedidos`, { accion: "marcar-enviado", orden: p.orden, enviado: !p.enviado });
+          const r2 = await enviar<{ resenaPedida?: string | null }>(`${API}/pedidos`, { accion: "marcar-enviado", orden: p.orden, enviado: !p.enviado });
           if (siSeCerro(r2.status)) return;
           if (!r2.ok) {
             b.disabled = false;
             return avisar(r2.datos.message || "No se pudo actualizar.");
           }
+          if (!p.enviado && !p.resenaPedida && r2.datos.resenaPedida) avisar("Listo. Al comprador le llegó un correo para que opine cuando lo reciba.");
           await cargarPedidos();
         });
         botones.append(b);
+      }
+      // Pedir (o volver a pedir) la opinión a mano: por ejemplo, pedidos enviados antes de activar las reseñas.
+      if (conResenas && p.estado === "pagada" && p.enviado && !p.anulado) {
+        const pedir = crear("button", "pa-boton pa-boton--suave pa-boton--chico", p.resenaPedida ? "Volver a pedir reseña" : "Pedir reseña");
+        pedir.type = "button";
+        pedir.dataset.guia = "pedir-resena";
+        pedir.addEventListener("click", async () => {
+          if (p.resenaPedida && !confirm(`Ya le pediste su opinión el ${fecha(p.resenaPedida)}. ¿Enviarle el correo otra vez?`)) return;
+          pedir.disabled = true;
+          const r2 = await enviar(`${API}/pedidos`, { accion: "pedir-resena", orden: p.orden });
+          if (siSeCerro(r2.status)) return;
+          if (!r2.ok) {
+            pedir.disabled = false;
+            return avisar(r2.datos.message || "No se pudo enviar el correo.");
+          }
+          avisar("Listo. Le enviamos el correo para que opine.");
+          await cargarPedidos();
+        });
+        botones.append(pedir);
       }
       if (puedeAnular && !p.anulado) {
         const anular = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Anular pedido");
@@ -2849,6 +2875,130 @@ async function cargarMensajes(solo = false) {
   );
 }
 $("[data-mensajes-todos]").addEventListener("change", () => cargarMensajes());
+
+// ─────────────────────────── reseñas (v0.45) ───────────────────────────
+
+interface ResenaPanel {
+  clave: string;
+  producto: string;
+  productoNombre: string;
+  orden: string;
+  nombre: string;
+  estrellas: number;
+  texto: string;
+  variante: string;
+  fecha: string;
+  estado: "pendiente" | "aprobada" | "rechazada";
+  respuesta: string;
+}
+
+function pintarBurbujaResenas(pendientes: number) {
+  const b = $("[data-resenas-pendientes]");
+  b.textContent = pendientes > 99 ? "99+" : String(pendientes);
+  b.hidden = pendientes === 0;
+  b.title = `${pendientes} por revisar`;
+}
+
+async function accionResena(cuerpo: Record<string, unknown>, boton: HTMLButtonElement, aviso: string) {
+  boton.disabled = true;
+  const r = await enviar(`${API}/resenas`, cuerpo);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    boton.disabled = false;
+    return avisar(r.datos.message || "No se pudo guardar.");
+  }
+  avisar(aviso);
+  await cargarResenas();
+}
+
+/** solo = true: solo actualiza la burbuja de la pestaña (al entrar al panel). */
+async function cargarResenas(solo = false) {
+  const r = await obtener<{ pendientes: number; total: number; resenas: ResenaPanel[] }>(`${API}/resenas`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    if (!solo) avisar(r.datos.message || "No se pudieron cargar las reseñas.");
+    return;
+  }
+  pintarBurbujaResenas(r.datos.pendientes);
+  if (solo) return;
+  const todas = $<HTMLInputElement>("[data-resenas-todas]").checked;
+  const lista = todas ? r.datos.resenas : r.datos.resenas.filter((x) => x.estado === "pendiente");
+  $("[data-resumen-resenas]").textContent = r.datos.total
+    ? `${r.datos.pendientes} por revisar · ${r.datos.total} en total` + (!todas && !lista.length ? ". Estás al día." : "")
+    : "Todavía no hay reseñas. Llegan cuando marcas pedidos como enviados y los compradores opinan.";
+  const fecha = (iso: string) => new Date(iso).toLocaleString("es-CL", { dateStyle: "medium", timeStyle: "short" });
+  const etiqueta = { pendiente: ["Por revisar", "pa-etiqueta--alerta"], aprobada: ["Publicada", "pa-etiqueta--ok"], rechazada: ["Rechazada", ""] } as const;
+  $("[data-lista-resenas]").replaceChildren(
+    ...lista.map((x) => {
+      const li = crear("li", "pa-pedido pa-mensaje");
+      const cabeza = crear("div", "pa-pedido__cabeza");
+      const izq = crear("div");
+      const [texto, clase] = etiqueta[x.estado];
+      izq.append(
+        crear("strong", "", x.productoNombre),
+        document.createTextNode(" "),
+        crear("span", "pa-resena__estrellas", "★".repeat(x.estrellas) + "☆".repeat(5 - x.estrellas)),
+        document.createTextNode(" "),
+        crear("span", `pa-etiqueta ${clase}`, texto)
+      );
+      cabeza.append(izq, crear("span", "pa-tenue pa-chico", fecha(x.fecha)));
+      li.append(cabeza, crear("p", "pa-pedido__dato", `${x.nombre}${x.variante ? ` · compró ${x.variante}` : ""} · pedido ${x.orden}`), crear("p", "pa-mensaje__texto", x.texto));
+      if (x.respuesta) li.append(crear("p", "pa-pedido__dato", `Tu respuesta: ${x.respuesta}`));
+
+      const botones = crear("div", "pa-mensaje__botones");
+      const boton = (t: string, suave = true) => {
+        const b = crear("button", suave ? "pa-boton pa-boton--suave pa-boton--chico" : "pa-boton pa-boton--chico", t);
+        b.type = "button";
+        return b;
+      };
+      if (x.estado !== "aprobada") {
+        const aprobar = boton("Aprobar y publicar", false);
+        aprobar.dataset.guia = "aprobar-resena";
+        aprobar.addEventListener("click", () => void accionResena({ accion: "aprobar", clave: x.clave }, aprobar, "Reseña publicada."));
+        botones.append(aprobar);
+      }
+      if (x.estado === "pendiente") {
+        const rechazar = boton("Rechazar");
+        rechazar.addEventListener("click", () => void accionResena({ accion: "rechazar", clave: x.clave }, rechazar, "Reseña rechazada: no se publica."));
+        botones.append(rechazar);
+      }
+      if (x.estado === "aprobada") {
+        const ocultar = boton("Despublicar");
+        ocultar.addEventListener("click", () => void accionResena({ accion: "rechazar", clave: x.clave }, ocultar, "Reseña despublicada."));
+        botones.append(ocultar);
+      }
+      const responder = boton(x.respuesta ? "Cambiar respuesta" : "Responder");
+      responder.dataset.guia = "responder-resena";
+      responder.addEventListener("click", () => {
+        const caja = li.querySelector<HTMLElement>(".pa-resena__responder");
+        if (caja) return caja.querySelector("textarea")?.focus();
+        const form = crear("div", "pa-resena__responder");
+        const area = crear("textarea");
+        area.rows = 3;
+        area.maxLength = 1000;
+        area.value = x.respuesta;
+        area.setAttribute("aria-label", `Respuesta a ${x.nombre}`);
+        area.placeholder = "Tu respuesta se publica bajo la reseña (vacío = sin respuesta).";
+        const guardar = boton("Guardar respuesta", false);
+        guardar.addEventListener("click", () => void accionResena({ accion: "responder", clave: x.clave, texto: area.value }, guardar, area.value.trim() ? "Respuesta guardada." : "Respuesta quitada."));
+        form.append(area, guardar);
+        li.append(form);
+        area.focus();
+      });
+      botones.append(responder);
+      const eliminar = boton("Eliminar");
+      eliminar.dataset.guia = "eliminar-resena";
+      eliminar.addEventListener("click", () => {
+        if (!confirm(`¿Eliminar la reseña de ${x.nombre}? Desaparece de la tienda y no se puede deshacer.`)) return;
+        void accionResena({ accion: "eliminar", clave: x.clave }, eliminar, "Reseña eliminada.");
+      });
+      botones.append(eliminar);
+      li.append(botones);
+      return li;
+    })
+  );
+}
+$("[data-resenas-todas]").addEventListener("change", () => cargarResenas());
 
 // ─────────────────────────── suscriptores ───────────────────────────
 

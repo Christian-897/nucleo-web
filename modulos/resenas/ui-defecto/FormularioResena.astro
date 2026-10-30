@@ -1,0 +1,72 @@
+---
+/**
+ * Formulario de reseña (página a la que lleva el correo, por defecto /resena/).
+ * Usa los colores del sitio (--c-acento, --c-borde, --c-tinta, --c-suave) si existen.
+ *
+ *   ---
+ *   import FormularioResena from "nucleo-web/resenas/FormularioResena.astro";
+ *   ---
+ *   <Base titulo="Tu opinión" noIndexar><FormularioResena /></Base>
+ */
+interface Props {
+  titulo?: string;
+}
+const { titulo = "¿Qué te pareció tu compra?" } = Astro.props;
+---
+<section class="resena-form" data-resena>
+  <h1 class="resena-form__titulo">{titulo}</h1>
+  <p class="resena-form__estado" data-resena-estado aria-live="polite">Cargando tu pedido…</p>
+  <form data-resena-form hidden novalidate>
+    <p class="resena-form__ayuda">Puedes opinar de uno o de todos. Tu opinión se publica después de que la tienda la revise.</p>
+    <ul class="resena-form__lista" data-resena-productos></ul>
+    <label class="resena-form__campo resena-form__campo--nombre">
+      <span>Tu nombre como aparecerá publicado</span>
+      <input type="text" maxlength="40" autocomplete="off" data-resena-nombre required />
+      <small>Te sugerimos tu nombre y la inicial de tu apellido.</small>
+    </label>
+    <p class="resena-form__error resena-form__error--general" data-resena-error role="alert"></p>
+    <button class="resena-form__boton" type="submit">Enviar mi opinión</button>
+  </form>
+  <div class="resena-form__gracias" data-resena-gracias hidden>
+    <p class="resena-form__gracias-titulo">¡Gracias por tu opinión!</p>
+    <p>La vamos a revisar y pronto aparecerá en la tienda.</p>
+    <a class="resena-form__boton" href="/">Volver a la tienda</a>
+  </div>
+</section>
+
+<style>
+  .resena-form { max-width: 640px; margin: 0 auto; padding: 32px 0 56px; color: var(--c-tinta, #3a2a33); }
+  .resena-form__titulo { font-size: clamp(1.8rem, 4vw, 2.4rem); margin: 0 0 12px; }
+  .resena-form__estado, .resena-form__ayuda { color: var(--c-suave, #7a6a72); }
+  .resena-form__lista { list-style: none; padding: 0; margin: 16px 0 24px; display: grid; gap: 16px; }
+  .resena-form :global(.resena-form__producto) { border: 1px solid var(--c-borde, #eadde2); border-radius: 14px; padding: 16px; background: #fff; }
+  .resena-form :global(.resena-form__cabeza) { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .resena-form :global(.resena-form__cabeza img) { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; }
+  .resena-form :global(.resena-form__nombre) { display: block; }
+  .resena-form :global(.resena-form__variante) { display: block; color: var(--c-suave, #7a6a72); font-size: .92rem; }
+  .resena-form :global(.resena-form__estrellas) { border: 0; padding: 0; margin: 0 0 10px; }
+  .resena-form :global(.resena-form__leyenda) { font-size: .95rem; margin-bottom: 4px; }
+  .resena-form :global(.resena-form__fila) { display: inline-flex; flex-direction: row-reverse; gap: 4px; }
+  .resena-form :global(.resena-form__fila input) { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .resena-form :global(.resena-form__fila label) { font-size: 2rem; line-height: 1; cursor: pointer; color: #d9cdd2; transition: color .15s; }
+  .resena-form :global(.resena-form__fila label:hover),
+  .resena-form :global(.resena-form__fila label:hover ~ label),
+  .resena-form :global(.resena-form__fila input:checked ~ label) { color: #e2a400; }
+  .resena-form :global(.resena-form__fila input:focus-visible + label) { outline: 3px solid var(--c-acento, #b5577a); outline-offset: 2px; border-radius: 4px; }
+  .resena-form__campo, .resena-form :global(.resena-form__campo) { display: grid; gap: 6px; font-weight: 600; }
+  .resena-form :global(.resena-form__campo textarea), .resena-form__campo input { font: inherit; font-weight: 400; padding: 10px 12px; border: 1.5px solid var(--c-borde, #eadde2); border-radius: 10px; background: #fff; color: inherit; }
+  .resena-form__campo small { font-weight: 400; color: var(--c-suave, #7a6a72); }
+  .resena-form :global(.resena-form__error) { color: #b42318; margin: 6px 0 0; font-size: .92rem; }
+  .resena-form :global(.resena-form__error:empty) { display: none; }
+  .resena-form :global(.resena-form__hecha) { color: var(--c-suave, #7a6a72); margin: 0; }
+  .resena-form__boton { display: inline-block; margin-top: 16px; padding: 12px 24px; border: 0; border-radius: 999px; background: var(--c-acento, #b5577a); color: #fff; font: inherit; font-weight: 700; cursor: pointer; text-decoration: none; }
+  .resena-form__boton:disabled { opacity: .6; cursor: wait; }
+  .resena-form__gracias { text-align: center; padding: 24px 0; }
+  .resena-form__gracias-titulo { font-size: 1.4rem; font-weight: 700; }
+</style>
+
+<script>
+  import { iniciarFormularioResena } from "../cliente";
+  const raiz = document.querySelector<HTMLElement>("[data-resena]");
+  if (raiz) iniciarFormularioResena(raiz);
+</script>

@@ -29,6 +29,7 @@
  *   functions/api/admin/boletin-foto.ts    export const { onRequestPost } = panel.boletinFoto;
  *   functions/api/admin/despacho.ts        export const { onRequestGet, onRequestPost } = panel.despacho;
  *   functions/api/admin/mensajes.ts        export const { onRequestGet, onRequestPost } = panel.mensajes;
+ *   functions/api/admin/resenas.ts         export const { onRequestGet, onRequestPost } = panel.resenas;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
  *   functions/api/admin/_middleware.ts     export const { onRequest } = panel.cabeceras;
@@ -55,6 +56,8 @@ import { crearResumen } from "./resumen";
 import { visitasPanel } from "./visitas";
 import { crearGestionProductos } from "./productos";
 import { crearGestionMensajes } from "./mensajes";
+import { crearGestionResenas } from "./resenas";
+import type { Resenas } from "../resenas/servidor";
 import { construccionGet, construccionPost } from "./construccion";
 
 export interface OpcionesPanel extends ConfigPanel {
@@ -82,6 +85,12 @@ export interface OpcionesPanel extends ConfigPanel {
    * pestaña "Mensajes".
    */
   mensajes?: ConfigCotizacion;
+  /**
+   * Reseñas de compradores verificados (crearResenas, v0.45): la MISMA instancia
+   * que usa el formulario público. Sin ella, no hay pestaña "Reseñas" ni correo
+   * para opinar al marcar un pedido como enviado.
+   */
+  resenas?: Resenas;
   /** Días que se guarda la marca de "enviado". Por defecto 90. */
   retencionPedidosDias?: number;
   /** Zona horaria del negocio para las métricas. Por defecto America/Santiago. */
@@ -93,7 +102,8 @@ const noDisponible = async () => jsonResponse(404, { message: "Esta sección no 
 export function crearPanel(opciones: OpcionesPanel) {
   const productos = opciones.catalogo ? crearGestionProductos(opciones.catalogo, opciones) : null;
   const categorias = opciones.catalogo ? crearGestionCategorias(opciones.catalogo, opciones) : null;
-  const pedidos = crearGestionPedidos(opciones.retencionPedidosDias, opciones.catalogo);
+  const pedidos = crearGestionPedidos(opciones.retencionPedidosDias, opciones.catalogo, opciones.resenas);
+  const resenas = opciones.resenas ? crearGestionResenas(opciones.resenas) : null;
   const resumen = crearResumen(opciones.zonaHoraria);
   const portada = opciones.carrusel ? crearGestionCarrusel(opciones.carrusel, opciones) : null;
   const contenido = opciones.contenido ? crearGestionContenido(opciones.contenido, opciones) : null;
@@ -139,6 +149,11 @@ export function crearPanel(opciones: OpcionesPanel) {
     },
     contenidoFoto: { onRequestPost: (c: Ctx) => (contenido ? contenido.foto(c) : noDisponible()) },
     pedidos: { onRequestGet: (c: Ctx) => pedidos.get(c), onRequestPost: (c: Ctx) => pedidos.post(c) },
+    /** Reseñas: aprobar, rechazar, eliminar y responder (v0.45). */
+    resenas: {
+      onRequestGet: (c: Ctx) => (resenas ? resenas.get(c) : noDisponible()),
+      onRequestPost: (c: Ctx) => (resenas ? resenas.post(c) : noDisponible()),
+    },
     /** Métricas de ventas (pestaña Resumen). */
     resumen: { onRequestGet: (c: Ctx) => resumen(c) },
     /** Visitas de Cloudflare Web Analytics (si están las variables ANALITICA_*). */

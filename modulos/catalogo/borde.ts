@@ -54,6 +54,8 @@ import { colorEnOpcion, precioDeOpcion, rangoDePrecios, tieneOpciones } from "./
 import { type VistaLista, type VistaListas, obtenerVistaListas, vistaDeFiltro, VISTA_LISTAS_POR_DEFECTO } from "./vista-listas";
 import { AJUSTES_FICHA_POR_DEFECTO, type AjustesFicha, obtenerAjustesFicha } from "./ficha";
 import { resumenParaGoogle, textoPlano } from "./resumen";
+import { leerPublicas, type ResumenResenas } from "../resenas/almacen";
+import { htmlEstrellas, htmlEstrellasFicha, htmlListaResenas, jsonLdResenas, textoResumen } from "../resenas/html";
 
 // ─────────────────── tipos mínimos de HTMLRewriter (sin workers-types) ───────────────────
 interface ElementoHtml {
@@ -94,6 +96,12 @@ export interface OpcionesBorde {
   vistaListas?: Partial<VistaListas>;
   /** Cuántos colores se muestran bajo la foto de una tarjeta (el resto va como "+N"). Por defecto 6. */
   coloresEnTarjeta?: number;
+  /**
+   * Reseñas aprobadas en la ficha (v0.45): estrellas junto al precio, la lista
+   * y el promedio en el JSON-LD. Marcas del sitio: data-ficha="estrellas",
+   * "resenas-bloque", "resenas-resumen" y "resenas".
+   */
+  resenas?: boolean;
 }
 
 /** Un elemento de lista: un producto, o un color de un producto (vista "una tarjeta por color"). */
@@ -693,6 +701,15 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
       const imagenAbs = new URL(imagen, opciones.sitio.dominio).href;
       const galeria = fotosSeguras(p);
       // Google muestra unos 155 caracteres: sin emojis ni saltos, cortado en una palabra (v0.44).
+      // Reseñas aprobadas (v0.45): una lectura de KV, ya armada. Si falla, la ficha sale igual.
+      let resenas: ResumenResenas | null = null;
+      if (opciones.resenas) {
+        try {
+          resenas = await leerPublicas(env.REVIEWS_KV, p.id);
+        } catch {
+          resenas = null;
+        }
+      }
       const descripcion = resumenParaGoogle(p.descripcion) || p.nombre;
       const descripcionLarga = textoPlano(p.descripcion || p.nombre).slice(0, 500);
       const jsonLd = {
@@ -709,6 +726,7 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
           availability: p.stock === 0 ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
           url: canonica,
         },
+        ...(resenas ? jsonLdResenas(resenas) : {}),
       };
 
       const parteApagada = (parte: string | null) =>
@@ -742,7 +760,16 @@ export function crearFichaProducto(fuente: CatalogoODinamico, opciones: Opciones
             // Ya quitada por apagada: escribirle contenido la haría reaparecer como texto suelto.
             if (parteApagada(el.getAttribute("data-ficha-opcional"))) return;
             for (const campo of (el.getAttribute("data-ficha") ?? "").split(/\s+/)) {
-              if (campo === "producto") {
+              if (campo === "estrellas" || campo === "resenas-bloque") {
+                if (resenas) {
+                  el.removeAttribute("hidden");
+                  if (campo === "estrellas") el.setInnerContent(htmlEstrellasFicha(resenas), { html: true });
+                } else el.setAttribute("hidden", "");
+              } else if (campo === "resenas-resumen") {
+                el.setInnerContent(resenas ? `${htmlEstrellas(resenas.promedio)} <span>${textoResumen(resenas)}</span>` : "", { html: true });
+              } else if (campo === "resenas") {
+                el.setInnerContent(resenas ? htmlListaResenas(resenas, opciones.sitio.nombre) : "", { html: true });
+              } else if (campo === "producto") {
                 el.setAttribute("data-producto", p.id);
                 el.setAttribute("data-nombre", p.nombre.toLowerCase());
               } else if (campo === "categoria-enlace") {

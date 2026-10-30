@@ -15,6 +15,8 @@ import type { CatalogoODinamico } from "../catalogo/almacen";
 import { devolverUnidades } from "../catalogo/stock";
 import { quitarPedido } from "../metricas/almacen";
 import type { PedidoGuardado } from "../pago/config";
+import { CLAVE_INVITADO } from "../resenas/almacen";
+import type { Resenas } from "../resenas/servidor";
 import { obtenerUsuario, puedeAnularPedidos } from "./auth";
 import { type Ctx, exigirSesion, jsonResponse, leerJson } from "./http";
 
@@ -49,6 +51,8 @@ export interface PedidoPanel {
   enviado: string | null;
   /** Anulado desde el panel (devolución o prueba). null si no. */
   anulado: AnulacionPedido | null;
+  /** Cuándo se le pidió la reseña al comprador (v0.45). null si no. */
+  resenaPedida: string | null;
 }
 
 async function leerAnulacion(kv: NonNullable<Ctx["env"]["REVIEWS_KV"]>, orden: string): Promise<AnulacionPedido | null> {
@@ -99,12 +103,13 @@ export async function listarPedidos(ctx: Ctx, incluirNoPagados: boolean): Promis
       ...(meta.despacho && typeof meta.despacho === "object" ? { despacho: meta.despacho as PedidoPanel["despacho"] } : {}),
       enviado: await kv.get(CLAVE_ENVIO(p.orden)),
       anulado: await leerAnulacion(kv, p.orden),
+      resenaPedida: await kv.get(CLAVE_INVITADO(p.orden)),
     });
   }
   return salida.sort((a, b) => b.creado.localeCompare(a.creado));
 }
 
-export function crearGestionPedidos(retencionDias = 90, catalogo?: CatalogoODinamico) {
+export function crearGestionPedidos(retencionDias = 90, catalogo?: CatalogoODinamico, resenas?: Resenas) {
   const retencion = retencionDias * 86400;
 
   async function anular(ctx: Ctx, orden: string, usuario: string): Promise<Response> {
@@ -177,7 +182,7 @@ export function crearGestionPedidos(retencionDias = 90, catalogo?: CatalogoODina
       const cuerpo = await leerJson(ctx.request);
       const orden = cuerpo?.orden;
       const accion = cuerpo?.accion;
-      if (typeof orden !== "string" || !ORDEN_VALIDA.test(orden) || !["marcar-enviado", "anular", "borrar"].includes(String(accion))) {
+      if (typeof orden !== "string" || !ORDEN_VALIDA.test(orden) || !["marcar-enviado", "anular", "borrar", "pedir-resena"].includes(String(accion))) {
         return jsonResponse(400, { message: "Solicitud inválida." });
       }
       const kv = ctx.env.REVIEWS_KV;
@@ -190,13 +195,30 @@ export function crearGestionPedidos(retencionDias = 90, catalogo?: CatalogoODina
         return accion === "anular" ? anular(ctx, orden, s.usuario) : borrar(ctx, orden);
       }
       if (!(await kv.get(PREFIJO_PEDIDO + orden))) return jsonResponse(404, { message: "Ese pedido no existe." });
+      if (accion === "pedir-resena") {
+        if (!resenas) return jsonResponse(404, { message: "Las reseñas no están activas en este sitio." });
+        const r = await resenas.invitar(ctx.env, orden, true);
+        if (!r.ok) return jsonResponse(400, { message: r.motivo === "correo" ? "No se pudo enviar el correo. Revisa la configuración de correos e intenta de nuevo." : "Ese pedido no se puede reseñar (no está pagado o no tiene productos)." });
+        return jsonResponse(200, { ok: true, resenaPedida: await kv.get(CLAVE_INVITADO(orden)), simulado: r.simulado === true });
+      }
       if (cuerpo!.enviado === false) {
         await kv.delete(CLAVE_ENVIO(orden));
         return jsonResponse(200, { ok: true, enviado: null });
       }
       const fecha = new Date().toISOString();
       await kv.put(CLAVE_ENVIO(orden), fecha, { expirationTtl: retencion });
-      return jsonResponse(200, { ok: true, enviado: fecha });
+      // Reseñas (v0.45): al marcarlo enviado se le pide su opinión al comprador, una sola vez.
+      // Si el correo falla, el pedido queda igual marcado como enviado.
+      let resenaPedida: string | null = null;
+      if (resenas) {
+        try {
+          await resenas.invitar(ctx.env, orden);
+          resenaPedida = await kv.get(CLAVE_INVITADO(orden));
+        } catch (e) {
+          console.error("[pedidos] no se pudo pedir la reseña", e);
+        }
+      }
+      return jsonResponse(200, { ok: true, enviado: fecha, resenaPedida });
     },
   };
 }

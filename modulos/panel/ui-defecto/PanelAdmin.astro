@@ -39,13 +39,15 @@ interface Props {
   despacho?: boolean;
   /** Muestra la pestaña "Mensajes" (el sitio montó panel.mensajes y el formulario de contacto). */
   mensajes?: boolean;
+  /** Muestra la pestaña "Reseñas" (el sitio montó panel.resenas y el formulario /resena/, v0.45). */
+  resenas?: boolean;
   /** Muestra el interruptor "Sitio en construcción" en Resumen (el sitio montó panel.construccion). */
   construccion?: boolean;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 import { LIMITES_BOLETIN } from "../../newsletter/boletin";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, construccion = false } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, resenas = false, construccion = false } = Astro.props;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -92,6 +94,7 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <button type="button" data-tab="sitio" hidden={!contenido}>Diseño y textos</button>
       <button type="button" data-tab="pedidos">Pedidos</button>
       <button type="button" data-tab="mensajes" hidden={!mensajes}>Mensajes <span class="pa-burbuja" data-mensajes-pendientes hidden></span></button>
+      <button type="button" data-tab="resenas" hidden={!resenas}>Reseñas <span class="pa-burbuja" data-resenas-pendientes hidden></span></button>
       <button type="button" data-tab="suscriptores">Suscriptores</button>
       <button type="button" data-tab="seguridad">Seguridad</button>
     </nav>
@@ -575,6 +578,15 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
       <label class="pa-casilla"><input type="checkbox" data-mensajes-todos /> Ver también los ya respondidos</label>
       <p class="pa-tenue" data-resumen-mensajes></p>
       <ul class="pa-lista" data-lista-mensajes aria-live="polite"></ul>
+    </section>
+
+    <!-- ───────────── reseñas (v0.45) ───────────── -->
+    <section class="pa-vista" data-vista="resenas" hidden>
+      <div class="pa-titulo"><h1>Reseñas</h1></div>
+      <p class="pa-tenue">Opiniones de compradores verificados. Al marcar un pedido como enviado, al comprador le llega un correo para opinar. <strong>Nada se publica sin que lo apruebes.</strong> Puedes rechazar, eliminar (insultos, odio, spam o datos personales) y responder en público.</p>
+      <label class="pa-casilla"><input type="checkbox" data-resenas-todas /> Ver también las aprobadas y rechazadas</label>
+      <p class="pa-tenue" data-resumen-resenas></p>
+      <ul class="pa-lista" data-lista-resenas aria-live="polite"></ul>
     </section>
 
     <!-- ───────────── suscriptores ───────────── -->
@@ -1151,6 +1163,9 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-pedido__dato { margin: 0; font-size: .92rem; }
   .pa-pedido__dato a { color: var(--pa-acento-oscuro); overflow-wrap: anywhere; }
   .pa-mensaje__texto { margin: 0; padding: 12px 14px; background: var(--pa-fondo, #f7f5f3); border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .95rem; line-height: 1.55; }
+  .pa-resena__estrellas { color: #c98a00; letter-spacing: 1px; }
+  .pa-resena__responder { display: grid; gap: 8px; margin-top: 10px; }
+  .pa-resena__responder textarea { font: inherit; padding: 10px 12px; border: 1.5px solid var(--pa-borde, #e7dfe2); border-radius: 10px; }
   .pa-mensaje--respondido { opacity: .75; }
   .pa-pedido--anulado { opacity: .7; }
   .pa-mensaje__botones { display: flex; gap: 8px; flex-wrap: wrap; }
