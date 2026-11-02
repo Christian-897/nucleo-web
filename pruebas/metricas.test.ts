@@ -3,6 +3,7 @@
  * los totales cuadran y los datos raros no rompen nada.
  */
 import assert from "node:assert/strict";
+import { topeEje } from "../modulos/panel/ui-defecto/resumen-vista";
 import type { AlmacenKV } from "../core/tipos";
 import {
   calcularResumen,
@@ -240,6 +241,17 @@ async function run() {
     assert.throws(() => normalizarConsulta({ desde: "2010-01-01", hasta: "2026-01-01" }, hoy), /10 años/);
     assert.equal(normalizarConsulta({ desde: "2026-10-01", hasta: "2027-01-01" }, hoy).hasta, hoy);
     assert.equal(normalizarConsulta({ desde: "2026-10-01", hasta: "2026-10-02", agrupar: "<script>" as any }, hoy).agrupar, "dia");
+  });
+
+  await prueba("eje de los gráficos: montos redondos; visitas con tope par y escala chica sin datos", () => {
+    assert.equal(topeEje(0), 10000, "montos sin ventas: $10.000");
+    assert.equal(topeEje(23000), 50000);
+    assert.equal(topeEje(0, { vacio: 10, enteros: true }), 10, "sin visitas: 0–10");
+    assert.equal(topeEje(1, { enteros: true }), 2);
+    assert.equal(topeEje(3, { enteros: true }), 4);
+    assert.equal(topeEje(7, { enteros: true }), 10);
+    assert.equal(topeEje(45, { enteros: true }), 60);
+    for (const n of [1, 3, 7, 13, 45, 99, 150, 777]) assert.equal((topeEje(n, { enteros: true }) / 2) % 1, 0, `la mitad es entera (${n})`);
   });
 
   console.log(`\n${pasaron} pruebas pasaron.`);

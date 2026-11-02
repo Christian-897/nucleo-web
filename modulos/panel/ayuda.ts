@@ -640,6 +640,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
       "Las reseñas son de **compradores verificados**: solo puede opinar quien compró, con un enlace propio que le llega por correo.",
       { pasos: ["En **Pedidos**, cuando despachas un pedido y tocas **Marcar como enviado**, al comprador le llega un correo: «¿Qué te pareció tu compra?».", "La persona elige de 1 a 5 estrellas y escribe su opinión de cada producto que compró.", "Te llega un aviso por correo y la reseña aparece en **Reseñas** como **Por revisar**.", "**No se publica nada hasta que tú la apruebes.**"] },
       "Las aprobadas se ven en la ficha del producto, con las estrellas junto al precio y la lista de opiniones abajo. Google puede mostrar esas estrellas en los resultados de búsqueda.",
+      "Mientras un producto no tenga ninguna reseña aprobada, en su ficha no aparece nada (ni estrellas ni «0 opiniones»): todo aparece solo con la primera que apruebes.",
       { nota: "En la tienda se publica solo el nombre que la persona eligió (por ejemplo «Ana P.»), nunca su correo ni su pedido." },
     ],
   },

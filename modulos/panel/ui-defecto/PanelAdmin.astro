@@ -1105,9 +1105,10 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
   .pa-tabla td:not(:first-child), .pa-tabla th:not(:first-child) { text-align: right; }
   .pa-ranking { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
   .pa-ranking--simple { list-style: none; padding-left: 0; }
-  .pa-ranking li { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
-  .pa-ranking li span:last-child { color: var(--pa-suave); text-align: right; min-width: 0; }
-  .pa-ranking li span:first-child { flex-shrink: 0; }
+  /* El nombre (largo: producto · tamaño · color) se ajusta en varias líneas; la cantidad y el monto quedan juntos a la derecha. */
+  .pa-ranking li { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
+  .pa-ranking li span:first-child { flex: 1 1 12rem; min-width: 0; overflow-wrap: anywhere; }
+  .pa-ranking li span:last-child { flex: 0 0 auto; margin-left: auto; color: var(--pa-suave); text-align: right; white-space: nowrap; }
   .pa-ranking:empty::before { content: "Todavía no hay ventas en este período."; color: var(--pa-suave); }
   .pa-subtitulo { font-size: 1.2rem !important; font-weight: 600 !important; margin: 28px 0 12px !important; }
   .pa-kpis--dos { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }

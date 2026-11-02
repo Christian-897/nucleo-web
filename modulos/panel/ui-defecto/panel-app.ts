@@ -2590,6 +2590,8 @@ async function cargarVisitas() {
     graficoTiempo(lienzo, $("[data-visitas-tooltip]"), puntos, "barras", entero, {
       segunda: (i) => `${entero(puntos[i].pedidos)} páginas vistas`,
       resumen: (total) => `Visitas por día: ${total} en total.`,
+      // Pocas visitas: el eje se ajusta (0–10 sin datos), no hasta 10.000 como los montos.
+      escala: { vacio: 10, enteros: true },
     })
   );
   const propio = location.hostname.replace(/^www\./, "");

@@ -62,9 +62,19 @@ export function variacion(actual: number, anterior: number): number | null {
   return anterior ? Math.round(((actual - anterior) / anterior) * 100) : null;
 }
 
-/** Tope "redondo" del eje: 1, 2 o 5 por potencia de 10. */
-export function topeEje(max: number): number {
-  if (max <= 0) return 10000;
+/**
+ * Tope "redondo" del eje: 1, 2 o 5 por potencia de 10. Sin datos, `vacio`
+ * (montos: $10.000). Con `enteros` (visitas, unidades) el tope es par y la
+ * mitad siempre es un número entero: 2, 4, 6, 10, 20, 40, 60, 100…
+ */
+export function topeEje(max: number, opciones: { vacio?: number; enteros?: boolean } = {}): number {
+  if (max <= 0) return opciones.vacio ?? 10000;
+  if (opciones.enteros) {
+    if (max <= 2) return 2;
+    const p = 10 ** Math.floor(Math.log10(max));
+    for (const f of [1, 2, 4, 6, 10]) if (f * p >= max && (f * p) % 2 === 0) return f * p;
+    return 10 * p;
+  }
   const p = 10 ** Math.floor(Math.log10(max));
   for (const f of [1, 2, 5, 10]) if (f * p >= max) return f * p;
   return 10 * p;
@@ -105,12 +115,12 @@ interface Lienzo {
   hijos: SVGElement[];
 }
 
-function prepararLienzo(lienzo: SVGSVGElement, n: number, maximo: number, precio: Precio, etiquetas: string[]): Lienzo {
+function prepararLienzo(lienzo: SVGSVGElement, n: number, maximo: number, precio: Precio, etiquetas: string[], escala: { vacio?: number; enteros?: boolean } = {}): Lienzo {
   const W = Math.max(280, Math.round(lienzo.getBoundingClientRect().width) || 640);
   const H = 200, izq = 64, der = 12, arriba = 10, abajo = 24;
   lienzo.setAttribute("viewBox", `0 0 ${W} ${H}`);
   const ancho = W - izq - der, alto = H - arriba - abajo;
-  const tope = topeEje(maximo);
+  const tope = topeEje(maximo, escala);
   const paso = ancho / Math.max(1, n);
   const hijos: SVGElement[] = [];
   for (const f of [0, 0.5, 1]) {
@@ -184,10 +194,15 @@ export function graficoTiempo(
   tipo: TipoTiempo,
   precio: Precio,
   /** Para usar el mismo gráfico con otra cosa que ventas (ej. visitas). */
-  textos?: { segunda?: (i: number) => string; resumen?: (total: string) => string }
+  textos?: {
+    segunda?: (i: number) => string;
+    resumen?: (total: string) => string;
+    /** Escala para cantidades (visitas): tope par y, sin datos, `vacio` (por defecto el de montos). */
+    escala?: { vacio?: number; enteros?: boolean };
+  }
 ) {
   const n = puntos.length;
-  const base = prepararLienzo(lienzo, n, Math.max(0, ...puntos.map((p) => p.ventas)), precio, puntos.map((p) => p.etiqueta));
+  const base = prepararLienzo(lienzo, n, Math.max(0, ...puntos.map((p) => p.ventas)), precio, puntos.map((p) => p.etiqueta), textos?.escala);
   const marcas: SVGElement[] = [];
   if (tipo === "linea") {
     const l = lineaDe(base, puntos.map((p) => p.ventas), "serie-a");
