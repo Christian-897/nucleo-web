@@ -1,0 +1,69 @@
+---
+/**
+ * Aviso de cookies por defecto: abajo de la pantalla, con "Aceptar" y
+ * "Rechazar" del mismo tamaño. Aparece solo si la persona no ha decidido.
+ * Ponerlo UNA vez en el layout, solo si el sitio usa alguna medición
+ * (por ejemplo, junto a <GoogleAnalytics />). Se adapta con variables CSS:
+ * --cookies-fondo, --cookies-tinta, --cookies-acento, --cookies-acento-tinta.
+ *
+ * Para volver a abrirlo (obligatorio ofrecerlo), un botón en el pie:
+ *   <button type="button" data-cookies-preferencias hidden>Preferencias de cookies</button>
+ */
+interface Props {
+  /** Página de la política de privacidad. */
+  privacidad?: string;
+  titulo?: string;
+  texto?: string;
+  aceptar?: string;
+  rechazar?: string;
+}
+const {
+  privacidad = "/privacidad/",
+  titulo = "Cookies de medición",
+  texto = "Usamos cookies para saber cuántas personas visitan la tienda y qué productos les interesan. Solo se activan si aceptas.",
+  aceptar = "Aceptar",
+  rechazar = "Rechazar",
+} = Astro.props;
+---
+<section class="aviso-cookies" data-aviso-cookies role="region" aria-label={titulo} hidden>
+  <div class="aviso-cookies__texto">
+    <p class="aviso-cookies__titulo">{titulo}</p>
+    <p>{texto} <a href={privacidad}>Política de privacidad</a></p>
+  </div>
+  <div class="aviso-cookies__botones">
+    <button type="button" class="aviso-cookies__boton" data-cookies-rechazar>{rechazar}</button>
+    <button type="button" class="aviso-cookies__boton" data-cookies-aceptar>{aceptar}</button>
+  </div>
+</section>
+
+<style>
+  .aviso-cookies {
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 60;
+    max-width: 760px; margin: 0 auto; padding: 14px 16px;
+    display: flex; gap: 12px 16px; align-items: center; flex-wrap: wrap;
+    background: var(--cookies-fondo, #fff); color: var(--cookies-tinta, #2a1d24);
+    border-radius: 14px; box-shadow: 0 8px 30px rgba(0, 0, 0, .18);
+    font-size: .9rem; line-height: 1.45;
+  }
+  .aviso-cookies[hidden] { display: none; }
+  .aviso-cookies__texto { flex: 1 1 320px; }
+  .aviso-cookies__texto p { margin: 0; }
+  .aviso-cookies__titulo { font-weight: 800; margin-bottom: 2px !important; }
+  .aviso-cookies a { color: inherit; text-decoration: underline; }
+  .aviso-cookies__botones { display: flex; gap: 8px; flex: 0 0 auto; }
+  /* Mismo tamaño y mismo peso: rechazar debe ser tan fácil como aceptar. */
+  .aviso-cookies__boton {
+    min-width: 110px; padding: 10px 16px; border-radius: 999px; cursor: pointer; font: inherit; font-weight: 700;
+    border: 2px solid var(--cookies-acento, #7a1838); background: var(--cookies-acento, #7a1838); color: var(--cookies-acento-tinta, #fff);
+  }
+  .aviso-cookies__boton:focus-visible { outline: 3px solid var(--cookies-tinta, #2a1d24); outline-offset: 2px; }
+  @media (max-width: 520px) {
+    .aviso-cookies__botones { width: 100%; }
+    .aviso-cookies__boton { flex: 1; }
+  }
+</style>
+
+<script>
+  import { iniciarAvisoCookies } from "../consentimiento";
+  iniciarAvisoCookies();
+</script>

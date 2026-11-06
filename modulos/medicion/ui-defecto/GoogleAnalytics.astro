@@ -1,0 +1,25 @@
+---
+/**
+ * Google Analytics 4. Ponerlo UNA vez en el layout, junto a <AvisoCookies />.
+ * No carga nada hasta que la persona acepta las cookies. Sin `id` (o con uno
+ * inválido) no hace nada, así que un sitio puede dejarlo puesto y activarlo
+ * solo cuando tenga su ID.
+ *
+ *   <GoogleAnalytics id="G-ABC123XYZ9" />
+ */
+interface Props {
+  /** ID de medición del flujo web (Administrar → Flujos de datos). */
+  id?: string;
+  /** Moneda de los montos. Por defecto CLP. */
+  moneda?: string;
+}
+const { id = "", moneda = "CLP" } = Astro.props;
+const valido = /^G-[A-Z0-9]{4,15}$/.test(id);
+---
+{valido && <span hidden data-nucleo-ga={id} data-moneda={moneda}></span>}
+
+<script>
+  import { iniciarGoogleAnalytics } from "../google-analytics";
+  const m = document.querySelector<HTMLElement>("[data-nucleo-ga]");
+  if (m?.dataset.nucleoGa) iniciarGoogleAnalytics({ id: m.dataset.nucleoGa, moneda: m.dataset.moneda || "CLP" });
+</script>

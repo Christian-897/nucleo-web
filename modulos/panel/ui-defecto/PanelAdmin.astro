@@ -43,11 +43,18 @@ interface Props {
   resenas?: boolean;
   /** Muestra el interruptor "Sitio en construcción" en Resumen (el sitio montó panel.construccion). */
   construccion?: boolean;
+  /**
+   * ID de Google Analytics del sitio (el mismo de <GoogleAnalytics />). Muestra
+   * en Resumen el acceso a Analytics y activa sus temas de Ayuda.
+   */
+  googleAnalytics?: string;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 import { LIMITES_BOLETIN } from "../../newsletter/boletin";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, resenas = false, construccion = false } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, resenas = false, construccion = false, googleAnalytics = "" } = Astro.props;
+const gaValido = /^G-[A-Z0-9]{4,15}$/.test(googleAnalytics);
+const hayMedicion = gaValido;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -382,6 +389,15 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <div class="pa-panel"><h2>Dispositivos</h2><div class="pa-partes" data-visitas-dispositivos></div></div>
         </div>
         <p class="pa-tenue pa-chico" data-visitas-nota></p>
+      </div>
+
+      <div class="pa-medicion" data-medicion hidden={!hayMedicion}>
+        <div class="pa-panel" data-google-analytics hidden={!gaValido}>
+          <h2>Google Analytics</h2>
+          <p>Visitas con más detalle: de dónde llegan, qué productos miran, cuántos los agregan al carrito y cuántos compran. Solo cuenta a quienes aceptan las cookies del aviso de la tienda.</p>
+          <p><a class="pa-boton pa-boton--suave" href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Abrir Google Analytics ↗</a></p>
+          <p class="pa-tenue pa-chico">ID de medición: <code>{googleAnalytics}</code>. Los datos aparecen en Analytics unas horas después.</p>
+        </div>
       </div>
 
       <h2 class="pa-subtitulo">Explorar ventas</h2>

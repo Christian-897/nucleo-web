@@ -57,6 +57,10 @@ prueba("normaliza tildes, mayúsculas y signos", () => {
 prueba("encuentra lo que la gente escribe", () => {
   const casos: [string, string][] = [
     ["cambiar precio", "cambiar-precio"],
+    ["google analytics", "google-analytics"],
+    ["estadísticas", "google-analytics"],
+    ["cookies", "aviso-cookies"],
+    ["rechazar cookies", "aviso-cookies"],
     ["¿cómo cambio el precio de un producto?", "cambiar-precio"],
     ["agotado", "stock"],
     ["stok", "stock"],

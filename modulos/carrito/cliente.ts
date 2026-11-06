@@ -9,6 +9,7 @@ import {
   MAX_POR_LINEA_POR_DEFECTO,
 } from "./config";
 import type { CarritoValidado, ItemCarrito } from "./tipos";
+import { emitirAgregar } from "../medicion/eventos";
 
 export interface Carrito {
   items(): ItemCarrito[];
@@ -97,6 +98,8 @@ export function crearCarrito(opciones: OpcionesCarritoCliente = {}): Carrito {
         });
       }
       avisar();
+      // Para la medición (si el sitio la usa y la persona aceptó): solo datos del producto.
+      emitirAgregar({ productoId: item.productoId, nombre: item.nombre, precio: Number(item.precio) || 0, cantidad });
     },
 
     quitar(productoId) {

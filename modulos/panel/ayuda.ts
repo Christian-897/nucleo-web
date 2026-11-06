@@ -155,6 +155,32 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "google-analytics",
+    seccion: "resumen",
+    titulo: "Ver las estadísticas en Google Analytics",
+    palabras: ["google analytics", "analytics", "analitycs", "estadísticas", "estadisticas", "informes", "de dónde llegan", "tiempo real", "embudo", "agregaron al carrito", "comercio electrónico"],
+    requiere: "[data-google-analytics]",
+    contenido: [
+      "Tu tienda está conectada a **Google Analytics**. Ahí ves con más detalle quién visita la tienda: de dónde llegan (Google, Instagram, WhatsApp…), qué productos miran, cuántos los **agregan al carrito**, cuántos **van a pagar** y cuántos **compran**.",
+      { pasos: ["En **Resumen**, baja hasta **Google Analytics** y toca **Abrir Google Analytics ↗** (o entra a analytics.google.com).", "Entra con la cuenta de Google con que creaste Analytics.", "**Informes → Tiempo real**: quién está en la tienda en este momento.", "**Informes → Monetización → Compras de comercio electrónico**: qué productos se agregan al carrito y cuáles se compran."] },
+      "Los informes se completan **unas horas después** (hasta un día). Para revisar que funciona, mira **Tiempo real** mientras abres la tienda en tu celular y aceptas las cookies.",
+      { nota: "Google Analytics **solo cuenta a quienes aceptan las cookies** del aviso de la tienda. Por eso sus números son más bajos que los de **Resumen → Visitas**, que cuenta a todos sin cookies. Las ventas que valen son las de **Pedidos**." },
+    ],
+  },
+  {
+    id: "aviso-cookies",
+    seccion: "resumen",
+    titulo: "El aviso de cookies de la tienda",
+    palabras: ["cookies", "galletas", "aviso de cookies", "aceptar cookies", "rechazar cookies", "privacidad", "consentimiento", "banner", "ley de datos"],
+    requiere: "[data-medicion]",
+    contenido: [
+      "Como tu tienda usa medición (por ejemplo, Google Analytics), a cada persona le aparece abajo un aviso para **Aceptar** o **Rechazar** las cookies de medición. Es para cumplir con la protección de datos: nadie es medido sin aceptar.",
+      { pasos: ["**Aceptar**: se activa la medición para esa persona.", "**Rechazar**: no se activa nada. Puede comprar igual, sin ninguna diferencia.", "La decisión se recuerda **180 días** en ese navegador; después se vuelve a preguntar.", "Para cambiarla, en el pie de la tienda está **Preferencias de cookies**."] },
+      "Si quieres ver el aviso otra vez (para probar), toca **Preferencias de cookies** en el pie de la tienda.",
+      { nota: "Tu **política de privacidad** debe decir que usas cookies de medición y con qué herramienta. Si no lo dice, pídele a quien administra tu sitio que la actualice." },
+    ],
+  },
+  {
     id: "cerrar-tienda",
     seccion: "resumen",
     titulo: "Cerrar la tienda un tiempo (vacaciones)",

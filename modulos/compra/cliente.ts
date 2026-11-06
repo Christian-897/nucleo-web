@@ -8,6 +8,7 @@ import { irAPagar } from "../pago/cliente";
 import type { Proveedor } from "../pago/tipos";
 import type { ItemCarrito } from "../carrito/tipos";
 import { validarComprador } from "./esquema";
+import { emitirIniciarCompra } from "../medicion/eventos";
 
 export interface ResultadoCompra {
   ok: boolean;
@@ -43,6 +44,8 @@ export async function iniciarCompra(params: {
   if (!v.ok) {
     return { ok: false, message: "Revisa los campos marcados.", fieldErrors: v.fieldErrors };
   }
+  // Para la medición: qué se va a pagar (sin datos del comprador).
+  emitirIniciarCompra(params.items, params.totalVisto);
   const r = await irAPagar(
     {
       proveedor: params.proveedor,
