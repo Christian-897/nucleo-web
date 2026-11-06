@@ -1,5 +1,5 @@
 /**
- * Prueba de la medición (v0.46): decisión de cookies, que nada se active sin
+ * Prueba de la medición (v0.46 Google Analytics, v0.47 píxel de Meta): decisión de cookies, que nada se active sin
  * aceptar, eventos de la tienda (carrito, ir a pagar, compra una sola vez) y
  * su traducción a Google Analytics. Se corre con `npm test`.
  */
@@ -19,6 +19,7 @@ const { decisionVigente, guardarDecision, leerDecision, cuandoAcepte, CLAVE_DECI
 const { escucharEventos, avisarCompraConfirmada, emitirIniciarCompra, EVENTO_AGREGAR, EVENTO_COMPRA } = await import("../modulos/medicion/eventos");
 const { idGoogleAnalyticsValido, eventoParaGoogle } = await import("../modulos/medicion/google-analytics");
 const { crearCarrito } = await import("../modulos/carrito/cliente");
+const { idPixelMetaValido, eventoParaMeta } = await import("../modulos/medicion/pixel-meta");
 
 let pasaron = 0;
 async function prueba(nombre: string, fn: () => Promise<void> | void) {
@@ -107,6 +108,30 @@ await prueba("Google Analytics: ID válido y eventos traducidos sin datos del co
   ]);
   assert.equal(eventoParaGoogle({ nombre: "otro", detalle: {} }), null);
   assert.equal(eventoParaGoogle({ nombre: EVENTO_AGREGAR, detalle: null }), null);
+});
+
+await prueba("píxel de Meta: identificador válido y eventos estándar, con eventID en la compra", () => {
+  assert.ok(idPixelMetaValido("2002860303742506"));
+  assert.ok(idPixelMetaValido("123456789012345"));
+  for (const malo of ["", "12345", "20028603037425067", "2002860303742506 ", "abc123456789012", "<script>", null]) assert.ok(!idPixelMetaValido(malo), String(malo));
+  const p = { productoId: "lana~azul", nombre: "Lana · Azul", precio: 3990, cantidad: 2 };
+  assert.deepEqual(eventoParaMeta({ nombre: EVENTO_AGREGAR, detalle: { producto: p } }), [
+    "AddToCart",
+    { content_ids: ["lana~azul"], content_name: "Lana · Azul", content_type: "product", contents: [{ id: "lana~azul", quantity: 2 }], value: 7980, currency: "CLP" },
+  ]);
+  const inicio = eventoParaMeta({ nombre: "nucleo:compra-iniciada", detalle: { productos: [p, { ...p, productoId: "gato", cantidad: 1 }], total: 12000 } });
+  assert.equal(inicio?.[0], "InitiateCheckout");
+  assert.equal(inicio?.[1].num_items, 3);
+  assert.deepEqual(inicio?.[1].content_ids, ["lana~azul", "gato"]);
+  assert.deepEqual(eventoParaMeta({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-1", monto: 9980 } }), [
+    "Purchase",
+    { value: 9980, currency: "CLP", content_type: "product" },
+    "SA-1",
+  ]);
+  assert.equal(eventoParaMeta({ nombre: "otro", detalle: {} }), null);
+  // Nada del comprador: ni correo, ni teléfono, ni nombre de persona en ningún evento.
+  const todo = JSON.stringify([inicio, eventoParaMeta({ nombre: EVENTO_AGREGAR, detalle: { producto: p } })]);
+  assert.ok(!/email|correo|phone|telefono|fn|ln/i.test(todo.replace(/content_name/g, "")));
 });
 
 console.log(`\n${pasaron} pruebas pasaron.`);

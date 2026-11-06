@@ -1,0 +1,24 @@
+---
+/**
+ * Píxel de Meta (Facebook / Instagram). Ponerlo UNA vez en el layout, junto a
+ * <AvisoCookies />. No carga nada hasta que la persona acepta las cookies.
+ * Sin `id` (o con uno inválido) no hace nada.
+ *
+ *   <PixelMeta id="123456789012345" />
+ */
+interface Props {
+  /** Identificador del píxel: 15 o 16 dígitos (Administrador de eventos). */
+  id?: string;
+  /** Moneda de los montos. Por defecto CLP. */
+  moneda?: string;
+}
+const { id = "", moneda = "CLP" } = Astro.props;
+const valido = /^\d{15,16}$/.test(id);
+---
+{valido && <span hidden data-nucleo-pixel-meta={id} data-moneda={moneda}></span>}
+
+<script>
+  import { iniciarPixelMeta } from "../pixel-meta";
+  const m = document.querySelector<HTMLElement>("[data-nucleo-pixel-meta]");
+  if (m?.dataset.nucleoPixelMeta) iniciarPixelMeta({ id: m.dataset.nucleoPixelMeta, moneda: m.dataset.moneda || "CLP" });
+</script>

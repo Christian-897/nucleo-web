@@ -10,6 +10,8 @@
  *   <button type="button" data-cookies-preferencias hidden>Preferencias de cookies</button>
  */
 interface Props {
+  /** El sitio usa medición de anuncios (píxel de Meta): el texto por defecto lo dice. */
+  anuncios?: boolean;
   /** Página de la política de privacidad. */
   privacidad?: string;
   titulo?: string;
@@ -17,10 +19,13 @@ interface Props {
   aceptar?: string;
   rechazar?: string;
 }
+const { anuncios = false } = Astro.props;
 const {
   privacidad = "/privacidad/",
   titulo = "Cookies de medición",
-  texto = "Usamos cookies para saber cuántas personas visitan la tienda y qué productos les interesan. Solo se activan si aceptas.",
+  texto = anuncios
+    ? "Usamos cookies para saber cuántas personas visitan la tienda, qué productos les interesan y cómo funcionan nuestros anuncios en redes sociales. Solo se activan si aceptas."
+    : "Usamos cookies para saber cuántas personas visitan la tienda y qué productos les interesan. Solo se activan si aceptas.",
   aceptar = "Aceptar",
   rechazar = "Rechazar",
 } = Astro.props;

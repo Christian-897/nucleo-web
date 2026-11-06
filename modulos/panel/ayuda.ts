@@ -168,13 +168,26 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "pixel-meta",
+    seccion: "resumen",
+    titulo: "El píxel de Meta: medir tus anuncios de Facebook e Instagram",
+    palabras: ["meta", "píxel", "pixel", "facebook", "instagram", "anuncios", "publicidad", "campañas", "administrador de eventos", "conversiones", "fbq"],
+    requiere: "[data-pixel-meta]",
+    contenido: [
+      "Tu tienda tiene conectado el **píxel de Meta**. Le cuenta a Meta qué hacen en la tienda las personas que llegan desde tus anuncios: cuántos **visitan**, cuántos **agregan al carrito**, cuántos **van a pagar** y cuántos **compran**. Con eso Meta muestra tus anuncios a gente parecida a quienes compran, y tú ves cuánto vende cada campaña.",
+      { pasos: ["En **Resumen**, baja hasta **Píxel de Meta** y toca **Abrir el Administrador de eventos ↗** (o entra a business.facebook.com/events_manager2).", "Entra con la cuenta de Facebook con que creaste el píxel y elige tu píxel en la lista.", "Ahí ves los eventos que llegan: **PageView** (visitas), **AddToCart** (agregar al carrito), **InitiateCheckout** (ir a pagar) y **Purchase** (compras).", "En **Administrador de anuncios**, las columnas de resultados muestran las compras que vinieron de cada anuncio."] },
+      "Para revisar que funciona: abre la tienda en tu celular, acepta las cookies y agrega un producto al carrito. En unos minutos aparece en el Administrador de eventos.",
+      { nota: "El píxel **solo mide a quienes aceptan las cookies** del aviso de la tienda, y no recibe nombres, correos ni teléfonos de tus clientes. Por eso sus números son menores que tus ventas reales: las que valen están en **Pedidos**." },
+    ],
+  },
+  {
     id: "aviso-cookies",
     seccion: "resumen",
     titulo: "El aviso de cookies de la tienda",
     palabras: ["cookies", "galletas", "aviso de cookies", "aceptar cookies", "rechazar cookies", "privacidad", "consentimiento", "banner", "ley de datos"],
     requiere: "[data-medicion]",
     contenido: [
-      "Como tu tienda usa medición (por ejemplo, Google Analytics), a cada persona le aparece abajo un aviso para **Aceptar** o **Rechazar** las cookies de medición. Es para cumplir con la protección de datos: nadie es medido sin aceptar.",
+      "Como tu tienda usa medición (por ejemplo, Google Analytics o el píxel de Meta), a cada persona le aparece abajo un aviso para **Aceptar** o **Rechazar** las cookies de medición. Es para cumplir con la protección de datos: nadie es medido sin aceptar.",
       { pasos: ["**Aceptar**: se activa la medición para esa persona.", "**Rechazar**: no se activa nada. Puede comprar igual, sin ninguna diferencia.", "La decisión se recuerda **180 días** en ese navegador; después se vuelve a preguntar.", "Para cambiarla, en el pie de la tienda está **Preferencias de cookies**."] },
       "Si quieres ver el aviso otra vez (para probar), toca **Preferencias de cookies** en el pie de la tienda.",
       { nota: "Tu **política de privacidad** debe decir que usas cookies de medición y con qué herramienta. Si no lo dice, pídele a quien administra tu sitio que la actualice." },

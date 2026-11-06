@@ -83,7 +83,7 @@ npm test            # corre las pruebas del módulo
 - **contenido** — diseño y textos editables desde el panel: paleta de colores (libre, con aviso de contraste), tipografías de una lista elegida (servidas desde el propio sitio), textos, enlaces de contacto y fotos. (listo)
 - **metricas** — resumen de ventas para el panel: hoy, 7 y 30 días, venta promedio, gráfico por día, más vendidos, medios de pago, rango de fechas a elección (por día, semana o mes), gráficos de barras, línea o torta y comparación por años. (listo)
 - **visitas** — las visitas de Cloudflare Web Analytics dentro del panel (7 o 30 días, páginas, países, dispositivos, de dónde llegan y cuántos compran), con una clave de solo lectura. (listo)
-- **medicion** — aviso de cookies (Aceptar / Rechazar, nada se carga antes de aceptar) y medición opcional por sitio: Google Analytics 4 con visitas, agregar al carrito, ir a pagar y compras. Sin datos del comprador. (v0.46)
+- **medicion** — aviso de cookies (Aceptar / Rechazar, nada se carga antes de aceptar) y medición opcional por sitio: Google Analytics 4 (v0.46) y píxel de Meta (v0.47), cada una por separado, con visitas, agregar al carrito, ir a pagar y compras. Sin datos del comprador.
 - **panel** — administración propia: login + doble factor, productos con fotos, categorías, portada (carrusel), diseño y textos, pedidos, suscriptores con boletines y revisión de pagos con Flow. (listo)
 - **newsletter** — suscripción con doble confirmación, baja con un clic, pedir el enlace de baja por correo, boletines desde el panel y exportación protegida. (listo)
 - _por venir:_ ver [docs/HOJA-DE-RUTA.md](docs/HOJA-DE-RUTA.md).

@@ -3,9 +3,10 @@
 Aviso de cookies y herramientas de medición **opcionales**. Cada sitio activa
 solo las que usa; un sitio sin medición no carga nada ni muestra aviso.
 
-- **Hoy:** Google Analytics 4 (`<GoogleAnalytics />`).
-- El aviso (`<AvisoCookies />`) es uno solo para todas las herramientas que se
-  sumen después (por ejemplo, el píxel de Meta irá aparte, en su propia versión).
+- **Google Analytics 4** (`<GoogleAnalytics />`, v0.46).
+- **Píxel de Meta** para Facebook e Instagram (`<PixelMeta />`, v0.47).
+- Cada una es independiente: un sitio puede tener una, las dos o ninguna. El
+  aviso (`<AvisoCookies />`) es uno solo para todas.
 
 ## Reglas que cumple
 
@@ -23,12 +24,15 @@ solo las que usa; un sitio sin medición no carga nada ni muestra aviso.
 
 ## Qué mide
 
-| En la tienda | Evento en Google | Quién lo emite |
-|---|---|---|
-| Cada página | `page_view` (lo hace Google solo) | — |
-| Agregar al carrito | `add_to_cart` | `carrito/cliente` (`agregar`) |
-| Ir a pagar (datos OK) | `begin_checkout` | `compra/cliente` (`iniciarCompra`) |
-| Compra pagada | `purchase` (con `transaction_id`) | la página `/pago/retorno` del sitio |
+| En la tienda | Google Analytics | Píxel de Meta | Quién lo emite |
+|---|---|---|---|
+| Cada página | `page_view` (lo hace Google solo) | `PageView` | — |
+| Agregar al carrito | `add_to_cart` | `AddToCart` | `carrito/cliente` (`agregar`) |
+| Ir a pagar (datos OK) | `begin_checkout` | `InitiateCheckout` | `compra/cliente` (`iniciarCompra`) |
+| Compra pagada | `purchase` (`transaction_id`) | `Purchase` (`eventID` = orden) | la página `/pago/retorno` del sitio |
+
+El píxel **no** usa la "coincidencia avanzada": nunca recibe correo, teléfono ni
+nombre del comprador.
 
 El carrito y la compra emiten eventos en `window` (`nucleo:carrito-agregado`,
 `nucleo:compra-iniciada`, `nucleo:compra-confirmada`) y además los dejan en una
@@ -43,13 +47,16 @@ se entera. Las herramientas los leen con `escucharEventos()`.
    ---
    import AvisoCookies from "nucleo-web/medicion/AvisoCookies.astro";
    import GoogleAnalytics from "nucleo-web/medicion/GoogleAnalytics.astro";
+   import PixelMeta from "nucleo-web/medicion/PixelMeta.astro";
    ---
    <GoogleAnalytics id={sitio.googleAnalytics} />   {/* sin id: no hace nada */}
-   <AvisoCookies privacidad="/privacidad/" />
+   <PixelMeta id={sitio.pixelMeta} />               {/* 15 o 16 dígitos; sin id: nada */}
+   <AvisoCookies privacidad="/privacidad/" anuncios={Boolean(sitio.pixelMeta)} />
    ```
 
    Colores: variables `--cookies-fondo`, `--cookies-tinta`, `--cookies-acento`,
-   `--cookies-acento-tinta`.
+   `--cookies-acento-tinta`. Con `anuncios`, el texto por defecto menciona los
+   anuncios en redes sociales.
 
 2. **Pie**: un botón para cambiar la decisión (se muestra solo):
 
@@ -65,9 +72,10 @@ se entera. Las herramientas los leen con `escucharEventos()`.
    avisarCompraConfirmada(r.orden, r.monto); // una vez por orden, aunque recargue
    ```
 
-4. **Panel**: `<PanelAdmin … googleAnalytics={sitio.googleAnalytics} />`. Muestra
-   en Resumen el acceso a Analytics y activa los temas de Ayuda «Ver las
-   estadísticas en Google Analytics» y «El aviso de cookies de la tienda».
+4. **Panel**: `<PanelAdmin … googleAnalytics={sitio.googleAnalytics} pixelMeta={sitio.pixelMeta} />`.
+   Muestra en Resumen el acceso a cada herramienta y activa sus temas de Ayuda
+   («Ver las estadísticas en Google Analytics», «El píxel de Meta…» y «El aviso
+   de cookies de la tienda»).
 
 5. **CSP** (`public/_headers`), sumar:
 
@@ -77,13 +85,28 @@ se entera. Las herramientas los leen con `escucharEventos()`.
    img-src     https://*.google-analytics.com https://*.googletagmanager.com
    ```
 
-6. **Política de privacidad**: agregar que el sitio usa cookies de medición de
-   Google Analytics, solo si la persona acepta, y que puede cambiar su decisión
-   en «Preferencias de cookies».
+   Con el píxel de Meta, además:
+
+   ```
+   script-src  https://connect.facebook.net
+   connect-src https://www.facebook.com
+   img-src     https://www.facebook.com
+   ```
+
+6. **Política de privacidad**: agregar que el sitio usa cookies de medición
+   (Google Analytics y/o el píxel de Meta), solo si la persona acepta, y que
+   puede cambiar su decisión en «Preferencias de cookies».
 
 No hay variables nuevas en Cloudflare: el ID de medición no es secreto.
 
-## Conseguir el ID y el acceso
+## Píxel de Meta: el identificador
+
+El cliente crea el píxel en su **Administrador de eventos** de Meta (Conectar
+datos → Web → píxel). Meta le ofrece un código para pegar: **no se pega**, solo
+se copia el identificador (el número de `fbq('init', '…')`, 15 o 16 dígitos)
+y va en la configuración del sitio. No es secreto.
+
+## Google Analytics: conseguir el ID y el acceso
 
 La cuenta de Analytics la crea **el cliente, con su propia cuenta de Google**, e
 invita a quien mantiene el sitio como **Administrador** (Administrar → Gestión

@@ -60,6 +60,8 @@ prueba("encuentra lo que la gente escribe", () => {
     ["google analytics", "google-analytics"],
     ["estadísticas", "google-analytics"],
     ["cookies", "aviso-cookies"],
+    ["pixel de facebook", "pixel-meta"],
+    ["anuncios de instagram", "pixel-meta"],
     ["rechazar cookies", "aviso-cookies"],
     ["¿cómo cambio el precio de un producto?", "cambiar-precio"],
     ["agotado", "stock"],

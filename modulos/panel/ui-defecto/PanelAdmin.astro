@@ -48,13 +48,19 @@ interface Props {
    * en Resumen el acceso a Analytics y activa sus temas de Ayuda.
    */
   googleAnalytics?: string;
+  /**
+   * Identificador del píxel de Meta (el mismo de <PixelMeta />). Muestra en
+   * Resumen el acceso al Administrador de eventos y activa su tema de Ayuda.
+   */
+  pixelMeta?: string;
 }
 import { LIMITES } from "../../carrusel/tipos";
 import { LIMITES_CATEGORIA } from "../../catalogo/categorias";
 import { LIMITES_BOLETIN } from "../../newsletter/boletin";
-const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, resenas = false, construccion = false, googleAnalytics = "" } = Astro.props;
+const { nombre, logo, tienda = "/", colores = {}, maxDestacados, coloresGraficos = [], carrusel = false, contenido = false, boletines = false, revisionPagos = false, despacho = false, mensajes = false, resenas = false, construccion = false, googleAnalytics = "", pixelMeta = "" } = Astro.props;
 const gaValido = /^G-[A-Z0-9]{4,15}$/.test(googleAnalytics);
-const hayMedicion = gaValido;
+const metaValido = /^\d{15,16}$/.test(pixelMeta);
+const hayMedicion = gaValido || metaValido;
 const COLOR = /^#[0-9a-fA-F]{3,8}$/;
 const c = (v: string | undefined, d: string) => (v && COLOR.test(v) ? v : d);
 const tema = {
@@ -397,6 +403,12 @@ const graficos = coloresGraficos.filter((x) => COLOR.test(x)).slice(0, 5).join("
           <p>Visitas con más detalle: de dónde llegan, qué productos miran, cuántos los agregan al carrito y cuántos compran. Solo cuenta a quienes aceptan las cookies del aviso de la tienda.</p>
           <p><a class="pa-boton pa-boton--suave" href="https://analytics.google.com/" target="_blank" rel="noopener noreferrer">Abrir Google Analytics ↗</a></p>
           <p class="pa-tenue pa-chico">ID de medición: <code>{googleAnalytics}</code>. Los datos aparecen en Analytics unas horas después.</p>
+        </div>
+        <div class="pa-panel" data-pixel-meta hidden={!metaValido}>
+          <h2>Píxel de Meta (Facebook e Instagram)</h2>
+          <p>Mide qué pasa en la tienda después de que alguien ve o toca tus anuncios: visitas, productos agregados al carrito, quienes van a pagar y las compras. Solo cuenta a quienes aceptan las cookies del aviso de la tienda.</p>
+          <p><a class="pa-boton pa-boton--suave" href="https://business.facebook.com/events_manager2" target="_blank" rel="noopener noreferrer">Abrir el Administrador de eventos ↗</a></p>
+          <p class="pa-tenue pa-chico">Identificador del píxel: <code>{pixelMeta}</code>.</p>
         </div>
       </div>
 
