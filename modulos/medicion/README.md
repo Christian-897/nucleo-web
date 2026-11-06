@@ -31,6 +31,13 @@ solo las que usa; un sitio sin medición no carga nada ni muestra aviso.
 | Ir a pagar (datos OK) | `begin_checkout` | `InitiateCheckout` | `compra/cliente` (`iniciarCompra`) |
 | Compra pagada | `purchase` (`transaction_id`) | `Purchase` (`eventID` = orden) | la página `/pago/retorno` del sitio |
 
+La compra lleva **qué productos se compraron** (v0.47.1): al ir a pagar, la
+compra guarda en el navegador los productos (`nucleo:compra-en-curso`, 48 horas)
+y `avisarCompraConfirmada()` los usa en la página de retorno y luego los borra.
+Así Google muestra los artículos comprados y Meta los `content_ids` de la compra.
+Se guarda aunque la persona haya rechazado las cookies (es almacenamiento local,
+no se envía a nadie); solo se envía si aceptó.
+
 El píxel **no** usa la "coincidencia avanzada": nunca recibe correo, teléfono ni
 nombre del comprador.
 

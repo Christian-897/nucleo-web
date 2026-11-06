@@ -29,6 +29,8 @@ export interface DetalleIniciarCompra {
 export interface DetalleCompra {
   orden: string;
   monto: number;
+  /** Lo que se compró (los productos con que se fue a pagar). Puede venir vacío. */
+  productos: ProductoMedido[];
 }
 
 export interface EventoTienda {
@@ -102,12 +104,36 @@ export function emitirAgregar(p: Partial<ProductoMedido>): void {
   emitir(EVENTO_AGREGAR, { producto: limpiarProducto(p) } satisfies DetalleAgregar);
 }
 
-/** Lo llama la compra cuando los datos están bien y se va a pagar. */
+const CLAVE_EN_CURSO = "nucleo:compra-en-curso";
+const HORAS_EN_CURSO = 48;
+
+/**
+ * Lo llama la compra cuando los datos están bien y se va a pagar. Además
+ * guarda en el navegador qué productos se fueron a pagar, para que la
+ * página de retorno sepa qué se compró (aunque el carrito cambie).
+ */
 export function emitirIniciarCompra(productos: Partial<ProductoMedido>[], total?: number): void {
   const lista = productos.map(limpiarProducto);
   const suma = lista.reduce((a, p) => a + p.precio * p.cantidad, 0);
   const t = typeof total === "number" && Number.isFinite(total) && total >= 0 ? total : suma;
+  try {
+    localStorage.setItem(CLAVE_EN_CURSO, JSON.stringify({ productos: lista.slice(0, 50), fecha: Date.now() }));
+  } catch {
+    // Sin almacenamiento: la compra se medirá sin el detalle de productos.
+  }
   emitir(EVENTO_INICIAR_COMPRA, { productos: lista, total: t } satisfies DetalleIniciarCompra);
+}
+
+/** Los productos con que se fue a pagar (si es de las últimas 48 horas). */
+function leerCompraEnCurso(): ProductoMedido[] {
+  try {
+    const d = JSON.parse(localStorage.getItem(CLAVE_EN_CURSO) || "null");
+    if (!d || !Array.isArray(d.productos) || typeof d.fecha !== "number") return [];
+    if (Date.now() - d.fecha > HORAS_EN_CURSO * 3_600_000) return [];
+    return d.productos.slice(0, 50).map(limpiarProducto).filter((p: ProductoMedido) => p.productoId);
+  } catch {
+    return [];
+  }
 }
 
 const ORDEN_MEDIBLE = /^[A-Za-z0-9_-]{1,64}$/;
@@ -117,9 +143,10 @@ const CLAVE_MEDIDAS = "nucleo:compras-medidas";
  * Para la página de retorno del pago (`/pago/retorno`): avisa UNA vez por
  * orden que la compra quedó pagada, aunque la persona recargue la página.
  * Llamarla solo cuando `/api/pago/estado` responde `estado: "pagada"`.
- * Devuelve true si avisó.
+ * Los productos se toman de lo que se fue a pagar (lo guardó la compra);
+ * también se pueden pasar. Devuelve true si avisó.
  */
-export function avisarCompraConfirmada(orden: string, monto: number): boolean {
+export function avisarCompraConfirmada(orden: string, monto: number, productos?: Partial<ProductoMedido>[]): boolean {
   if (!ORDEN_MEDIBLE.test(String(orden)) || !Number.isFinite(Number(monto)) || Number(monto) < 0) return false;
   let medidas: string[] = [];
   try {
@@ -134,6 +161,12 @@ export function avisarCompraConfirmada(orden: string, monto: number): boolean {
   } catch {
     // Sin almacenamiento: igual se avisa (como mucho, se contaría de nuevo al recargar).
   }
-  emitir(EVENTO_COMPRA, { orden, monto: Number(monto) } satisfies DetalleCompra);
+  const lista = productos ? productos.map(limpiarProducto).filter((p) => p.productoId) : leerCompraEnCurso();
+  try {
+    localStorage.removeItem(CLAVE_EN_CURSO);
+  } catch {
+    /* nada */
+  }
+  emitir(EVENTO_COMPRA, { orden, monto: Number(monto), productos: lista } satisfies DetalleCompra);
   return true;
 }

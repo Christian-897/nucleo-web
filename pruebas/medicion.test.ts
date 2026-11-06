@@ -88,7 +88,18 @@ await prueba("compra: se avisa UNA vez por orden (aunque recargue) y se rechaza 
   assert.equal(avisarCompraConfirmada("SA-1234ABCD", 15980), false, "recargar no cuenta otra compra");
   assert.equal(avisarCompraConfirmada("<script>", 1), false);
   assert.equal(avisarCompraConfirmada("SA-OTRA0001", Number.NaN), false);
-  assert.deepEqual(compras, [{ orden: "SA-1234ABCD", monto: 15980 }]);
+  // Lleva los productos con que se fue a pagar (los guardó emitirIniciarCompra en la prueba anterior).
+  assert.deepEqual(compras, [{ orden: "SA-1234ABCD", monto: 15980, productos: [{ productoId: "lana~azul", nombre: "Lana · Azul", precio: 3990, cantidad: 2 }] }]);
+  assert.equal(datos.has("nucleo:compra-en-curso"), false, "se borra al avisar");
+  // Sin compra en curso: va sin productos. O se pueden pasar a mano.
+  avisarCompraConfirmada("SA-SINDATOS", 100);
+  avisarCompraConfirmada("SA-AMANO", 200, [{ productoId: "gato", nombre: "Gato", precio: 200, cantidad: 1 }]);
+  assert.deepEqual((compras[1] as { productos: unknown[] }).productos, []);
+  assert.equal((compras[2] as { productos: { productoId: string }[] }).productos[0].productoId, "gato");
+  // Una compra en curso de hace más de 48 horas no se usa.
+  datos.set("nucleo:compra-en-curso", JSON.stringify({ productos: [{ productoId: "viejo", nombre: "V", precio: 1, cantidad: 1 }], fecha: Date.now() - 49 * 3_600_000 }));
+  avisarCompraConfirmada("SA-VIEJA", 1);
+  assert.deepEqual((compras[3] as { productos: unknown[] }).productos, []);
 });
 
 await prueba("Google Analytics: ID válido y eventos traducidos sin datos del comprador", () => {
@@ -102,9 +113,12 @@ await prueba("Google Analytics: ID válido y eventos traducidos sin datos del co
   const inicio = eventoParaGoogle({ nombre: "nucleo:compra-iniciada", detalle: { productos: [p], total: 9980 } });
   assert.equal(inicio?.[0], "begin_checkout");
   assert.equal(inicio?.[1].value, 9980);
-  assert.deepEqual(eventoParaGoogle({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-1", monto: 9980 } }), [
+  assert.deepEqual(eventoParaGoogle({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-1", monto: 9980, productos: [] } }), [
     "purchase",
     { transaction_id: "SA-1", currency: "CLP", value: 9980 },
+  ]);
+  assert.deepEqual(eventoParaGoogle({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-2", monto: 7980, productos: [p] } })?.[1].items, [
+    { item_id: "lana~azul", item_name: "Lana · Azul", price: 3990, quantity: 2 },
   ]);
   assert.equal(eventoParaGoogle({ nombre: "otro", detalle: {} }), null);
   assert.equal(eventoParaGoogle({ nombre: EVENTO_AGREGAR, detalle: null }), null);
@@ -123,11 +137,14 @@ await prueba("píxel de Meta: identificador válido y eventos estándar, con eve
   assert.equal(inicio?.[0], "InitiateCheckout");
   assert.equal(inicio?.[1].num_items, 3);
   assert.deepEqual(inicio?.[1].content_ids, ["lana~azul", "gato"]);
-  assert.deepEqual(eventoParaMeta({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-1", monto: 9980 } }), [
+  assert.deepEqual(eventoParaMeta({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-1", monto: 9980, productos: [] } }), [
     "Purchase",
     { value: 9980, currency: "CLP", content_type: "product" },
     "SA-1",
   ]);
+  assert.deepEqual(eventoParaMeta({ nombre: EVENTO_COMPRA, detalle: { orden: "SA-2", monto: 7980, productos: [p] } })?.[1], {
+    value: 7980, currency: "CLP", content_type: "product", content_ids: ["lana~azul"], contents: [{ id: "lana~azul", quantity: 2 }], num_items: 2,
+  });
   assert.equal(eventoParaMeta({ nombre: "otro", detalle: {} }), null);
   // Nada del comprador: ni correo, ni teléfono, ni nombre de persona en ningún evento.
   const todo = JSON.stringify([inicio, eventoParaMeta({ nombre: EVENTO_AGREGAR, detalle: { producto: p } })]);

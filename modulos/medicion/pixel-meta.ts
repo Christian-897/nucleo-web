@@ -74,7 +74,15 @@ export function eventoParaMeta(e: EventoTienda, moneda = "CLP"): [string, Params
   if (e.nombre === EVENTO_COMPRA) {
     const x = d as unknown as DetalleCompra;
     if (!x.orden) return null;
-    return ["Purchase", { value: x.monto, currency: moneda, content_type: "product" }, x.orden];
+    const lista = Array.isArray(x.productos) ? x.productos : [];
+    const detalle = lista.length
+      ? {
+          content_ids: lista.map((p) => p.productoId),
+          contents: lista.map((p) => ({ id: p.productoId, quantity: p.cantidad })),
+          num_items: lista.reduce((a, p) => a + p.cantidad, 0),
+        }
+      : {};
+    return ["Purchase", { value: x.monto, currency: moneda, content_type: "product", ...detalle }, x.orden];
   }
   return null;
 }

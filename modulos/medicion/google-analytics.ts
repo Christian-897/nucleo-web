@@ -55,7 +55,8 @@ export function eventoParaGoogle(e: EventoTienda, moneda = "CLP"): [string, Para
   if (e.nombre === EVENTO_COMPRA) {
     const x = d as unknown as DetalleCompra;
     if (!x.orden) return null;
-    return ["purchase", { transaction_id: x.orden, currency: moneda, value: x.monto }];
+    const items = Array.isArray(x.productos) && x.productos.length ? { items: itemsGoogle(x.productos) } : {};
+    return ["purchase", { transaction_id: x.orden, currency: moneda, value: x.monto, ...items }];
   }
   return null;
 }
