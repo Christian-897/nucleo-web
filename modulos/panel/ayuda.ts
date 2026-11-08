@@ -482,7 +482,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     titulo: "Escribir el texto de una categoría (y cómo la describe Google)",
     palabras: ["texto categoría", "descripción categoría", "seo", "google", "posicionamiento", "aparecer en google", "espacio en blanco", "se ve vacío", "texto largo", "descripción larga"],
     contenido: [
-      "Cada categoría puede tener un texto propio. Se muestra en su página, junto a los productos (o debajo, si son muchos), y Google usa el comienzo para describirla en los resultados de búsqueda.",
+      "Cada categoría puede tener un texto propio. Se muestra en la página de esa categoría de la tienda (el lugar depende del diseño de tu sitio: arriba, junto o debajo de los productos), y Google usa el comienzo para describirla en los resultados de búsqueda. Si lo dejas vacío, no se ve nada.",
       { pasos: ["Ve a **Categorías** y toca **Editar** en la categoría.", "Escribe en **Texto de la categoría**. Puedes usar varios párrafos.", "Toca **Guardar cambios**. Se ve en la tienda en unos segundos."] },
       "Consejos para que ayude a vender y a aparecer en Google:",
       { pasos: ["Parte con qué es y para qué sirve, con las palabras que la gente busca. Ejemplo: «Fundas de almohada de satín que reducen el frizz y el quiebre mientras duermes».", "Después cuenta los beneficios, los cuidados y los tamaños.", "Escribe para personas, no repitas palabras de más. Los emojis se ven en la página, pero Google no los muestra."] },
@@ -522,7 +522,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
       "Cada diapositiva puede tener una **foto para celular**: vertical o cuadrada, para que en el teléfono no se corte la persona o el producto.",
       { pasos: ["Ve a **Portada** y toca **Editar** en la diapositiva.", "Abajo de la foto, toca **Elegir foto para celular**.", "Toca **Guardar cambios**."] },
       "Si no eliges una, en el celular se usa la foto normal. **Quitar la foto para celular** vuelve a eso.",
-      { nota: "Deja espacio libre donde van los textos (en la mayoría de los diseños, a la izquierda o arriba)." },
+      { nota: "Antes de guardar, mira cómo se ve en tu celular: según el diseño de tu sitio, el texto de la portada va encima de la foto o debajo. Si va encima, elige una foto con espacio libre donde caen los textos para que se lean bien." },
     ],
   },
 
