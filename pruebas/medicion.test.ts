@@ -20,6 +20,7 @@ const { escucharEventos, avisarCompraConfirmada, emitirIniciarCompra, EVENTO_AGR
 const { idGoogleAnalyticsValido, eventoParaGoogle } = await import("../modulos/medicion/google-analytics");
 const { crearCarrito } = await import("../modulos/carrito/cliente");
 const { idPixelMetaValido, eventoParaMeta } = await import("../modulos/medicion/pixel-meta");
+const { idClarityValido, eventoParaClarity } = await import("../modulos/medicion/clarity");
 
 let pasaron = 0;
 async function prueba(nombre: string, fn: () => Promise<void> | void) {
@@ -149,6 +150,18 @@ await prueba("píxel de Meta: identificador válido y eventos estándar, con eve
   // Nada del comprador: ni correo, ni teléfono, ni nombre de persona en ningún evento.
   const todo = JSON.stringify([inicio, eventoParaMeta({ nombre: EVENTO_AGREGAR, detalle: { producto: p } })]);
   assert.ok(!/email|correo|phone|telefono|fn|ln/i.test(todo.replace(/content_name/g, "")));
+});
+
+await prueba("Clarity: ID válido y la tienda marca las visitas sin datos del comprador", () => {
+  assert.equal(idClarityValido("abc12defgh"), true);
+  assert.equal(idClarityValido("ABC12DEFGH"), false, "Clarity usa minúsculas");
+  assert.equal(idClarityValido("abc"), false);
+  assert.equal(idClarityValido("abc12def<h"), false);
+  assert.equal(idClarityValido(undefined), false);
+  assert.equal(eventoParaClarity({ nombre: EVENTO_AGREGAR, detalle: { producto: { productoId: "x" } } }), "agregar_carrito");
+  assert.equal(eventoParaClarity({ nombre: "nucleo:compra-iniciada", detalle: {} }), "ir_a_pagar");
+  assert.equal(eventoParaClarity({ nombre: EVENTO_COMPRA, detalle: { orden: "A1", monto: 1 } }), "compra");
+  assert.equal(eventoParaClarity({ nombre: "otro", detalle: {} }), null);
 });
 
 console.log(`\n${pasaron} pruebas pasaron.`);

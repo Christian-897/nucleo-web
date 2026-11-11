@@ -66,6 +66,8 @@ prueba("encuentra lo que la gente escribe", () => {
     ["los números no cuadran", "medicion-numeros"],
     ["meta me pide pegar el código", "pixel-meta"],
     ["rechazar cookies", "aviso-cookies"],
+    ["mapa de calor", "clarity"],
+    ["grabaciones de las visitas", "clarity"],
     ["¿cómo cambio el precio de un producto?", "cambiar-precio"],
     ["agotado", "stock"],
     ["stok", "stock"],

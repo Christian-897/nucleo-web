@@ -12,6 +12,8 @@
 interface Props {
   /** El sitio usa medición de anuncios (píxel de Meta): el texto por defecto lo dice. */
   anuncios?: boolean;
+  /** El sitio usa grabaciones anónimas (Microsoft Clarity): el texto por defecto lo dice. */
+  grabaciones?: boolean;
   /** Página de la política de privacidad. */
   privacidad?: string;
   titulo?: string;
@@ -19,13 +21,18 @@ interface Props {
   aceptar?: string;
   rechazar?: string;
 }
-const { anuncios = false } = Astro.props;
+const { anuncios = false, grabaciones = false } = Astro.props;
+const queMide = [
+  "cuántas personas visitan la tienda",
+  "qué productos les interesan",
+  ...(grabaciones ? ["cómo usan la página (grabaciones anónimas de clics y desplazamiento, sin lo que escribes)"] : []),
+  ...(anuncios ? ["cómo funcionan nuestros anuncios en redes sociales"] : []),
+];
+const listaMide = queMide.length > 1 ? queMide.slice(0, -1).join(", ") + " y " + queMide[queMide.length - 1] : queMide[0];
 const {
   privacidad = "/privacidad/",
   titulo = "Cookies de medición",
-  texto = anuncios
-    ? "Usamos cookies para saber cuántas personas visitan la tienda, qué productos les interesan y cómo funcionan nuestros anuncios en redes sociales. Solo se activan si aceptas."
-    : "Usamos cookies para saber cuántas personas visitan la tienda y qué productos les interesan. Solo se activan si aceptas.",
+  texto = `Usamos cookies para saber ${listaMide}. Solo se activan si aceptas.`,
   aceptar = "Aceptar",
   rechazar = "Rechazar",
 } = Astro.props;

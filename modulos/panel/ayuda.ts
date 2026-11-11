@@ -171,6 +171,21 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     ],
   },
   {
+    id: "clarity",
+    seccion: "resumen",
+    titulo: "Ver cómo usan la tienda: mapas de calor y grabaciones (Clarity)",
+    palabras: ["clarity", "microsoft clarity", "mapa de calor", "mapas de calor", "heatmap", "grabaciones", "grabación", "videos de visitas", "dónde hacen clic", "dónde tocan", "abandonan", "se confunden"],
+    requiere: "[data-clarity]",
+    contenido: [
+      "Tu tienda está conectada a **Microsoft Clarity**, un servicio gratis que muestra **cómo** usan la tienda las personas: dónde tocan, hasta dónde bajan y en qué parte se van. Las grabaciones son anónimas y **no muestran lo que escriben** en los formularios.",
+      { pasos: ["En **Resumen**, baja hasta **Microsoft Clarity** y toca **Abrir Clarity ↗** (o entra a clarity.microsoft.com).", "Entra con la cuenta con que te dieron acceso (Google o Microsoft) y elige el proyecto de tu tienda.", "Arriba elige el período, por ejemplo **Últimos 7 días**."] },
+      "Lo que más sirve:",
+      { pasos: ["**Mapas de calor**: elige una página (por ejemplo, la de un producto) y mira dónde tocan más y hasta dónde llegan bajando. Si casi nadie llega al botón **Agregar al carrito**, conviene subir la información importante.", "**Grabaciones**: videos de visitas reales. Filtra por el evento **agregar_carrito**, **ir_a_pagar** o **compra** para ver solo a quienes llegaron a ese paso, o por **Clics de rabia** (tocan varias veces algo que no responde) para encontrar problemas.", "**Panel**: un resumen de clics muertos, clics de rabia y cuánto bajan en las páginas."] },
+      "Un uso práctico: si en **Pedidos** ves pocas compras pero muchos carritos, revisa en Clarity las grabaciones con **ir_a_pagar** para ver en qué paso se quedan.",
+      { nota: "Clarity **solo graba a quienes aceptan las cookies** y oculta lo que se escribe en los formularios. En Clarity → **Configuración → Enmascaramiento** debe quedar en **Equilibrado** o **Estricto**; no lo cambies a «Relajado»." },
+    ],
+  },
+  {
     id: "pixel-meta",
     seccion: "resumen",
     titulo: "El píxel de Meta: medir tus anuncios de Facebook e Instagram",
@@ -190,11 +205,11 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "medicion-numeros",
     seccion: "resumen",
-    titulo: "Por qué Analytics o Meta muestran menos visitas o ventas que las reales",
+    titulo: "Por qué Analytics, Clarity o Meta muestran menos visitas o ventas que las reales",
     palabras: ["no coinciden", "no cuadran", "menos visitas", "faltan ventas", "números distintos", "diferencia", "no aparece la prueba", "bloqueador"],
     requiere: "[data-medicion]",
     contenido: [
-      "Es normal. **Google Analytics y Meta solo cuentan a quienes tocan «Aceptar»** en el aviso de cookies, y tampoco a quienes usan un bloqueador de publicidad. En cambio, **Resumen → Visitas** cuenta a todos (sin cookies) y **Pedidos** tiene todas las ventas.",
+      "Es normal. **Google Analytics, Clarity y Meta solo cuentan a quienes tocan «Aceptar»** en el aviso de cookies, y tampoco a quienes usan un bloqueador de publicidad. En cambio, **Resumen → Visitas** cuenta a todos (sin cookies) y **Pedidos** tiene todas las ventas.",
       { pasos: ["Para saber **cuánto vendiste**: **Pedidos** y **Resumen**.", "Para saber **de dónde llega la gente y qué anuncio funciona mejor**: Google Analytics y Meta. Míralos como tendencia (qué sube, qué baja), no como número exacto."] },
       "Si hiciste una prueba y no aparece nada: revisa que tocaste **Aceptar**, prueba en el celular en una pestaña de incógnito (sin bloqueadores) y espera unos minutos. Si sigue sin aparecer, avísale a quien administra tu sitio.",
       "Tus clientes **siempre pueden comprar sin aceptar** las cookies: no cambia nada de la compra.",
@@ -207,7 +222,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
     palabras: ["cookies", "galletas", "aviso de cookies", "aceptar cookies", "rechazar cookies", "privacidad", "consentimiento", "banner", "ley de datos"],
     requiere: "[data-medicion]",
     contenido: [
-      "Como tu tienda usa medición (por ejemplo, Google Analytics o el píxel de Meta), a cada persona le aparece abajo un aviso para **Aceptar** o **Rechazar** las cookies de medición. Es para cumplir con la protección de datos: nadie es medido sin aceptar.",
+      "Como tu tienda usa medición (por ejemplo, Google Analytics, Microsoft Clarity o el píxel de Meta), a cada persona le aparece abajo un aviso para **Aceptar** o **Rechazar** las cookies de medición. Es para cumplir con la protección de datos: nadie es medido sin aceptar.",
       { pasos: ["**Aceptar**: se activa la medición para esa persona.", "**Rechazar**: no se activa nada. Puede comprar igual, sin ninguna diferencia.", "La decisión se recuerda **180 días** en ese navegador; después se vuelve a preguntar.", "Para cambiarla, en el pie de la tienda está **Preferencias de cookies**."] },
       "Si quieres ver el aviso otra vez (para probar), toca **Preferencias de cookies** en el pie de la tienda.",
       { nota: "Tu **política de privacidad** debe decir que usas cookies de medición y con qué herramienta. Si no lo dice, pídele a quien administra tu sitio que la actualice." },

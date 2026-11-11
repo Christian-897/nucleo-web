@@ -5,6 +5,7 @@ solo las que usa; un sitio sin medición no carga nada ni muestra aviso.
 
 - **Google Analytics 4** (`<GoogleAnalytics />`, v0.46).
 - **Píxel de Meta** para Facebook e Instagram (`<PixelMeta />`, v0.47).
+- **Microsoft Clarity**: mapas de calor y grabaciones anónimas (`<Clarity />`, v0.48).
 - Cada una es independiente: un sitio puede tener una, las dos o ninguna. El
   aviso (`<AvisoCookies />`) es uno solo para todas.
 
@@ -31,6 +32,9 @@ solo las que usa; un sitio sin medición no carga nada ni muestra aviso.
 | Ir a pagar (datos OK) | `begin_checkout` | `InitiateCheckout` | `compra/cliente` (`iniciarCompra`) |
 | Compra pagada | `purchase` (`transaction_id`) | `Purchase` (`eventID` = orden) | la página `/pago/retorno` del sitio |
 
+Clarity graba la visita completa y marca la sesión con `agregar_carrito`,
+`ir_a_pagar` y `compra` (solo el nombre del evento), para filtrar grabaciones.
+
 La compra lleva **qué productos se compraron** (v0.47.1): al ir a pagar, la
 compra guarda en el navegador los productos (`nucleo:compra-en-curso`, 48 horas)
 y `avisarCompraConfirmada()` los usa en la página de retorno y luego los borra.
@@ -55,10 +59,12 @@ se entera. Las herramientas los leen con `escucharEventos()`.
    import AvisoCookies from "nucleo-web/medicion/AvisoCookies.astro";
    import GoogleAnalytics from "nucleo-web/medicion/GoogleAnalytics.astro";
    import PixelMeta from "nucleo-web/medicion/PixelMeta.astro";
+   import Clarity from "nucleo-web/medicion/Clarity.astro";
    ---
    <GoogleAnalytics id={sitio.googleAnalytics} />   {/* sin id: no hace nada */}
    <PixelMeta id={sitio.pixelMeta} />               {/* 15 o 16 dígitos; sin id: nada */}
-   <AvisoCookies privacidad="/privacidad/" anuncios={Boolean(sitio.pixelMeta)} />
+   <Clarity id={sitio.clarity} />                   {/* minúsculas y números; sin id: nada */}
+   <AvisoCookies privacidad="/privacidad/" anuncios={Boolean(sitio.pixelMeta)} grabaciones={Boolean(sitio.clarity)} />
    ```
 
    Colores: variables `--cookies-fondo`, `--cookies-tinta`, `--cookies-acento`,
@@ -79,7 +85,7 @@ se entera. Las herramientas los leen con `escucharEventos()`.
    avisarCompraConfirmada(r.orden, r.monto); // una vez por orden, aunque recargue
    ```
 
-4. **Panel**: `<PanelAdmin … googleAnalytics={sitio.googleAnalytics} pixelMeta={sitio.pixelMeta} />`.
+4. **Panel**: `<PanelAdmin … googleAnalytics={sitio.googleAnalytics} pixelMeta={sitio.pixelMeta} clarity={sitio.clarity} />`.
    Muestra en Resumen el acceso a cada herramienta y activa sus temas de Ayuda
    («Ver las estadísticas en Google Analytics», «El píxel de Meta…» y «El aviso
    de cookies de la tienda»).
@@ -90,6 +96,14 @@ se entera. Las herramientas los leen con `escucharEventos()`.
    script-src  https://www.googletagmanager.com
    connect-src https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com
    img-src     https://*.google-analytics.com https://*.googletagmanager.com
+   ```
+
+   Con Clarity, además:
+
+   ```
+   script-src  https://www.clarity.ms https://*.clarity.ms
+   connect-src https://*.clarity.ms https://c.bing.com
+   img-src     https://*.clarity.ms https://c.bing.com
    ```
 
    Con el píxel de Meta, además:
@@ -128,3 +142,14 @@ flujo web) → ID de medición** y se ve como `G-ABC123XYZ9`.
 3. "Preferencias de cookies" → "Aceptar" → aparece `gtag/js?id=G-…` y en
    Analytics → **Informes → Tiempo real** se ve la visita.
 4. Agregar un producto: en Tiempo real aparece `add_to_cart`.
+
+## Microsoft Clarity: el proyecto y el acceso
+
+Lo crea quien mantiene el sitio en **clarity.microsoft.com** (se entra con
+Google o Microsoft): **Nuevo proyecto** → nombre y URL → al ofrecer
+instalación, elegir **instalar manualmente** y **no pegar el código**: solo
+copiar el ID del proyecto (en **Configuración → Información general**, unas
+10 letras y números) y ponerlo en la configuración del sitio. Revisar
+**Configuración → Enmascaramiento**: «Equilibrado» o «Estricto». Para
+entregarlo: **Configuración → Equipo → Agregar** con el correo del cliente y
+rol **Administrador**.

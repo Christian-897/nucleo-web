@@ -1,6 +1,7 @@
 /**
  * Módulo medicion: aviso de cookies + herramientas de medición opcionales.
- * Cada sitio activa SOLO las que usa: Google Analytics 4 y el píxel de Meta.
+ * Cada sitio activa SOLO las que usa: Google Analytics 4, Microsoft Clarity
+ * y el píxel de Meta.
  * Todo corre en el navegador; no hay variables nuevas en Cloudflare.
  */
 export {
@@ -25,4 +26,5 @@ export {
   type ProductoMedido,
 } from "./eventos";
 export { iniciarPixelMeta, idPixelMetaValido, eventoParaMeta, type OpcionesPixelMeta } from "./pixel-meta";
+export { iniciarClarity, idClarityValido, eventoParaClarity, type OpcionesClarity } from "./clarity";
 export { iniciarGoogleAnalytics, idGoogleAnalyticsValido, eventoParaGoogle, type OpcionesGoogleAnalytics } from "./google-analytics";

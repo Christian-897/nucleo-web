@@ -1,0 +1,22 @@
+---
+/**
+ * Microsoft Clarity (mapas de calor y grabaciones anónimas). Ponerlo UNA vez
+ * en el layout, junto a <AvisoCookies grabaciones />. No carga nada hasta que
+ * la persona acepta las cookies. Sin `id` (o con uno inválido) no hace nada.
+ *
+ *   <Clarity id="abc12defgh" />
+ */
+interface Props {
+  /** ID del proyecto (Clarity → Configuración → Información general). */
+  id?: string;
+}
+const { id = "" } = Astro.props;
+const valido = /^[a-z0-9]{8,14}$/.test(id);
+---
+{valido && <span hidden data-nucleo-clarity={id}></span>}
+
+<script>
+  import { iniciarClarity } from "../clarity";
+  const m = document.querySelector<HTMLElement>("[data-nucleo-clarity]");
+  if (m?.dataset.nucleoClarity) iniciarClarity({ id: m.dataset.nucleoClarity });
+</script>
