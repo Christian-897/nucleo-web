@@ -5,6 +5,7 @@ cliente. Todos van primero en el núcleo.
 
 | Idea | Para qué | Notas |
 |---|---|---|
+| **Panel por piezas** | Que un sitio copie solo los módulos que usa | Hoy el panel importa siempre catálogo, carrito, compra, despacho, newsletter, reseñas, carrusel y métricas, aunque el sitio no los use: un sitio de servicios (Novalis) lleva 118 archivos de 197. Plan: `crearPanel` recibe cada gestión ya armada por el sitio (productos, pedidos, boletines…) en vez de crearlas por dentro, y `panel-app.ts` se parte por pestaña con imports dinámicos. Mantener `crearPanel` actual como envoltorio para las tiendas existentes. Medir con `npm run armar-sitio -- <sitio> --revisar`. |
 | **Videos cortos en la portada** | Tutoriales verticales (YouTube Shorts o reels de Instagram) | Portada con ▶ y el reproductor se carga al tocar; editable desde el panel (enlace, título, orden). Instagram se ve con su marco blanco y pesa más. El video **por producto** ya existe (v0.22.0, YouTube): reutilizar `catalogo/video`. |
 | **Antes y después** | Dos fotos con barra deslizable | Mouse, dedo y teclado; editable desde el panel. Las fotos deben tener el mismo encuadre. |
 | **Redirigir `.pages.dev`** | No duplicar el sitio en Google | 301 hacia el dominio propio. |

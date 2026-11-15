@@ -68,6 +68,19 @@ npm run typecheck   # revisa el código del núcleo
 npm test            # corre las pruebas del módulo
 ```
 
+## Armar el núcleo de un sitio (v0.50)
+
+Cada sitio lleva dentro solo los archivos del núcleo que usa, en `nucleo/`:
+
+```bash
+npm run armar-sitio -- ../mi-sitio              # lee sus imports y copia lo necesario
+npm run armar-sitio -- ../mi-sitio --revisar    # solo muestra qué copiaría
+npm run armar-sitio -- ../mi-sitio --modulos contenido,cotizacion,pago-libre
+```
+
+En el sitio: `"nucleo-web": "file:./nucleo"` y `"zod"` en `dependencies`. Ver
+`docs/SITIO-NUEVO.md` (regla 4b).
+
 ## Módulos
 
 - **cotizacion** — formulario de presupuesto. (listo)

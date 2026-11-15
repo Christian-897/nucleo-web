@@ -18,8 +18,16 @@ de trabajo acordadas. Pensada para leerla al comienzo de cada chat nuevo.
 3. **Zip del núcleo:** solo los archivos cambiados (`git status --short`) y la
    versión subida en `package.json`.
 4. **Orden:** zip del núcleo → el usuario lo sube → verificar → el usuario crea
-   el release `vX.Y.Z` (target `main`) → zip del sitio (con la versión nueva en
-   su `package.json`). Si el sitio sube antes del release, el deploy falla.
+   el release `vX.Y.Z` (target `main`) → zip del sitio.
+4b. **Cada sitio lleva su núcleo adentro (desde v0.50).** El sitio NO descarga
+   el núcleo de GitHub al compilar: se copia en `<sitio>/nucleo/` solo lo que
+   usa, con `npm run armar-sitio -- <carpeta-del-sitio>` (o `--modulos a,b,c`
+   para un sitio sin código todavía; `--revisar` muestra qué copiaría). En el
+   `package.json` del sitio: `"nucleo-web": "file:./nucleo"` y `"zod"`. Así un
+   problema con el repo del núcleo (borrado, privado, caído) no deja a ningún
+   sitio sin poder publicar. `nucleo/VERSION.txt` dice qué versión y qué
+   módulos tiene; para actualizar un sitio se vuelve a armar desde la versión
+   nueva. GitHub sube máximo 100 archivos por vez: repartir en tandas.
 5. **Con cada zip, el bloque completo:** título y descripción del release en
    bloques de código y la ruta entera de pasos. Si algo cambia, repetir todo el
    bloque, no solo la diferencia.
