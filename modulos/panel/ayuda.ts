@@ -11,6 +11,8 @@
  *  - Al cambiar un botón o una función del panel, actualizar aquí también.
  */
 
+import { textoSegunModo, type ModoPanel } from "./modo";
+
 export type SeccionAyuda =
   | "general"
   | "resumen"
@@ -54,6 +56,11 @@ export interface TemaAyuda {
   requiere?: string;
   /** Solo lo hace la persona dueña del panel. */
   soloDueno?: boolean;
+  /**
+   * Solo en ese modo del panel (v0.49). Sin esto, el tema sirve en los dos
+   * y en modo servicios se adapta solo con textoSegunModo.
+   */
+  modo?: ModoPanel;
 }
 
 export const TEMAS_AYUDA: TemaAyuda[] = [
@@ -104,6 +111,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "boletas",
     seccion: "general",
+    modo: "tienda",
     titulo: "Boletas: cómo queda cada venta con su boleta",
     palabras: ["boleta", "boleta electrónica", "factura", "sii", "impuestos", "voucher", "comprobante de pago", "modelo de emisión", "e-boleta", "documento tributario", "transferencia", "proveedor de boletas", "automatizar boletas"],
     contenido: [
@@ -123,6 +131,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "resumen",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "Qué muestra el Resumen",
     palabras: ["ventas", "cuánto vendí", "estadísticas", "métricas", "gráficos", "más vendidos", "inicio del panel", "venta promedio"],
     contenido: [
@@ -134,6 +143,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "revision-pagos",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "«Hay cosas que revisar» en la Revisión de pagos",
     palabras: ["flow no reconoce", "pago no reconocido", "alerta", "cuadra", "cobro", "revisar pago", "pago dudoso", "no se pudo iniciar el pago", "falla el pago", "no puedo pagar", "error al pagar"],
     requiere: "[data-revision]",
@@ -147,6 +157,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "visitas",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "Cuántas personas visitan la tienda",
     palabras: ["visitas", "visitantes", "tráfico", "páginas vistas", "gente que entra", "conversión", "compran"],
     contenido: [
@@ -157,6 +168,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "google-analytics",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "Ver las estadísticas en Google Analytics",
     palabras: ["google analytics", "analytics", "analitycs", "estadísticas", "estadisticas", "informes", "de dónde llegan", "de dónde vienen las visitas", "tiempo real", "comercio electrónico", "productos más vendidos en analytics"],
     requiere: "[data-google-analytics]",
@@ -173,6 +185,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "clarity",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "Ver cómo usan la tienda: mapas de calor y grabaciones (Clarity)",
     palabras: ["clarity", "microsoft clarity", "mapa de calor", "mapas de calor", "heatmap", "grabaciones", "grabación", "videos de visitas", "dónde hacen clic", "dónde tocan", "abandonan", "se confunden"],
     requiere: "[data-clarity]",
@@ -188,6 +201,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "pixel-meta",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "El píxel de Meta: medir tus anuncios de Facebook e Instagram",
     palabras: ["meta", "píxel", "pixel", "facebook", "instagram", "anuncios", "publicidad", "campañas", "administrador de eventos", "administrador de anuncios", "conversiones", "fbq", "pegar el código"],
     requiere: "[data-pixel-meta]",
@@ -205,6 +219,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "medicion-numeros",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "Por qué Analytics, Clarity o Meta muestran menos visitas o ventas que las reales",
     palabras: ["no coinciden", "no cuadran", "menos visitas", "faltan ventas", "números distintos", "diferencia", "no aparece la prueba", "bloqueador"],
     requiere: "[data-medicion]",
@@ -218,6 +233,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "aviso-cookies",
     seccion: "resumen",
+    modo: "tienda",
     titulo: "El aviso de cookies de la tienda",
     palabras: ["cookies", "galletas", "aviso de cookies", "aceptar cookies", "rechazar cookies", "privacidad", "consentimiento", "banner", "ley de datos"],
     requiere: "[data-medicion]",
@@ -253,6 +269,57 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
       "Si no aparece el botón y dice que está encendido desde Cloudflare, pídele a quien administra tu sitio que lo abra.",
       "Si te pide **Tu clave para abrir o cerrar la tienda**, escribe la clave que creaste. Si te equivocas 5 veces, espera 15 minutos.",
       "Si no aparece el botón ni el enlace **Cambiar**, necesitas un código del dueño del panel.",
+    ],
+  },
+
+  {
+    id: "pagos-recibidos",
+    seccion: "resumen",
+    titulo: "Ver los pagos que hicieron tus clientes desde el sitio",
+    palabras: ["pagos", "anticipo", "saldo", "abono", "cuánto me pagaron", "transferencia", "flow", "mercado pago", "cuotas", "comprobante"],
+    requiere: "[data-pagos]",
+    contenido: [
+      "En **Resumen → Pagos recibidos** ves cada pago hecho desde la página **Pagar** del sitio: monto, quién pagó, qué pagó (anticipo, saldo o extra), con qué medio y cuándo. El más nuevo aparece arriba.",
+      "Solo aparecen los pagos **ya confirmados** por Flow o Mercado Pago. Cuando alguien paga, también te llega un correo de aviso, y a quien pagó le llega su comprobante.",
+      "Si la persona pagó en cuotas, a ti igual te llega el total: las cuotas las paga ella a su banco.",
+      { nota: "El monto lo escribe quien paga. Antes de empezar o entregar un trabajo, revisa que calce con lo que acordaron." },
+    ],
+  },
+  // ── Resumen en modo servicios (v0.49): sin ventas ni pedidos ──
+  {
+    id: "resumen-servicios",
+    seccion: "resumen",
+    modo: "servicios",
+    titulo: "Qué muestra el Resumen",
+    palabras: ["inicio del panel", "estadísticas", "métricas", "cuántos entran", "estado del sitio"],
+    contenido: [
+      "Es lo primero que ves al entrar: el **estado del sitio** (si está publicado o con el aviso de construcción) y las **visitas** de los últimos 7 o 30 días.",
+      "Las solicitudes de cotización y los mensajes están en la pestaña **Mensajes**. Si hay nuevos, la pestaña muestra un número.",
+    ],
+  },
+  {
+    id: "visitas-servicios",
+    seccion: "resumen",
+    modo: "servicios",
+    titulo: "Cuántas personas visitan el sitio",
+    palabras: ["visitas", "visitantes", "tráfico", "páginas vistas", "gente que entra", "de dónde llegan"],
+    contenido: [
+      "En **Resumen → Visitas** ves cuántas personas entraron, qué páginas miraron, de dónde llegaron y desde qué aparato. Puedes ver los últimos 7 o 30 días.",
+      "Si dice que no están conectadas, quien administra tu sitio puede activarlas.",
+    ],
+  },
+  {
+    id: "medicion-servicios",
+    seccion: "resumen",
+    modo: "servicios",
+    titulo: "Google Analytics, Clarity y el píxel de Meta",
+    palabras: ["google analytics", "analytics", "clarity", "mapa de calor", "grabaciones", "meta", "píxel", "pixel", "anuncios", "cookies", "aviso de cookies"],
+    requiere: "[data-medicion]",
+    contenido: [
+      "Si tu sitio tiene medición conectada, en **Resumen** aparece un cuadro por cada servicio con su botón para abrirlo:",
+      { pasos: ["**Google Analytics**: cuántas personas visitan el sitio, de dónde llegan (Google, Instagram, WhatsApp) y qué páginas miran.", "**Microsoft Clarity**: mapas de calor y grabaciones anónimas, para ver hasta dónde bajan y dónde se confunden.", "**Píxel de Meta**: mide qué pasa en el sitio después de que alguien ve o toca tus anuncios de Facebook e Instagram."] },
+      "Estos servicios **solo cuentan a quienes tocan «Aceptar»** en el aviso de cookies, así que muestran menos visitas que **Resumen → Visitas**. Míralos como tendencia, no como número exacto.",
+      { nota: "Tu política de privacidad debe decir que usas cookies de medición. Si no lo dice, pídele a quien administra tu sitio que la actualice." },
     ],
   },
 
@@ -707,6 +774,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "resenas-como-funcionan",
     seccion: "resenas",
+    modo: "tienda",
     titulo: "Cómo funcionan las reseñas",
     palabras: ["reseñas", "reseña", "opiniones", "opinión", "comentarios", "estrellas", "calificación", "valoración", "google estrellas", "compra verificada"],
     requiere: '[data-tab="resenas"]:not([hidden])',
@@ -743,6 +811,7 @@ export const TEMAS_AYUDA: TemaAyuda[] = [
   {
     id: "pedir-resena",
     seccion: "resenas",
+    modo: "tienda",
     titulo: "Pedir una reseña a mano (o volver a pedirla)",
     palabras: ["pedir reseña", "enviar reseña", "correo reseña", "no llegó el correo de reseña", "volver a pedir"],
     requiere: '[data-tab="resenas"]:not([hidden])',
@@ -995,3 +1064,33 @@ export function buscarAyuda(temas: TemaAyuda[], consulta: string): TemaAyuda[] {
   const corte = (resultados[0]?.puntaje ?? 0) * 0.4;
   return resultados.filter((r) => r.puntaje >= corte).map((r) => r.tema);
 }
+
+/** Secciones de la ayuda que solo existen en una tienda (v0.49). */
+const SECCIONES_SOLO_TIENDA = new Set<SeccionAyuda>(["productos", "categorias", "pedidos", "despacho", "suscriptores"]);
+
+function adaptarBloque(b: BloqueAyuda, modo: ModoPanel): BloqueAyuda {
+  if (typeof b === "string") return textoSegunModo(b, modo);
+  if ("pasos" in b) return { pasos: b.pasos.map((x) => textoSegunModo(x, modo)) };
+  return { nota: textoSegunModo(b.nota, modo) };
+}
+
+/**
+ * Los temas que corresponden a un modo del panel, con el texto adaptado
+ * (v0.49). En modo tienda devuelve los mismos de siempre, sin cambios.
+ */
+export function temasParaModo(temas: TemaAyuda[], modo: ModoPanel): TemaAyuda[] {
+  return temas
+    .filter((t) => (t.modo ?? modo) === modo)
+    .filter((t) => modo === "tienda" || !SECCIONES_SOLO_TIENDA.has(t.seccion))
+    .map((t) =>
+      modo === "tienda"
+        ? t
+        : { ...t, titulo: textoSegunModo(t.titulo, modo), contenido: t.contenido.map((b) => adaptarBloque(b, modo)) }
+    );
+}
+
+/** Nombre de una sección de la ayuda según el modo («Resumen y estado del sitio»). */
+export function nombreSeccion(seccion: SeccionAyuda, modo: ModoPanel): string {
+  return textoSegunModo(SECCIONES_AYUDA[seccion].nombre, modo);
+}
+

@@ -7,6 +7,8 @@ import type { Proveedor } from "./tipos";
 export interface ResultadoIniciarPago {
   ok: boolean;
   message?: string;
+  /** Errores por campo, cuando el sitio los entrega (v0.49). */
+  fieldErrors?: Record<string, string[]>;
 }
 
 /**
@@ -28,13 +30,14 @@ export async function irAPagar(
     const cuerpo = (await res.json().catch(() => ({}))) as {
       redirectUrl?: string;
       message?: string;
+      fieldErrors?: Record<string, string[]>;
     };
     // Solo se redirige a HTTPS de los proveedores conocidos.
     if (res.ok && cuerpo.redirectUrl && destinoPermitido(cuerpo.redirectUrl)) {
       window.location.href = cuerpo.redirectUrl;
       return { ok: true };
     }
-    return { ok: false, message: cuerpo.message ?? "No se pudo iniciar el pago." };
+    return { ok: false, message: cuerpo.message ?? "No se pudo iniciar el pago.", fieldErrors: cuerpo.fieldErrors };
   } catch {
     return { ok: false, message: "No hay conexión. Intenta nuevamente." };
   }

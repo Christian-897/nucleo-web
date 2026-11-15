@@ -29,6 +29,7 @@
  *   functions/api/admin/boletin-foto.ts    export const { onRequestPost } = panel.boletinFoto;
  *   functions/api/admin/despacho.ts        export const { onRequestGet, onRequestPost } = panel.despacho;
  *   functions/api/admin/mensajes.ts        export const { onRequestGet, onRequestPost } = panel.mensajes;
+ *   functions/api/admin/pagos.ts           export const { onRequestGet } = panel.pagos;   (v0.49, con pagos: true)
  *   functions/api/admin/resenas.ts         export const { onRequestGet, onRequestPost } = panel.resenas;
  *   functions/media/[id].ts                export const { onRequestGet } = panel.media;
  *   functions/admin/_middleware.ts         export const { onRequest } = panel.cabeceras;
@@ -56,6 +57,7 @@ import { crearResumen } from "./resumen";
 import { visitasPanel } from "./visitas";
 import { crearGestionProductos } from "./productos";
 import { crearGestionMensajes } from "./mensajes";
+import { crearGestionPagos } from "./pagos";
 import { crearGestionResenas } from "./resenas";
 import type { Resenas } from "../resenas/servidor";
 import { construccionGet, construccionPost } from "./construccion";
@@ -86,6 +88,11 @@ export interface OpcionesPanel extends ConfigPanel {
    */
   mensajes?: ConfigCotizacion;
   /**
+   * Pagos de monto libre (módulo pago-libre, v0.49). Con `true` hay cuadro
+   * "Pagos recibidos" en Resumen. Sin esto, la ruta responde 404.
+   */
+  pagos?: boolean;
+  /**
    * Reseñas de compradores verificados (crearResenas, v0.45): la MISMA instancia
    * que usa el formulario público. Sin ella, no hay pestaña "Reseñas" ni correo
    * para opinar al marcar un pedido como enviado.
@@ -109,6 +116,7 @@ export function crearPanel(opciones: OpcionesPanel) {
   const contenido = opciones.contenido ? crearGestionContenido(opciones.contenido, opciones) : null;
   const boletines = opciones.boletines ? crearGestionBoletines(opciones.boletines, opciones) : null;
   const mensajes = opciones.mensajes ? crearGestionMensajes(opciones.mensajes) : null;
+  const pagos = opciones.pagos ? crearGestionPagos() : null;
   const revision = opciones.revisionPagos
     ? crearRevisionPagos({ zonaHoraria: opciones.zonaHoraria, ...(opciones.revisionPagos === true ? {} : opciones.revisionPagos) })
     : null;
@@ -217,6 +225,10 @@ export function crearPanel(opciones: OpcionesPanel) {
       },
     },
     /** Mensajes del formulario de contacto (pestaña "Mensajes"). */
+    /** GET /api/admin/pagos: pagos de monto libre confirmados (v0.49). */
+    pagos: {
+      onRequestGet: (c: Ctx) => (pagos ? pagos.get(c) : noDisponible()),
+    },
     mensajes: {
       onRequestGet: (c: Ctx) => (mensajes ? mensajes.get(c) : noDisponible()),
       onRequestPost: (c: Ctx) => (mensajes ? mensajes.post(c) : noDisponible()),

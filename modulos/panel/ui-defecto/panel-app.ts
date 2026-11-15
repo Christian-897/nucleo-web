@@ -25,6 +25,7 @@ import {
 } from "./resumen-vista";
 import { crearVistaSitio } from "./sitio-vista";
 import { crearVistaAyuda } from "./ayuda-vista";
+import { leerModo, PESTANAS_SOLO_TIENDA, textoSegunModo } from "../modo";
 import { IDS_ZONAS, NOMBRES_RETIRO, nombreZona, textoRetiro, textosDespacho, type TarifasDespacho, type ZonaDespacho } from "../../despacho/calculo";
 
 type Vista = "cargando" | "no-disponible" | "instalar" | "invitacion" | "invitacion-vencida" | "entrar" | "codigo" | "resumen" | "productos" | "categorias" | "portada" | "sitio" | "pedidos" | "mensajes" | "resenas" | "suscriptores" | "seguridad";
@@ -95,6 +96,9 @@ interface Pedido {
 }
 
 const raiz = document.querySelector<HTMLElement>("[data-panel]")!;
+/** Modo del panel (v0.49): "servicios" esconde lo de tienda y habla de «el sitio». */
+const MODO = leerModo(raiz.dataset.modo);
+const tm = (texto: string) => textoSegunModo(texto, MODO);
 const $ = <T extends Element = HTMLElement>(sel: string, dentro: ParentNode = raiz) => dentro.querySelector<T>(sel)!;
 const $$ = <T extends Element = HTMLElement>(sel: string, dentro: ParentNode = raiz) => [...dentro.querySelectorAll<T>(sel)];
 
@@ -310,10 +314,13 @@ for (const b of $$<HTMLButtonElement>("[data-tab]")) {
 }
 
 async function abrirPestana(v: Vista) {
+  // En modo servicios no existen las pestañas de tienda (un enlace viejo o la ayuda no deben abrirlas).
+  if (MODO === "servicios" && (PESTANAS_SOLO_TIENDA as readonly string[]).includes(v)) v = "resumen";
   mostrar(v);
   if (v === "resumen") {
     void cargarRevision();
     void cargarConstruccion();
+    if (!$("[data-pagos]").hidden) void cargarPagos();
     await cargarResumen();
   }
   if (v === "productos") await cargarProductos();
@@ -2257,24 +2264,24 @@ function mostrarConstruccion(d: EstadoConstruccion) {
     ? ` Lo cambió ${d.por} el ${new Date(d.fecha).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}.`
     : "";
   if (!d.activo) {
-    titulo.textContent = "Tu tienda está abierta ✓";
-    detalle.textContent = "Si necesitas cerrarla un tiempo (vacaciones, cambios grandes), puedes mostrar el aviso «Sitio en construcción». Tus datos y pedidos no se borran." + quien;
+    titulo.textContent = tm("Tu tienda está abierta ✓");
+    detalle.textContent = tm("Si necesitas cerrarla un tiempo (vacaciones, cambios grandes), puedes mostrar el aviso «Sitio en construcción». Tus datos y pedidos no se borran." + quien);
     boton.textContent = "Mostrar aviso de construcción";
     boton.dataset.activo = "true";
     boton.hidden = !puede;
-    if (!puede) detalle.textContent = "Para cerrar la tienda necesitas un código del dueño del panel." + quien;
+    if (!puede) detalle.textContent = tm("Para cerrar la tienda necesitas un código del dueño del panel.") + quien;
     return;
   }
-  titulo.textContent = "Tu tienda muestra el aviso «Sitio en construcción»";
-  const tu = d.previa ? " Tú sí ves la tienda con «Ver tienda» (vista previa)." : "";
+  titulo.textContent = tm("Tu tienda muestra el aviso «Sitio en construcción»");
+  const tu = d.previa ? tm(" Tú sí ves la tienda con «Ver tienda» (vista previa).") : "";
   if (d.forzado) {
-    detalle.textContent = "Los clientes no pueden ver productos ni comprar. Está encendido desde Cloudflare: para abrir la tienda, pídeselo a quien administra el sitio." + tu;
+    detalle.textContent = tm("Los clientes no pueden ver productos ni comprar. Está encendido desde Cloudflare: para abrir la tienda, pídeselo a quien administra el sitio.") + tu;
     boton.hidden = true;
     return;
   }
   detalle.textContent = "Los clientes no pueden ver productos ni comprar." + quien + tu +
     (puede ? "" : " Para abrirla necesitas un código del dueño del panel.");
-  boton.textContent = "Abrir la tienda al público";
+  boton.textContent = tm("Abrir la tienda al público");
   boton.dataset.activo = "false";
   boton.hidden = !puede;
 }
@@ -2290,14 +2297,14 @@ $("[data-construccion-boton]").addEventListener("click", async (e) => {
   const b = e.currentTarget as HTMLButtonElement;
   const activo = b.dataset.activo === "true";
   const pregunta = activo
-    ? "¿Mostrar el aviso «Sitio en construcción»? Los clientes no podrán ver productos ni comprar hasta que vuelvas a abrir la tienda."
-    : "¿Abrir la tienda al público? Todos podrán ver productos y comprar.";
+    ? tm("¿Mostrar el aviso «Sitio en construcción»? Los clientes no podrán ver productos ni comprar hasta que vuelvas a abrir la tienda.")
+    : tm("¿Abrir la tienda al público? Todos podrán ver productos y comprar.");
   const campoClave = $<HTMLInputElement>("[data-construccion-clave]");
   const pideClave = !$("[data-construccion-clave-caja]").hidden;
   const clave = campoClave.value.trim();
   if (pideClave && !clave) {
     campoClave.focus();
-    return avisar("Escribe tu clave para abrir o cerrar la tienda.");
+    return avisar(tm("Escribe tu clave para abrir o cerrar la tienda."));
   }
   if (!confirm(pregunta)) return;
   b.disabled = true;
@@ -2309,7 +2316,7 @@ $("[data-construccion-boton]").addEventListener("click", async (e) => {
     return avisar(r.datos.message || "No se pudo cambiar. Intenta de nuevo.");
   }
   mostrarConstruccion(r.datos);
-  avisar(activo ? "Listo: aviso encendido. Puede tardar hasta un minuto en verse en todos lados." : "Listo: tienda abierta. Puede tardar hasta un minuto en verse en todos lados.");
+  avisar(activo ? "Listo: aviso encendido. Puede tardar hasta un minuto en verse en todos lados." : tm("Listo: tienda abierta. Puede tardar hasta un minuto en verse en todos lados."));
 });
 
 $<HTMLFormElement>('[data-form="activar-construccion"]').addEventListener("submit", async (e) => {
@@ -2326,7 +2333,7 @@ $<HTMLFormElement>('[data-form="activar-construccion"]').addEventListener("submi
     if (!r.ok) return errorDe(f, (r.datos as { message?: string }).message || "No se pudo activar.");
     f.reset();
     mostrarConstruccion(r.datos);
-    avisar("Listo: ya puedes abrir y cerrar la tienda con tu clave. Guárdala bien.");
+    avisar(tm("Listo: ya puedes abrir y cerrar la tienda con tu clave. Guárdala bien."));
   });
 });
 
@@ -2336,6 +2343,8 @@ $("[data-ir-construccion]").addEventListener("click", async () => {
 });
 
 async function cargarResumen() {
+  // Modo servicios: el Resumen solo tiene el estado del sitio y las visitas.
+  if (MODO === "servicios") return void cargarVisitas();
   const r = await obtener<ResumenPanel>(`${API}/resumen`);
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudo cargar el resumen.");
@@ -2363,6 +2372,39 @@ async function cargarResumen() {
   if (!f.desde.value) aplicarAtajo("30");
   else await cargarRango();
 }
+
+// ─── pagos de monto libre (v0.49) ───
+
+interface PagoRecibido { orden: string; fecha: string; nombre: string; email: string; concepto: string; detalle: string; monto: number; proveedor: string }
+const NOMBRE_PROVEEDOR: Record<string, string> = { flow: "Flow", mercadopago: "Mercado Pago" };
+
+async function cargarPagos() {
+  const lista = $("[data-pagos-lista]");
+  const nota = $("[data-pagos-nota]");
+  const r = await obtener<{ pagos: PagoRecibido[]; hayMas: boolean }>(`${API}/pagos`);
+  if (siSeCerro(r.status)) return;
+  if (!r.ok) {
+    nota.textContent = "No se pudieron cargar los pagos. Toca Actualizar.";
+    return;
+  }
+  lista.replaceChildren(
+    ...r.datos.pagos.map((p) => {
+      const li = crear("li", "pa-pago");
+      li.append(
+        crear("strong", "", `${formatearPrecio(p.monto)} · ${p.nombre}`),
+        crear("div", "pa-fila__datos", `${p.concepto}${p.detalle ? ` — ${p.detalle}` : ""}`),
+        crear("div", "pa-fila__datos pa-tenue", `${diaHora(p.fecha)} · ${NOMBRE_PROVEEDOR[p.proveedor] ?? p.proveedor} · ${p.email} · orden ${p.orden}`)
+      );
+      return li;
+    })
+  );
+  nota.textContent = !r.datos.pagos.length
+    ? "Todavía no hay pagos."
+    : r.datos.hayMas
+      ? "Se muestran los 100 más recientes. Los anteriores están en tu cuenta de Flow o Mercado Pago."
+      : "";
+}
+$("[data-pagos-recargar]").addEventListener("click", cargarPagos);
 
 // ─── visitas (Cloudflare Web Analytics) ───
 
@@ -3451,7 +3493,7 @@ function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendie
         if (u.abreTienda) {
           const p = u.permisoTienda;
           const desde = p ? ` · permiso desde el ${diaHora(p.desde)}${p.dadoPor ? `, dado por ${p.dadoPor}` : ""}` : "";
-          info.append(crear("div", "pa-fila__datos", "Abre y cierra la tienda con su clave" + desde));
+          info.append(crear("div", "pa-fila__datos", tm("Abre y cierra la tienda con su clave") + desde));
         }
       }
       li.append(info);
@@ -3467,7 +3509,7 @@ function pintarUsuarios(usuarios: FichaUsuario[], invitaciones: InvitacionPendie
           botones.append(restablecer);
         }
         if (u.abreTienda) {
-          const sinTienda = crear("button", "pa-boton pa-boton--suave pa-boton--chico", "Quitar permiso de abrir la tienda");
+          const sinTienda = crear("button", "pa-boton pa-boton--suave pa-boton--chico", tm("Quitar permiso de abrir la tienda"));
           sinTienda.type = "button";
           sinTienda.addEventListener("click", () => quitarClaveConstruccionPanel(u.usuario));
           botones.append(sinTienda);
@@ -3528,11 +3570,11 @@ async function permisoPedidosPanel(usuario: string, casilla: HTMLInputElement) {
 }
 
 async function quitarClaveConstruccionPanel(usuario: string) {
-  if (!confirm(`¿Quitarle a ${usuario} el permiso de abrir y cerrar la tienda? Su clave deja de servir. Para devolvérselo, crea un código nuevo.`)) return;
+  if (!confirm(tm(`¿Quitarle a ${usuario} el permiso de abrir y cerrar la tienda? Su clave deja de servir. Para devolvérselo, crea un código nuevo.`))) return;
   const r = await enviar(`${API}/seguridad`, { accion: "quitar-clave-construccion", usuario });
   if (siSeCerro(r.status)) return;
   if (!r.ok) return avisar(r.datos.message || "No se pudo quitar.");
-  avisar(`${usuario} ya no puede abrir ni cerrar la tienda.`);
+  avisar(tm(`${usuario} ya no puede abrir ni cerrar la tienda.`));
   await cargarSeguridad();
 }
 
@@ -3543,13 +3585,13 @@ function textoEvento(e: EventoConstruccion): string {
     case "codigo-anulado":
       return `${e.por} anuló un código${e.codigoCreado ? ` creado el ${diaHora(e.codigoCreado)}` : ""}`;
     case "permiso-dado":
-      return `${e.para} recibió permiso para abrir y cerrar la tienda (código de ${e.por}${e.codigoCreado ? `, creado el ${diaHora(e.codigoCreado)}` : ""})`;
+      return tm(`${e.para} recibió permiso para abrir y cerrar la tienda (código de ${e.por}${e.codigoCreado ? `, creado el ${diaHora(e.codigoCreado)}` : ""})`);
     case "permiso-quitado":
-      return `${e.por} le quitó a ${e.para} el permiso para abrir y cerrar la tienda`;
+      return tm(`${e.por} le quitó a ${e.para} el permiso para abrir y cerrar la tienda`);
     case "tienda-cerrada":
-      return `${e.por} cerró la tienda (aviso de construcción)`;
+      return tm(`${e.por} cerró la tienda (aviso de construcción)`);
     case "tienda-abierta":
-      return `${e.por} abrió la tienda al público`;
+      return tm(`${e.por} abrió la tienda al público`);
   }
 }
 

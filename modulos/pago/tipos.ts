@@ -56,8 +56,11 @@ export interface CobroCreado {
  * filtrar detalles internos.
  */
 export class ErrorPedido extends Error {
-  constructor(mensajePublico: string) {
+  /** Errores por campo, para marcarlos en el formulario (v0.49). Opcional. */
+  readonly fieldErrors?: Record<string, string[]>;
+  constructor(mensajePublico: string, fieldErrors?: Record<string, string[]>) {
     super(mensajePublico);
     this.name = "ErrorPedido";
+    if (fieldErrors) this.fieldErrors = fieldErrors;
   }
 }

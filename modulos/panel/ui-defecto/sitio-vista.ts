@@ -6,6 +6,7 @@
 import { enviar, obtener, reducirFoto, subirFotoContenido } from "../cliente";
 import { esColor, revisarContraste, type ParContraste } from "../../contenido/color";
 import type { Campo, Esquema, Valores } from "../../contenido/tipos";
+import { leerModo, textoSegunModo } from "../modo";
 
 interface FuentePanel {
   id: string;
@@ -154,17 +155,20 @@ export function crearVistaSitio(a: Ayudas) {
   }
 
   function vistaPrevia(): HTMLElement {
+    // En modo servicios (v0.49) la muestra habla de servicios, no de carrito.
+    const modo = leerModo(document.querySelector<HTMLElement>("[data-panel]")?.dataset.modo);
+    const tm = (texto: string) => textoSegunModo(texto, modo);
     const caja = crear("div", "pa-vista-previa");
     caja.dataset.sitioPrevia = "";
     caja.setAttribute("aria-hidden", "true");
-    caja.append(crear("div", "pa-vista-previa__franja", "Envíos a todo Chile · Compra segura"));
+    caja.append(crear("div", "pa-vista-previa__franja", tm("Envíos a todo Chile · Compra segura")));
     const cuerpo = crear("div", "pa-vista-previa__cuerpo");
     cuerpo.append(
       crear("p", "pa-vista-previa__firma", "Tu marca"),
       crear("span", "pa-vista-previa__marca"),
-      crear("p", "pa-vista-previa__titulo", "Productos destacados"),
-      crear("p", "pa-vista-previa__texto", "Así se ve el texto normal del sitio, con tildes y eñes: ¡Qué lindo tejido!"),
-      crear("span", "pa-vista-previa__boton", "Agregar al carrito")
+      crear("p", "pa-vista-previa__titulo", tm("Productos destacados")),
+      crear("p", "pa-vista-previa__texto", tm("Así se ve el texto normal del sitio, con tildes y eñes: ¡Qué lindo tejido!")),
+      crear("span", "pa-vista-previa__boton", tm("Agregar al carrito"))
     );
     caja.append(cuerpo, crear("div", "pa-vista-previa__pie", "Pie de página"));
     return caja;

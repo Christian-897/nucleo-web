@@ -30,3 +30,4 @@ export { crearRevisionPagos, type ConfigRevisionPagos } from "./revision-pagos";
 export { listarPedidos, type PedidoPanel } from "./pedidos";
 export { textoStock, ayudaVendidos, type TextoStock } from "./texto-stock";
 export { exigirSesion, type Ctx } from "./http";
+export { leerModo, textoSegunModo, PESTANAS_SOLO_TIENDA, type ModoPanel } from "./modo";

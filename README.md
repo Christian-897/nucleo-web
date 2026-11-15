@@ -73,6 +73,7 @@ npm test            # corre las pruebas del módulo
 - **cotizacion** — formulario de presupuesto. (listo)
 - **carrito** — carrito de compra con validación de precio/stock en servidor. (listo)
 - **pago** — cobro con Flow y Mercado Pago, verificación de monto, firma de webhooks e idempotencia. (listo)
+- **pago-libre** — la persona escribe el monto acordado (anticipo, saldo o extra) y paga con Flow o Mercado Pago, en cuotas si quiere; Turnstile, mínimo y máximo, aviso por correo y **Resumen → Pagos recibidos** en el panel. Para servicios que se cotizan caso a caso. (v0.49)
 - **catalogo** — productos desde JSON con validación y stock real en KV; nombre, nombre corto y foto de las categorías editables desde el panel. (listo)
 - **compra** — tienda completa: carrito + pago + datos del comprador + correos, en un llamado. (listo)
 - **construccion** — aviso de "sitio en construcción" con vista previa para el dueño, encendido por variable. (listo)
@@ -85,6 +86,7 @@ npm test            # corre las pruebas del módulo
 - **visitas** — las visitas de Cloudflare Web Analytics dentro del panel (7 o 30 días, páginas, países, dispositivos, de dónde llegan y cuántos compran), con una clave de solo lectura. (listo)
 - **medicion** — aviso de cookies (Aceptar / Rechazar, nada se carga antes de aceptar) y medición opcional por sitio: Google Analytics 4 (v0.46) y píxel de Meta (v0.47), cada una por separado, con visitas, agregar al carrito, ir a pagar y compras. Sin datos del comprador.
 - **panel** — administración propia: login + doble factor, productos con fotos, categorías, portada (carrusel), diseño y textos, pedidos, suscriptores con boletines y revisión de pagos con Flow. (listo)
+  Desde v0.49 tiene **modo servicios** (`<PanelAdmin modo="servicios" />`) para sitios que venden servicios y reciben cotizaciones: esconde Productos, Categorías, Pedidos, Suscriptores y las ventas del Resumen, y la ayuda y los avisos dicen «sitio» en vez de «tienda». Sin `modo`, el panel sigue siendo el de una tienda.
 - **newsletter** — suscripción con doble confirmación, baja con un clic, pedir el enlace de baja por correo, boletines desde el panel y exportación protegida. (listo)
 - _por venir:_ ver [docs/HOJA-DE-RUTA.md](docs/HOJA-DE-RUTA.md).
 

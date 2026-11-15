@@ -3,7 +3,8 @@
  * botón "? Ayuda" de arriba o desde el "?" de cada sección.
  * REGLA: todo con textContent / createElement; nunca innerHTML.
  */
-import { buscarAyuda, SECCIONES_AYUDA, TEMAS_AYUDA, type BloqueAyuda, type SeccionAyuda, type TemaAyuda } from "../ayuda";
+import { buscarAyuda, nombreSeccion, SECCIONES_AYUDA, TEMAS_AYUDA, temasParaModo, type BloqueAyuda, type SeccionAyuda, type TemaAyuda } from "../ayuda";
+import { leerModo, textoSegunModo } from "../modo";
 import { GUIAS_AYUDA } from "../guias";
 import { crearGuia } from "./guia-vista";
 
@@ -70,10 +71,12 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
   const filtroTexto = dialogo.querySelector<HTMLElement>("[data-ayuda-filtro-texto]")!;
   let secciones: SeccionAyuda[] | null = null;
   const guia = crearGuia({ raiz, irA });
+  // Modo del panel (v0.49): en "servicios" no hay temas de tienda y el texto dice «sitio».
+  const modo = leerModo(raiz.dataset.modo);
 
   /** Solo los temas de lo que este sitio tiene activo. */
   function temasDelSitio(): TemaAyuda[] {
-    return TEMAS_AYUDA.filter((t) => {
+    return temasParaModo(TEMAS_AYUDA, modo).filter((t) => {
       if (!t.requiere) return true;
       const el = raiz.querySelector<HTMLElement>(t.requiere);
       return Boolean(el) && !el!.hidden;
@@ -108,7 +111,7 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
       ver.textContent = "Muéstrame cómo";
       ver.addEventListener("click", () => {
         dialogo.close();
-        guia.iniciar(t.titulo, pasosGuia);
+        guia.iniciar(t.titulo, pasosGuia.map((p) => ({ ...p, texto: textoSegunModo(p.texto, modo) })));
       });
       acciones.append(ver);
     }
@@ -118,7 +121,7 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
       const ir = document.createElement("button");
       ir.type = "button";
       ir.className = "pa-boton pa-boton--suave pa-boton--chico";
-      ir.textContent = `Ir a ${SECCIONES_AYUDA[t.seccion].nombre}`;
+      ir.textContent = `Ir a ${nombreSeccion(t.seccion, modo)}`;
       ir.addEventListener("click", () => {
         dialogo.close();
         void irA(pestana);
@@ -137,7 +140,7 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
     const encontrados = consulta ? buscarAyuda(temas, consulta) : temas;
     lista.replaceChildren();
     if (!encontrados.length) {
-      estado.textContent = `No encontré nada sobre «${consulta}». Prueba con otras palabras (por ejemplo: precio, pedido, despacho, contraseña) o pregúntale a quien administra tu sitio.`;
+      estado.textContent = `No encontré nada sobre «${consulta}». Prueba con otras palabras (por ejemplo: ${modo === "servicios" ? "texto, foto, mensaje, contraseña" : "precio, pedido, despacho, contraseña"}) o pregúntale a quien administra tu sitio.`;
       return;
     }
     if (consulta) {
@@ -153,7 +156,7 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
         actual = t.seccion;
         const h = document.createElement("h3");
         h.className = "pa-ayuda__seccion";
-        h.textContent = SECCIONES_AYUDA[actual].nombre;
+        h.textContent = nombreSeccion(actual, modo);
         lista.append(h);
       }
       lista.append(articulo(t, false));
@@ -174,7 +177,7 @@ export function crearVistaAyuda({ raiz, irA }: OpcionesVista) {
 
   function abrir(pestana?: string) {
     secciones = pestana ? SECCIONES_DE_PESTANA[pestana] ?? null : null;
-    filtroTexto.textContent = secciones ? `Mostrando ayuda de ${secciones.map((s) => SECCIONES_AYUDA[s].nombre).join(" y ")}.` : "";
+    filtroTexto.textContent = secciones ? `Mostrando ayuda de ${secciones.map((s) => nombreSeccion(s, modo)).join(" y ")}.` : "";
     buscador.value = "";
     pintar();
     if (!dialogo.open) dialogo.showModal();

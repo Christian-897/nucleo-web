@@ -99,3 +99,17 @@ src/styles/                  tema.css y global.css
 functions/                   una línea por ruta, importando de src/servidor
 public/_headers              CSP y caché
 ```
+
+## Sitio de servicios (catálogo con cotización, sin tienda)
+
+Desde v0.49 el panel tiene **modo servicios**. Un sitio que vende servicios
+monta solo lo que usa (contenido, cotización, construcción) y pasa el modo:
+
+```astro
+<PanelAdmin nombre="Mi negocio" contenido mensajes construccion modo="servicios" />
+```
+
+Así el panel esconde Productos, Categorías, Pedidos, Suscriptores y las ventas
+del Resumen, y la ayuda, «Muéstrame cómo» y los avisos dicen «sitio» en vez de
+«tienda». Las funciones de tienda (`productos`, `categorias`, `pedidos`,
+`suscriptores`) no hace falta montarlas. Sitio de referencia: Novalis.

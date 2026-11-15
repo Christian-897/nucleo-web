@@ -175,7 +175,7 @@ export async function iniciarPago(
   try {
     pedido = await config.prepararPedido(cuerpo, env, request);
   } catch (e) {
-    if (e instanceof ErrorPedido) return jsonResponse(400, { message: e.message });
+    if (e instanceof ErrorPedido) return jsonResponse(400, e.fieldErrors ? { message: e.message, fieldErrors: e.fieldErrors } : { message: e.message });
     console.error("[pago] prepararPedido falló", e);
     return jsonResponse(400, { message: "No se pudo preparar tu pedido." });
   }
